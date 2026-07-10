@@ -114,9 +114,10 @@ function Cargar() {
         `¡Éxito! Se cargaron ${parsed.length} registros del archivo "${file.name}".`,
         { id: "save-inventory" }
       );
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      toast.error("Ocurrió un error al intentar guardar el inventario. Inténtalo de nuevo.", {
+      const errMsg = error.message || error.details || error.hint || "error desconocido";
+      toast.error(`Ocurrió un error al guardar: ${errMsg}`, {
         id: "save-inventory",
       });
     } finally {
