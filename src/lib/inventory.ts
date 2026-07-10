@@ -149,24 +149,101 @@ export function formatDateTime(iso: string): string {
   return dateTimeFormatter.format(date);
 }
 
-export function loadInventory(): {
-  rows: InventoryRow[];
-  updatedAt: string | null;
-} {
-  if (typeof window === "undefined") return { rows: [], updatedAt: null };
-  try {
-    const raw = window.localStorage.getItem(STORAGE_DATA_KEY);
-    const updatedAt = window.localStorage.getItem(STORAGE_UPDATED_KEY);
-    const rows = raw ? (JSON.parse(raw) as InventoryRow[]) : [];
-    return { rows, updatedAt: updatedAt ?? null };
-  } catch {
-    return { rows: [], updatedAt: null };
-  }
+import { supabase } from "@/integrations/supabase/client";
+
+interface InventoryDbRow {
+  referencia: string;
+  descripcion: string;
+  talla_lote: string;
+  color: string;
+  saldo: number;
+  talla: string;
+  cod_color: string;
+  sku: string;
+  pvm: number;
+  pvp: number;
+  created_at?: string;
 }
 
-export function saveInventory(rows: InventoryRow[]): string {
-  const updatedAt = new Date().toISOString();
-  window.localStorage.setItem(STORAGE_DATA_KEY, JSON.stringify(rows));
-  window.localStorage.setItem(STORAGE_UPDATED_KEY, updatedAt);
-  return updatedAt;
+function fromDb(row: InventoryDbRow): InventoryRow {
+  return {
+    referencia: row.referencia,
+    descripcion: row.descripcion,
+    tallaLote: row.talla_lote,
+    color: row.color,
+    saldo: row.saldo,
+    talla: row.talla,
+    codColor: row.cod_color,
+    sku: row.sku,
+    pvm: row.pvm,
+    pvp: row.pvp,
+  };
+}
+
+function toDb(row: InventoryRow): InventoryDbRow {
+  return {
+    referencia: row.referencia,
+    descripcion: row.descripcion,
+    talla_lote: row.tallaLote,
+    color: row.color,
+    saldo: row.saldo,
+    talla: row.talla,
+    cod_color: row.codColor,
+    sku: row.sku,
+    pvm: row.pvm,
+    pvp: row.pvp,
+  };
+}
+
+/** Load the shared inventory from the database. */
+export async function loadInventory(): Promise<{
+  rows: InventoryRow[];
+  updatedAt: string | null;
+}> {
+  const { data, error } = await supabase
+    .from("inventory")
+    .select("*")
+    .order("referencia", { ascending: true });
+
+  if (error) throw error;
+
+  const rows = (data ?? []).map(fromDb);
+  const updatedAt = (data ?? []).reduce<string | null>((latest, row) => {
+    const created = (row as InventoryDbRow).created_at ?? null;
+    if (!created) return latest;
+    if (!latest || created > latest) return created;
+    return latest;
+  }, null);
+
+  return { rows, updatedAt };
+}
+
+/** Replace the entire shared inventory with a new dataset. */
+export async function saveInventory(rows: InventoryRow[]): Promise<string> {
+  // Clear existing inventory.
+  const { error: deleteError } = await supabase
+    .from("inventory")
+    .delete()
+    .not("id", "is", null);
+  if (deleteError) throw deleteError;
+
+  // Insert new records in batches.
+  const payload = rows.map(toDb);
+  const batchSize = 500;
+  for (let i = 0; i < payload.length; i += batchSize) {
+    const batch = payload.slice(i, i + batchSize);
+    const { error: insertError } = await supabase
+      .from("inventory")
+      .insert(batch);
+    if (insertError) throw insertError;
+  }
+
+  // Read back the latest timestamp for an accurate "last updated" value.
+  const { data } = await supabase
+    .from("inventory")
+    .select("created_at")
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  return data?.[0]?.created_at ?? new Date().toISOString();
 }

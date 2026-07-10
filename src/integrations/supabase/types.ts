@@ -14,7 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      inventory: {
+        Row: {
+          cod_color: string
+          color: string
+          created_at: string
+          descripcion: string
+          id: string
+          pvm: number
+          pvp: number
+          referencia: string
+          saldo: number
+          sku: string
+          talla: string
+          talla_lote: string
+        }
+        Insert: {
+          cod_color?: string
+          color?: string
+          created_at?: string
+          descripcion?: string
+          id?: string
+          pvm?: number
+          pvp?: number
+          referencia: string
+          saldo?: number
+          sku?: string
+          talla?: string
+          talla_lote?: string
+        }
+        Update: {
+          cod_color?: string
+          color?: string
+          created_at?: string
+          descripcion?: string
+          id?: string
+          pvm?: number
+          pvp?: number
+          referencia?: string
+          saldo?: number
+          sku?: string
+          talla?: string
+          talla_lote?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

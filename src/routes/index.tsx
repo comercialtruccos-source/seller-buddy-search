@@ -36,10 +36,22 @@ function Index() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const { rows, updatedAt } = loadInventory();
-    setRows(rows);
-    setUpdatedAt(updatedAt);
-    setHydrated(true);
+    let active = true;
+    (async () => {
+      try {
+        const { rows, updatedAt } = await loadInventory();
+        if (!active) return;
+        setRows(rows);
+        setUpdatedAt(updatedAt);
+      } catch {
+        if (active) toast.error("No se pudo cargar el inventario.");
+      } finally {
+        if (active) setHydrated(true);
+      }
+    })();
+    return () => {
+      active = false;
+    };
   }, []);
 
   const groups = useMemo(() => groupByReferencia(rows), [rows]);
@@ -56,14 +68,18 @@ function Index() {
         toast.error("El archivo no contiene referencias válidas.");
         return;
       }
-      const savedAt = saveInventory(parsed);
+      toast.loading("Guardando inventario…", { id: "save-inventory" });
+      const savedAt = await saveInventory(parsed);
       setRows(parsed);
       setUpdatedAt(savedAt);
       toast.success(
         `Inventario actualizado: ${parsed.length} registros cargados.`,
+        { id: "save-inventory" },
       );
     } catch {
-      toast.error("No se pudo leer el archivo. Verifica que sea un CSV.");
+      toast.error("No se pudo guardar el archivo. Intenta de nuevo.", {
+        id: "save-inventory",
+      });
     }
   };
 
