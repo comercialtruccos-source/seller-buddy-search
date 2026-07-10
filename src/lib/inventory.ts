@@ -25,8 +25,8 @@ export interface ReferenceGroup {
 export const STORAGE_DATA_KEY = "inventario_data";
 export const STORAGE_UPDATED_KEY = "inventario_actualizado";
 
-/** Parse a single CSV line respecting quoted fields. */
-function parseLine(line: string): string[] {
+/** Parse a single CSV line respecting quoted fields and dynamic separator. */
+function parseLine(line: string, separator: string = ","): string[] {
   const result: string[] = [];
   let current = "";
   let inQuotes = false;
@@ -39,7 +39,7 @@ function parseLine(line: string): string[] {
       } else {
         inQuotes = !inQuotes;
       }
-    } else if (char === "," && !inQuotes) {
+    } else if (char === separator && !inQuotes) {
       result.push(current);
       current = "";
     } else {
@@ -50,9 +50,41 @@ function parseLine(line: string): string[] {
   return result.map((v) => v.trim());
 }
 
+/** Robust number parsing supporting both Spanish (dots/commas thousands) and standard numbers. */
 function toNumber(value: string): number {
   if (!value) return 0;
-  const cleaned = value.replace(/[^0-9.-]/g, "");
+  
+  // Clean spaces, dollar signs
+  let cleaned = value.trim().replace(/[\$\s]/g, "");
+  
+  // Check if it's formatted in Spanish (e.g., 98.651,00 or 98.651)
+  if (cleaned.includes(",") && cleaned.includes(".")) {
+    const lastCommaIdx = cleaned.lastIndexOf(",");
+    const lastDotIdx = cleaned.lastIndexOf(".");
+    if (lastCommaIdx > lastDotIdx) {
+      // Dot is thousands, comma is decimal (Spanish format)
+      cleaned = cleaned.replace(/\./g, "").replace(/,/g, ".");
+    } else {
+      // Comma is thousands, dot is decimal (English format)
+      cleaned = cleaned.replace(/,/g, "");
+    }
+  } else if (cleaned.includes(",")) {
+    // Only commas: could be thousands (e.g. 98,651) or decimal (e.g. 98,65)
+    // If comma is followed by exactly 3 digits, it is likely a thousands separator.
+    const parts = cleaned.split(",");
+    if (parts.length === 2 && parts[1].length === 3) {
+      cleaned = cleaned.replace(/,/g, "");
+    } else {
+      cleaned = cleaned.replace(/,/g, ".");
+    }
+  } else if (cleaned.includes(".")) {
+    // Only dots: could be thousands (e.g. 98.651) or decimal (e.g. 98.65)
+    const parts = cleaned.split(".");
+    if (parts.length === 2 && parts[1].length === 3) {
+      cleaned = cleaned.replace(/\./g, "");
+    }
+  }
+  
   const n = Number(cleaned);
   return Number.isFinite(n) ? n : 0;
 }
@@ -83,7 +115,13 @@ function isValidImageUrl(url: string | undefined): boolean {
 }
 
 export function parseInventoryCsv(text: string): InventoryRow[] {
-  const lines = text
+  // Remove UTF-8 BOM if present
+  let cleanText = text;
+  if (cleanText.startsWith("\ufeff")) {
+    cleanText = cleanText.substring(1);
+  }
+
+  const lines = cleanText
     .replace(/\r\n/g, "\n")
     .replace(/\r/g, "\n")
     .split("\n")
@@ -91,8 +129,14 @@ export function parseInventoryCsv(text: string): InventoryRow[] {
 
   if (lines.length === 0) return [];
 
-  // Parse headers to see if we have a photo/image column.
-  const headers = parseLine(lines[0]).map((h) => h.toLowerCase());
+  // Dynamically detect separator: count commas vs semicolons on the header line
+  const firstLine = lines[0];
+  const commaCount = (firstLine.match(/,/g) || []).length;
+  const semicolonCount = (firstLine.match(/;/g) || []).length;
+  const separator = semicolonCount > commaCount ? ";" : ",";
+
+  // Parse headers using the detected separator
+  const headers = parseLine(lines[0], separator).map((h) => h.toLowerCase());
   const photoIdx = headers.findIndex(
     (h) => h.includes("foto") || h.includes("imagen") || h.includes("image")
   );
@@ -101,7 +145,7 @@ export function parseInventoryCsv(text: string): InventoryRow[] {
   const rows: InventoryRow[] = [];
 
   for (const line of dataLines) {
-    const cols = parseLine(line);
+    const cols = parseLine(line, separator);
     if (cols.length < 10) continue;
     const referencia = cols[0];
     if (!referencia) continue;
