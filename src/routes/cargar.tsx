@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   AlertCircle,
   FileWarning,
+  Link2,
 } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import {
@@ -21,11 +22,69 @@ export const Route = createFileRoute("/cargar")({
 function Cargar() {
   const [dragActive, setDragActive] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncUrl, setSyncUrl] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("sync_csv_url") || "";
+    }
+    return "";
+  });
   const [uploadedInfo, setUploadedInfo] = useState<{
     count: number;
     filename: string;
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleSyncFromUrl = async () => {
+    const trimmedUrl = syncUrl.trim();
+    if (!trimmedUrl) {
+      toast.error("Por favor ingresa una URL válida.");
+      return;
+    }
+
+    try {
+      setIsSyncing(true);
+      setUploadedInfo(null);
+      
+      // Save URL to localStorage so they don't have to re-paste
+      localStorage.setItem("sync_csv_url", trimmedUrl);
+
+      toast.loading("Descargando inventario desde la URL…", { id: "sync-inventory" });
+      
+      const res = await fetch(trimmedUrl);
+      if (!res.ok) {
+        throw new Error(`Error de red: ${res.status} ${res.statusText}`);
+      }
+      
+      const text = await res.text();
+      const parsed = parseInventoryCsv(text);
+      
+      if (parsed.length === 0) {
+        toast.error("No se encontraron registros válidos. Verifica que la URL sea un CSV con el formato correcto.", { id: "sync-inventory" });
+        return;
+      }
+
+      toast.loading("Guardando inventario en Supabase…", { id: "sync-inventory" });
+      await saveInventory(parsed);
+      
+      setUploadedInfo({
+        count: parsed.length,
+        filename: "Enlace en la nube",
+      });
+      
+      toast.success(
+        `¡Éxito! Se cargaron e integraron ${parsed.length} registros desde la URL.`,
+        { id: "sync-inventory" }
+      );
+    } catch (error: any) {
+      console.error(error);
+      toast.error(`Error al sincronizar: ${error.message || "error desconocido"}`, {
+        id: "sync-inventory",
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const handleFile = async (file: File) => {
     if (!file.name.endsWith(".csv")) {
@@ -171,6 +230,43 @@ function Cargar() {
                 </p>
               </div>
             )}
+          </div>
+
+          {/* Divider */}
+          <div className="my-6 flex items-center justify-between">
+            <span className="h-px bg-border flex-1" />
+            <span className="text-[10px] font-extrabold text-muted-foreground/60 px-3 uppercase tracking-wider">O también</span>
+            <span className="h-px bg-border flex-1" />
+          </div>
+
+          {/* URL Sync Block */}
+          <div className="bg-muted/30 border border-border/80 rounded-2xl p-5 shadow-xs">
+            <h3 className="text-sm font-bold text-foreground mb-1 flex items-center gap-2">
+              <Link2 className="h-4 w-4 text-accent" />
+              Sincronizar desde URL pública (CSV)
+            </h3>
+            <p className="text-xs text-muted-foreground mb-4 leading-relaxed">
+              Ingresa el enlace de tu Google Sheets publicado como CSV para sincronizar las cantidades sin descargar archivos.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                type="url"
+                value={syncUrl}
+                onChange={(e) => setSyncUrl(e.target.value)}
+                placeholder="https://docs.google.com/spreadsheets/d/.../pub?output=csv"
+                className="flex-1 rounded-xl border border-border bg-background px-3.5 py-2 text-sm text-foreground focus:border-accent focus:ring-1 focus:ring-accent outline-hidden"
+              />
+              <button
+                onClick={handleSyncFromUrl}
+                disabled={isSyncing || isUploading || !syncUrl.trim()}
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary px-5 py-2.5 text-xs font-bold text-primary-foreground hover:bg-primary/95 transition-all shadow-xs active:scale-[0.98] disabled:opacity-50 select-none cursor-pointer"
+              >
+                {isSyncing ? "Sincronizando..." : "Sincronizar"}
+              </button>
+            </div>
+            <div className="mt-3 text-[10px] text-muted-foreground/75 leading-relaxed bg-accent/5 rounded-lg p-2.5 border border-accent/10">
+              <span className="font-bold text-accent">¿Cómo obtener este enlace?</span> En tu hoja de cálculo de Google Sheets, ve a <strong>Archivo &gt; Compartir &gt; Publicar en la Web</strong>. Elige todo el documento o una pestaña específica, selecciona el formato <strong>Valores separados por comas (.csv)</strong> y copia la URL generada.
+            </div>
           </div>
 
           {/* Upload Status Card */}
