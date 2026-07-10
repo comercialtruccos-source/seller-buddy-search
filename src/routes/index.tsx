@@ -1,8 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Search,
-  Upload,
   Clock,
   PackageSearch,
   Tag,
@@ -17,8 +16,6 @@ import {
   formatDateTime,
   groupByReferencia,
   loadInventory,
-  parseInventoryCsv,
-  saveInventory,
   searchReferences,
   type InventoryRow,
   type ReferenceGroup,
@@ -33,7 +30,6 @@ function Index() {
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [hydrated, setHydrated] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let active = true;
@@ -60,35 +56,6 @@ function Index() {
     [groups, query],
   );
 
-  const handleFile = async (file: File) => {
-    try {
-      const text = await file.text();
-      const parsed = parseInventoryCsv(text);
-      if (parsed.length === 0) {
-        toast.error("El archivo no contiene referencias válidas.");
-        return;
-      }
-      toast.loading("Guardando inventario…", { id: "save-inventory" });
-      const savedAt = await saveInventory(parsed);
-      setRows(parsed);
-      setUpdatedAt(savedAt);
-      toast.success(
-        `Inventario actualizado: ${parsed.length} registros cargados.`,
-        { id: "save-inventory" },
-      );
-    } catch {
-      toast.error("No se pudo guardar el archivo. Intenta de nuevo.", {
-        id: "save-inventory",
-      });
-    }
-  };
-
-  const onInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) handleFile(file);
-    e.target.value = "";
-  };
-
   return (
     <div className="min-h-screen bg-background">
       <Toaster position="top-center" richColors />
@@ -108,23 +75,6 @@ function Index() {
                 Consulta de precios detal y mayorista
               </p>
             </div>
-          </div>
-
-          <div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv,text/csv"
-              className="hidden"
-              onChange={onInputChange}
-            />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-accent-foreground transition-opacity hover:opacity-90"
-            >
-              <Upload className="h-4 w-4" />
-              Cargar inventario
-            </button>
           </div>
         </div>
       </header>
