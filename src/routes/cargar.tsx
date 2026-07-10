@@ -14,6 +14,7 @@ import {
   parseInventoryCsv,
   saveInventory,
 } from "@/lib/inventory";
+import { downloadCsvFromUrl } from "@/lib/shopify";
 
 export const Route = createFileRoute("/cargar")({
   component: Cargar,
@@ -51,12 +52,8 @@ function Cargar() {
 
       toast.loading("Descargando inventario desde la URL…", { id: "sync-inventory" });
       
-      const res = await fetch(trimmedUrl);
-      if (!res.ok) {
-        throw new Error(`Error de red: ${res.status} ${res.statusText}`);
-      }
-      
-      const text = await res.text();
+      // Fetch via server-side function to bypass browser CORS block and provide clear errors
+      const text = await downloadCsvFromUrl({ data: trimmedUrl });
       const parsed = parseInventoryCsv(text);
       
       if (parsed.length === 0) {

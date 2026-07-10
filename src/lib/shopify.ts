@@ -55,3 +55,33 @@ export const getShopifyProductImage = createServerFn({ method: "GET" })
       return null;
     }
   });
+
+export const downloadCsvFromUrl = createServerFn({ method: "GET" })
+  .validator((url: string) => url)
+  .handler(async ({ data: url }) => {
+    try {
+      if (!url) return "";
+      
+      const response = await fetch(url, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Accept": "text/csv,text/plain,application/csv,*/*",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error de servidor remoto: ${response.status} ${response.statusText}`);
+      }
+
+      const contentType = response.headers.get("content-type") || "";
+      if (contentType.includes("text/html")) {
+        throw new Error("El enlace requiere iniciar sesión (Microsoft / OneDrive) y no permite la descarga directa de datos.");
+      }
+
+      const text = await response.text();
+      return text;
+    } catch (error: any) {
+      console.error(`Error downloading CSV from URL ${url}:`, error);
+      throw new Error(error.message || "Error al descargar el archivo desde el servidor");
+    }
+  });
