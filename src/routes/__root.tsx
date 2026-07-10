@@ -95,13 +95,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Buscador de Referencias | Consulta de Inventario" },
+      { name: "twitter:description", content: "Consulta rápida de referencias con precios detal y mayorista para vendedores." },
+      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/A2hF0rKLaKhRs6wwliRCCbBkUIf1/social-images/social-1783693253988-TR-Isotipo.webp" },
+      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/A2hF0rKLaKhRs6wwliRCCbBkUIf1/social-images/social-1783693253988-TR-Isotipo.webp" },
     ],
     links: [
       {
         rel: "stylesheet",
         href: appCss,
       },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       {
         rel: "preconnect",
