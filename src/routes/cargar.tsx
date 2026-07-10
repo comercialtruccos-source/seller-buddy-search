@@ -216,7 +216,7 @@ function Cargar() {
                 "SKU",
                 "PVM UNIT",
                 "PVP UNIT",
-                "Foto / Imagen (Opcional)",
+                "Image (Opcional)",
               ].map((h) => (
                 <span key={h} className="rounded bg-muted px-2 py-1 text-foreground border border-border">
                   {h}

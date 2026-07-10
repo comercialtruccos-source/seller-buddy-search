@@ -61,6 +61,27 @@ function toNumber(value: string): number {
  * Parse the inventory CSV. Expected headers:
  * Referencia, Descripción, Talla - Lote, Color, Saldo, Talla, CodColor, SKU, PVM UNIT, PVP UNIT
  */
+function isValidImageUrl(url: string | undefined): boolean {
+  if (!url) return false;
+  const u = url.trim().toLowerCase();
+  if (
+    u === "" ||
+    u === "#n/d" ||
+    u === "#n/a" ||
+    u === "#ref!" ||
+    u === "#value!" ||
+    u === "#valor!" ||
+    u === "n/a" ||
+    u === "n/d" ||
+    u === "null" ||
+    u === "undefined"
+  ) {
+    return false;
+  }
+  // Ignore values that don't look like URLs or paths (must contain a dot or slash)
+  return u.includes(".") || u.includes("/");
+}
+
 export function parseInventoryCsv(text: string): InventoryRow[] {
   const lines = text
     .replace(/\r\n/g, "\n")
@@ -98,10 +119,17 @@ export function parseInventoryCsv(text: string): InventoryRow[] {
       pvp: toNumber(cols[9]),
     };
 
+    let rawImgUrl = "";
     if (photoIdx !== -1 && cols[photoIdx]) {
-      row.imageUrl = cols[photoIdx];
+      rawImgUrl = cols[photoIdx];
     } else if (cols[10]) {
-      row.imageUrl = cols[10];
+      rawImgUrl = cols[10];
+    }
+
+    if (isValidImageUrl(rawImgUrl)) {
+      row.imageUrl = rawImgUrl.trim();
+    } else {
+      row.imageUrl = "";
     }
 
     rows.push(row);
