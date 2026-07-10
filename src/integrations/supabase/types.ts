@@ -21,6 +21,7 @@ export type Database = {
           created_at: string
           descripcion: string
           id: string
+          image_url: string
           pvm: number
           pvp: number
           referencia: string
@@ -35,6 +36,7 @@ export type Database = {
           created_at?: string
           descripcion?: string
           id?: string
+          image_url?: string
           pvm?: number
           pvp?: number
           referencia: string
@@ -49,6 +51,7 @@ export type Database = {
           created_at?: string
           descripcion?: string
           id?: string
+          image_url?: string
           pvm?: number
           pvp?: number
           referencia?: string

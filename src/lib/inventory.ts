@@ -9,6 +9,7 @@ export interface InventoryRow {
   sku: string;
   pvm: number; // precio mayorista (PVM UNIT)
   pvp: number; // precio detal (PVP UNIT)
+  imageUrl?: string;
 }
 
 export interface ReferenceGroup {
@@ -18,6 +19,7 @@ export interface ReferenceGroup {
   pvp: number;
   totalSaldo: number;
   variantes: InventoryRow[];
+  imageUrl?: string;
 }
 
 export const STORAGE_DATA_KEY = "inventario_data";
@@ -68,7 +70,12 @@ export function parseInventoryCsv(text: string): InventoryRow[] {
 
   if (lines.length === 0) return [];
 
-  // Skip header row.
+  // Parse headers to see if we have a photo/image column.
+  const headers = parseLine(lines[0]).map((h) => h.toLowerCase());
+  const photoIdx = headers.findIndex(
+    (h) => h.includes("foto") || h.includes("imagen") || h.includes("image")
+  );
+
   const dataLines = lines.slice(1);
   const rows: InventoryRow[] = [];
 
@@ -77,7 +84,8 @@ export function parseInventoryCsv(text: string): InventoryRow[] {
     if (cols.length < 10) continue;
     const referencia = cols[0];
     if (!referencia) continue;
-    rows.push({
+
+    const row: InventoryRow = {
       referencia,
       descripcion: cols[1] ?? "",
       tallaLote: cols[2] ?? "",
@@ -88,7 +96,15 @@ export function parseInventoryCsv(text: string): InventoryRow[] {
       sku: cols[7] ?? "",
       pvm: toNumber(cols[8]),
       pvp: toNumber(cols[9]),
-    });
+    };
+
+    if (photoIdx !== -1 && cols[photoIdx]) {
+      row.imageUrl = cols[photoIdx];
+    } else if (cols[10]) {
+      row.imageUrl = cols[10];
+    }
+
+    rows.push(row);
   }
 
   return rows;
@@ -105,6 +121,9 @@ export function groupByReferencia(rows: InventoryRow[]): ReferenceGroup[] {
       // Keep the max known prices in case of inconsistencies.
       existing.pvm = existing.pvm || row.pvm;
       existing.pvp = existing.pvp || row.pvp;
+      if (!existing.imageUrl && row.imageUrl) {
+        existing.imageUrl = row.imageUrl;
+      }
     } else {
       map.set(row.referencia, {
         referencia: row.referencia,
@@ -113,6 +132,7 @@ export function groupByReferencia(rows: InventoryRow[]): ReferenceGroup[] {
         pvp: row.pvp,
         totalSaldo: row.saldo,
         variantes: [row],
+        imageUrl: row.imageUrl,
       });
     }
   }
@@ -162,6 +182,7 @@ interface InventoryDbRow {
   sku: string;
   pvm: number;
   pvp: number;
+  image_url?: string;
   created_at?: string;
 }
 
@@ -177,6 +198,7 @@ function fromDb(row: InventoryDbRow): InventoryRow {
     sku: row.sku,
     pvm: row.pvm,
     pvp: row.pvp,
+    imageUrl: row.image_url ?? "",
   };
 }
 
@@ -192,6 +214,7 @@ function toDb(row: InventoryRow): InventoryDbRow {
     sku: row.sku,
     pvm: row.pvm,
     pvp: row.pvp,
+    image_url: row.imageUrl ?? "",
   };
 }
 

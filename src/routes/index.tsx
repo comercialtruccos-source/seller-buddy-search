@@ -8,8 +8,10 @@ import {
   Boxes,
   FileWarning,
   CheckCircle2,
+  Image as ImageIcon,
 } from "lucide-react";
 import { toast, Toaster } from "sonner";
+import { useQuery } from "@tanstack/react-query";
 
 import {
   formatCurrency,
@@ -20,6 +22,7 @@ import {
   type InventoryRow,
   type ReferenceGroup,
 } from "@/lib/inventory";
+import { getShopifyProductImage } from "@/lib/shopify";
 
 export const Route = createFileRoute("/")({
   component: Index,
@@ -173,77 +176,126 @@ function EmptyState({
 }
 
 function ReferenceCard({ group }: { group: ReferenceGroup }) {
+  // Query Shopify search suggestion API to fetch product image in live mode
+  const { data: shopifyProduct, isLoading } = useQuery({
+    queryKey: ["shopifyProduct", group.referencia],
+    queryFn: () => getShopifyProductImage({ data: group.referencia }),
+    staleTime: 1000 * 60 * 60, // Cache for 1 hour
+    enabled: !group.imageUrl, // Only fetch if we don't have a custom image URL in inventory data
+  });
+
+  const imageUrl = group.imageUrl || shopifyProduct?.imageUrl;
+  const shopifyUrl = shopifyProduct?.shopifyUrl;
+
   return (
-    <article className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-      {/* Card header */}
-      <div className="border-b border-border px-5 py-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-md bg-primary px-2 py-0.5 font-mono text-sm font-semibold text-primary-foreground">
-            {group.referencia}
-          </span>
-          <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-            <Boxes className="h-3.5 w-3.5" />
-            {group.totalSaldo} unidades
-          </span>
+    <article className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm hover:shadow-md transition-all duration-300 flex flex-col md:flex-row">
+      {/* Product Image Section */}
+      <div className="relative w-full md:w-48 bg-muted shrink-0 aspect-[3/4] md:aspect-auto md:min-h-[220px] overflow-hidden border-b md:border-b-0 md:border-r border-border">
+        {isLoading ? (
+          <div className="absolute inset-0 bg-muted/60 animate-pulse flex items-center justify-center">
+            <Boxes className="h-8 w-8 text-accent animate-spin" />
+          </div>
+        ) : imageUrl ? (
+          <a
+            href={shopifyUrl || "#"}
+            target={shopifyUrl ? "_blank" : undefined}
+            rel="noopener noreferrer"
+            className={`block h-full w-full group relative ${shopifyUrl ? "cursor-pointer" : "cursor-default"}`}
+          >
+            <img
+              src={imageUrl}
+              alt={group.descripcion}
+              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+              loading="lazy"
+            />
+            {shopifyUrl && (
+              <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-center pb-3">
+                <span className="bg-background/90 backdrop-blur-xs text-[10px] font-bold text-foreground px-2.5 py-1 rounded-full shadow-sm">
+                  Ver en tienda
+                </span>
+              </div>
+            )}
+          </a>
+        ) : (
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground/30 p-4">
+            <ImageIcon className="h-10 w-10 mb-2 stroke-1" />
+            <span className="text-xs font-semibold text-center select-none">Sin foto</span>
+          </div>
+        )}
+      </div>
+
+      {/* Product Info Section */}
+      <div className="flex-1 flex flex-col justify-between">
+        {/* Card header */}
+        <div className="px-5 py-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-md bg-primary px-2 py-0.5 font-mono text-sm font-semibold text-primary-foreground">
+              {group.referencia}
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+              <Boxes className="h-3.5 w-3.5" />
+              {group.totalSaldo} unidades
+            </span>
+          </div>
+          <h2 className="mt-2 text-xl font-bold text-foreground">
+            {group.descripcion}
+          </h2>
         </div>
-        <h2 className="mt-2 text-xl font-bold text-foreground">
-          {group.descripcion}
-        </h2>
-      </div>
 
-      {/* Prices */}
-      <div className="grid grid-cols-1 gap-px bg-border sm:grid-cols-2">
-        <PriceBlock
-          label="Precio Detal (PVP)"
-          value={formatCurrency(group.pvp)}
-          highlight
-        />
-        <PriceBlock
-          label="Precio Mayorista (PVM)"
-          value={formatCurrency(group.pvm)}
-        />
-      </div>
+        {/* Prices */}
+        <div className="grid grid-cols-1 gap-px bg-border sm:grid-cols-2 border-t border-border">
+          <PriceBlock
+            label="Precio Detal (PVP)"
+            value={formatCurrency(group.pvp)}
+            highlight
+          />
+          <PriceBlock
+            label="Precio Mayorista (PVM)"
+            value={formatCurrency(group.pvm)}
+          />
+        </div>
 
-      {/* Variants table */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
-              <th className="px-5 py-3 font-semibold">Talla</th>
-              <th className="px-5 py-3 font-semibold">Color</th>
-              <th className="px-5 py-3 text-right font-semibold">Saldo</th>
-              <th className="px-5 py-3 font-semibold">SKU</th>
-            </tr>
-          </thead>
-          <tbody>
-            {group.variantes.map((v, i) => (
-              <tr
-                key={v.sku || i}
-                className="border-b border-border last:border-0"
-              >
-                <td className="px-5 py-3 font-medium">{v.talla || "—"}</td>
-                <td className="px-5 py-3">{v.color || "—"}</td>
-                <td className="px-5 py-3 text-right">
-                  <span
-                    className={
-                      v.saldo > 0
-                        ? "inline-flex items-center gap-1 font-semibold text-foreground"
-                        : "text-muted-foreground"
-                    }
-                  >
-                    {v.saldo > 0 && (
-                      <CheckCircle2 className="h-3.5 w-3.5 text-accent" />
-                    )}
-                    {v.saldo}
-                  </span>
-                </td>
-                <td className="px-5 py-3 font-mono text-xs text-muted-foreground">
-                  {v.sku || "—"}
-                </td>
+        {/* Variants table */}
+        <div className="overflow-x-auto border-t border-border">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground bg-muted/30">
+                <th className="px-5 py-2 font-semibold">Talla</th>
+                <th className="px-5 py-2 font-semibold">Color</th>
+                <th className="px-5 py-2 text-right font-semibold">Saldo</th>
+                <th className="px-5 py-2 font-semibold">SKU</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {group.variantes.map((v, i) => (
+                <tr
+                  key={v.sku || i}
+                  className="border-b border-border last:border-0"
+                >
+                  <td className="px-5 py-2 font-medium">{v.talla || "—"}</td>
+                  <td className="px-5 py-2">{v.color || "—"}</td>
+                  <td className="px-5 py-2 text-right">
+                    <span
+                      className={
+                        v.saldo > 0
+                          ? "inline-flex items-center gap-1 font-semibold text-foreground"
+                          : "text-muted-foreground"
+                      }
+                    >
+                      {v.saldo > 0 && (
+                        <CheckCircle2 className="h-3.5 w-3.5 text-accent" />
+                      )}
+                      {v.saldo}
+                    </span>
+                  </td>
+                  <td className="px-5 py-2 font-mono text-xs text-muted-foreground">
+                    {v.sku || "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </article>
   );
