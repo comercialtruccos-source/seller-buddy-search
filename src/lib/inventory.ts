@@ -146,7 +146,6 @@ export function parseInventoryCsv(text: string): InventoryRow[] {
 
   for (const line of dataLines) {
     const cols = parseLine(line, separator);
-    if (cols.length < 10) continue;
     const referencia = cols[0];
     if (!referencia) continue;
 
@@ -211,13 +210,70 @@ export function groupByReferencia(rows: InventoryRow[]): ReferenceGroup[] {
   return Array.from(map.values());
 }
 
+function normalizeText(str: string): string {
+  return str
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+}
+
+function normalizeCode(str: string): string {
+  return str.toLowerCase().replace(/[^a-z0-9]/gi, "").trim();
+}
+
 export function searchReferences(
   groups: ReferenceGroup[],
   query: string,
 ): ReferenceGroup[] {
-  const q = query.trim().toLowerCase();
-  if (!q) return [];
-  return groups.filter((g) => g.referencia.toLowerCase().includes(q));
+  const cleanQuery = query.trim();
+  if (!cleanQuery) return [];
+
+  // Normalize query words for text search
+  const words = normalizeText(cleanQuery).split(/\s+/).filter(Boolean);
+  if (words.length === 0) return [];
+
+  // Code-based query (remove spaces, hyphens, dots, etc.)
+  const queryCode = normalizeCode(cleanQuery);
+
+  return groups.filter((group) => {
+    const normRef = normalizeText(group.referencia);
+    const normRefCode = normalizeCode(group.referencia);
+    const normDesc = normalizeText(group.descripcion);
+
+    // 1. Direct code search (Reference code or SKU exact/prefix match)
+    if (queryCode.length >= 3 && normRefCode.includes(queryCode)) {
+      return true;
+    }
+
+    if (queryCode.length >= 3) {
+      const matchesSku = group.variantes.some((v) => {
+        const normSku = normalizeCode(v.sku);
+        return normSku.includes(queryCode);
+      });
+      if (matchesSku) return true;
+    }
+
+    // 2. Word-by-word search (AND logic across Reference, Description, Color, SKU)
+    return words.every((word) => {
+      // Word matches reference
+      if (normRef.includes(word)) return true;
+      // Word matches description
+      if (normDesc.includes(word)) return true;
+      // Word matches color in any variant
+      const matchesColor = group.variantes.some((v) =>
+        normalizeText(v.color).includes(word)
+      );
+      if (matchesColor) return true;
+      // Word matches SKU in any variant
+      const matchesSku = group.variantes.some((v) =>
+        normalizeText(v.sku).includes(word)
+      );
+      if (matchesSku) return true;
+
+      return false;
+    });
+  });
 }
 
 const currencyFormatter = new Intl.NumberFormat("es-CO", {

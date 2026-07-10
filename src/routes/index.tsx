@@ -111,7 +111,7 @@ function Index() {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar por referencia (ej: B01020061)"
+            placeholder="Buscar por referencia, descripción, color o SKU (ej: B0102, cargo, azul)"
             className="w-full rounded-2xl border border-border bg-card py-4 pl-12 pr-4 text-base shadow-sm outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-accent/30"
             autoFocus
           />
@@ -132,7 +132,7 @@ function Index() {
             query.trim() === "" && (
               <EmptyState
                 icon={<Search className="h-8 w-8" />}
-                title="Escribe una referencia"
+                title="Busca por referencia, descripción o SKU"
                 description={`${groups.length} referencias disponibles para consultar.`}
               />
             )}
