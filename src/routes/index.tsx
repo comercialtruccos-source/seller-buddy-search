@@ -180,8 +180,6 @@ function EmptyState({
 }
 
 function ReferenceCard({ group }: { group: ReferenceGroup }) {
-  const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
-
   // Query Shopify search suggestion API to fetch product image in live mode
   const { data: shopifyProduct, isLoading } = useQuery({
     queryKey: ["shopifyProduct", group.referencia],
@@ -286,142 +284,60 @@ function ReferenceCard({ group }: { group: ReferenceGroup }) {
           />
         </div>
 
-        {/* Inventory View Toggle */}
-        <div className="px-5 py-2.5 border-t border-border flex items-center justify-between bg-muted/10">
+        {/* Inventory Header */}
+        <div className="px-5 py-3 border-t border-border flex items-center bg-muted/10">
           <span className="text-[11px] font-extrabold uppercase tracking-wider text-muted-foreground">
             Disponibilidad de Inventario
           </span>
-          <div className="flex rounded-lg border border-border bg-card p-0.5 shadow-xs">
-            <button
-              onClick={() => setViewMode("grid")}
-              className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-bold transition-all ${
-                viewMode === "grid"
-                  ? "bg-primary text-primary-foreground shadow-xs"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <LayoutGrid className="h-3.5 w-3.5" />
-              Matriz
-            </button>
-            <button
-              onClick={() => setViewMode("table")}
-              className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-bold transition-all ${
-                viewMode === "table"
-                  ? "bg-primary text-primary-foreground shadow-xs"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Table className="h-3.5 w-3.5" />
-              Tabla
-            </button>
-          </div>
         </div>
 
-        {/* Variants Content */}
-        {viewMode === "grid" ? (
-          <div className="p-5 space-y-4 border-t border-border">
-            {variantsByColor.map(([color, variants]) => (
-              <div
-                key={color}
-                className="flex flex-col sm:flex-row sm:items-start gap-3 border-b border-border/50 last:border-0 pb-4 last:pb-0"
-              >
-                <div className="flex items-center gap-2 w-32 shrink-0 pt-1">
-                  <span className="h-2 w-2 rounded-full bg-accent" />
-                  <span className="text-sm font-bold text-foreground capitalize">
-                    {color}
-                  </span>
-                </div>
-                <div className="flex flex-wrap gap-2 flex-1">
-                  {variants.map((v) => {
-                    const hasStock = v.saldo > 0;
-                    const isLowStock = v.saldo > 0 && v.saldo <= 5;
-                    const isHighStock = v.saldo > 10;
-
-                    let badgeColor = "bg-muted text-muted-foreground/60 border-border opacity-40 line-through cursor-not-allowed";
-                    if (hasStock) {
-                      if (isLowStock) {
-                        badgeColor = "bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-900/30 hover:bg-amber-100 dark:hover:bg-amber-950/40 hover:border-amber-300";
-                      } else if (isHighStock) {
-                        badgeColor = "bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900/30 hover:bg-emerald-100 dark:hover:bg-emerald-950/40 hover:border-emerald-300";
-                      } else {
-                        badgeColor = "bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-950/40 hover:border-blue-300";
-                      }
-                    }
-
-                    return (
-                      <button
-                        key={v.sku}
-                        disabled={!hasStock}
-                        onClick={() => copySku(v.sku, v.talla, color)}
-                        className={`inline-flex items-center gap-2 border px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-150 group relative ${badgeColor}`}
-                        title={hasStock ? `Click para copiar SKU: ${v.sku}` : "Sin stock disponible"}
-                      >
-                        <span>Talla {v.talla}</span>
-                        <span className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded-md text-[10px] font-extrabold ${
-                          !hasStock ? "bg-muted/50 text-muted-foreground/40" : "bg-white/80 dark:bg-black/20"
-                        }`}>
-                          {v.saldo}
-                        </span>
-                        {hasStock && (
-                          <Copy className="h-3.5 w-3.5 opacity-0 group-hover:opacity-60 transition-opacity ml-0.5" />
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
+        {/* Variants Content (Grid Matrix Only) */}
+        <div className="p-5 space-y-4 border-t border-border">
+          {variantsByColor.map(([color, variants]) => (
+            <div
+              key={color}
+              className="flex flex-col sm:flex-row sm:items-start gap-3 border-b border-border/50 last:border-0 pb-4 last:pb-0"
+            >
+              <div className="flex items-center gap-2 w-32 shrink-0 pt-1">
+                <span className="h-2 w-2 rounded-full bg-accent" />
+                <span className="text-sm font-bold text-foreground capitalize">
+                  {color}
+                </span>
               </div>
-            ))}
-          </div>
-        ) : (
-          <div className="overflow-x-auto border-t border-border">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground bg-muted/30">
-                  <th className="px-5 py-2.5 font-semibold">Talla</th>
-                  <th className="px-5 py-2.5 font-semibold">Color</th>
-                  <th className="px-5 py-2.5 text-right font-semibold">Saldo</th>
-                  <th className="px-5 py-2.5 font-semibold">SKU (Click para copiar)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {group.variantes.map((v, i) => (
-                  <tr
-                    key={v.sku || i}
-                    className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors"
-                  >
-                    <td className="px-5 py-2.5 font-medium">{v.talla || "—"}</td>
-                    <td className="px-5 py-2.5 capitalize">{v.color || "—"}</td>
-                    <td className="px-5 py-2.5 text-right">
-                      <span
-                        className={
-                          v.saldo > 0
-                            ? "inline-flex items-center gap-1 font-semibold text-foreground"
-                            : "text-muted-foreground"
-                        }
-                      >
-                        {v.saldo > 0 && (
-                          <CheckCircle2 className="h-3.5 w-3.5 text-accent" />
-                        )}
+              <div className="flex flex-wrap gap-2 flex-1">
+                {variants.map((v) => {
+                  const hasStock = v.saldo > 0;
+
+                  let badgeColor = "bg-muted text-muted-foreground/60 border-border opacity-30 line-through cursor-not-allowed";
+                  if (hasStock) {
+                    // Unified brand denim blue color palette for all active stock sizes
+                    badgeColor = "bg-accent/10 text-primary border-accent/25 hover:bg-accent/20 dark:bg-accent/15 dark:text-accent dark:border-accent/30 dark:hover:bg-accent/25";
+                  }
+
+                  return (
+                    <button
+                      key={v.sku}
+                      disabled={!hasStock}
+                      onClick={() => copySku(v.sku, v.talla, color)}
+                      className={`inline-flex items-center gap-2 border px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-150 group relative ${badgeColor}`}
+                      title={hasStock ? `Click para copiar SKU: ${v.sku}` : "Sin stock disponible"}
+                    >
+                      <span>Talla {v.talla}</span>
+                      <span className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded-md text-[10px] font-extrabold ${
+                        !hasStock ? "bg-muted/50 text-muted-foreground/40" : "bg-primary/15 text-primary dark:bg-accent/20 dark:text-accent"
+                      }`}>
                         {v.saldo}
                       </span>
-                    </td>
-                    <td className="px-5 py-2.5">
-                      <button
-                        onClick={() => copySku(v.sku, v.talla, v.color)}
-                        className="inline-flex items-center gap-1.5 font-mono text-xs text-muted-foreground hover:text-primary transition-colors cursor-pointer group"
-                      >
-                        <span>{v.sku || "—"}</span>
-                        {v.sku && (
-                          <Copy className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                        )}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                      {hasStock && (
+                        <Copy className="h-3.5 w-3.5 opacity-0 group-hover:opacity-60 transition-opacity ml-0.5" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </article>
   );
