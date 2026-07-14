@@ -351,12 +351,24 @@ export async function loadInventory(): Promise<{
   rows: InventoryRow[];
   updatedAt: string | null;
 }> {
-  const { data, error } = await supabase
-    .from("inventory")
-    .select("*")
-    .order("referencia", { ascending: true });
-
-  if (error) throw error;
+  const pageSize = 1000;
+  let from = 0;
+  const all: InventoryDbRow[] = [];
+  // Paginate to bypass PostgREST's default 1000-row cap.
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const { data, error } = await supabase
+      .from("inventory")
+      .select("*")
+      .order("referencia", { ascending: true })
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    const batch = (data ?? []) as InventoryDbRow[];
+    all.push(...batch);
+    if (batch.length < pageSize) break;
+    from += pageSize;
+  }
+  const data = all;
 
   const rows = (data ?? []).map(fromDb);
   const updatedAt = (data ?? []).reduce<string | null>((latest, row) => {
