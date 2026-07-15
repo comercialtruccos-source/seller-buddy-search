@@ -66,12 +66,11 @@ function Index() {
   const [selectedTallas, setSelectedTallas] = useState<Set<string>>(new Set());
   const [selectedColores, setSelectedColores] = useState<Set<string>>(new Set());
 
-  // Options available inside the current search results (fall back to all when no query)
-  const optionSource = query.trim() === "" ? [] : results;
+  // Filter options based on ALL inventory (independent of query), so filters work without searching first
   const { tallasOptions, coloresOptions } = useMemo(() => {
     const tSet = new Set<string>();
     const cSet = new Set<string>();
-    for (const g of optionSource) {
+    for (const g of groups) {
       for (const v of g.variantes) {
         if (v.saldo <= 0) continue;
         if (v.talla) tSet.add(v.talla);
@@ -86,9 +85,9 @@ function Index() {
     });
     const colores = Array.from(cSet).sort((a, b) => a.localeCompare(b, "es"));
     return { tallasOptions: tallas, coloresOptions: colores };
-  }, [optionSource]);
+  }, [groups]);
 
-  // Clear filters that are no longer available in the current results
+  // Clear filters that are no longer available
   useEffect(() => {
     setSelectedTallas((prev) => {
       const next = new Set(Array.from(prev).filter((t) => tallasOptions.includes(t)));
@@ -100,10 +99,19 @@ function Index() {
     });
   }, [tallasOptions, coloresOptions]);
 
+  const hasActiveFilters = selectedTallas.size > 0 || selectedColores.size > 0;
+
+  // Base list: search results if there's a query, otherwise all groups when filters are active
+  const baseList = useMemo(() => {
+    if (query.trim() !== "") return results;
+    if (hasActiveFilters) return groups;
+    return [];
+  }, [query, results, groups, hasActiveFilters]);
+
   const filteredResults = useMemo(() => {
-    if (selectedTallas.size === 0 && selectedColores.size === 0) return results;
+    if (!hasActiveFilters) return baseList;
     const out: ReferenceGroup[] = [];
-    for (const g of results) {
+    for (const g of baseList) {
       const variantes = g.variantes.filter((v) => {
         const okT = selectedTallas.size === 0 || selectedTallas.has(v.talla);
         const okC = selectedColores.size === 0 || selectedColores.has(v.color);
