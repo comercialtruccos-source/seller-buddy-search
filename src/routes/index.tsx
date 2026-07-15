@@ -133,7 +133,6 @@ function Index() {
     else next.add(value);
     return next;
   };
-  const hasActiveFilters = selectedTallas.size > 0 || selectedColores.size > 0;
 
   return (
     <div className="min-h-screen bg-background">
