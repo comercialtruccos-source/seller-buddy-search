@@ -94,7 +94,7 @@ function Cargar() {
       setIsUploading(true);
       setUploadedInfo(null);
       
-      const text = await file.text();
+      const text = await readCsvFileText(file);
       const parsed = parseInventoryCsv(text);
       
       if (parsed.length === 0) {
