@@ -189,7 +189,7 @@ function Index() {
         </div>
 
         {/* Filters */}
-        {hydrated && rows.length > 0 && query.trim() !== "" && results.length > 0 && (
+        {hydrated && rows.length > 0 && (
           <div className="mt-5 rounded-2xl border border-border bg-card/60 p-4 shadow-xs">
             <div className="mb-3 flex items-center justify-between gap-2">
               <span className="text-[11px] font-extrabold uppercase tracking-wider text-muted-foreground">
