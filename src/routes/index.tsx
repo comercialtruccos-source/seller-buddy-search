@@ -274,11 +274,12 @@ function Index() {
 
           {hydrated &&
             rows.length > 0 &&
-            query.trim() === "" && (
+            query.trim() === "" &&
+            !hasActiveFilters && (
               <EmptyState
                 icon={<Search className="h-8 w-8" />}
-                title="Busca por referencia, descripción o SKU"
-                description={`${groups.length} referencias disponibles para consultar.`}
+                title="Busca o filtra por talla y color"
+                description={`${groups.length} referencias disponibles. Escribe una referencia o usa los filtros arriba.`}
               />
             )}
 
