@@ -90,6 +90,21 @@ function toNumber(value: string): number {
 }
 
 /**
+ * Decode a CSV file trying UTF-8 first and falling back to Windows-1252 when
+ * the file was exported with the Spanish/Latin-1 encoding used by Excel on
+ * Windows. This prevents tildes and "ñ" from becoming the "�" replacement
+ * character.
+ */
+export async function readCsvFileText(file: File): Promise<string> {
+  const buf = await file.arrayBuffer();
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(buf);
+  } catch {
+    return new TextDecoder("windows-1252").decode(buf);
+  }
+}
+
+/**
  * Parse the inventory CSV. Expected headers:
  * Referencia, Descripción, Talla - Lote, Color, Saldo, Talla, CodColor, SKU, PVM UNIT, PVP UNIT
  */
