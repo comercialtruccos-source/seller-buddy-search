@@ -63,6 +63,70 @@ function Index() {
     [groups, query],
   );
 
+  const [selectedTallas, setSelectedTallas] = useState<Set<string>>(new Set());
+  const [selectedColores, setSelectedColores] = useState<Set<string>>(new Set());
+
+  // Options available inside the current search results (fall back to all when no query)
+  const optionSource = query.trim() === "" ? [] : results;
+  const { tallasOptions, coloresOptions } = useMemo(() => {
+    const tSet = new Set<string>();
+    const cSet = new Set<string>();
+    for (const g of optionSource) {
+      for (const v of g.variantes) {
+        if (v.saldo <= 0) continue;
+        if (v.talla) tSet.add(v.talla);
+        if (v.color) cSet.add(v.color);
+      }
+    }
+    const tallas = Array.from(tSet).sort((a, b) => {
+      const na = Number(a);
+      const nb = Number(b);
+      if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb;
+      return a.localeCompare(b, "es");
+    });
+    const colores = Array.from(cSet).sort((a, b) => a.localeCompare(b, "es"));
+    return { tallasOptions: tallas, coloresOptions: colores };
+  }, [optionSource]);
+
+  // Clear filters that are no longer available in the current results
+  useEffect(() => {
+    setSelectedTallas((prev) => {
+      const next = new Set(Array.from(prev).filter((t) => tallasOptions.includes(t)));
+      return next.size === prev.size ? prev : next;
+    });
+    setSelectedColores((prev) => {
+      const next = new Set(Array.from(prev).filter((c) => coloresOptions.includes(c)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [tallasOptions, coloresOptions]);
+
+  const filteredResults = useMemo(() => {
+    if (selectedTallas.size === 0 && selectedColores.size === 0) return results;
+    const out: ReferenceGroup[] = [];
+    for (const g of results) {
+      const variantes = g.variantes.filter((v) => {
+        const okT = selectedTallas.size === 0 || selectedTallas.has(v.talla);
+        const okC = selectedColores.size === 0 || selectedColores.has(v.color);
+        return okT && okC;
+      });
+      if (variantes.length === 0) continue;
+      out.push({
+        ...g,
+        variantes,
+        totalSaldo: variantes.reduce((s, v) => s + v.saldo, 0),
+      });
+    }
+    return out;
+  }, [results, selectedTallas, selectedColores]);
+
+  const toggle = (set: Set<string>, value: string) => {
+    const next = new Set(set);
+    if (next.has(value)) next.delete(value);
+    else next.add(value);
+    return next;
+  };
+  const hasActiveFilters = selectedTallas.size > 0 || selectedColores.size > 0;
+
   return (
     <div className="min-h-screen bg-background">
       <Toaster position="top-center" richColors />
