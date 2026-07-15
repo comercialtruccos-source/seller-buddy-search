@@ -63,6 +63,70 @@ function Index() {
     [groups, query],
   );
 
+  const [selectedTallas, setSelectedTallas] = useState<Set<string>>(new Set());
+  const [selectedColores, setSelectedColores] = useState<Set<string>>(new Set());
+
+  // Options available inside the current search results (fall back to all when no query)
+  const optionSource = query.trim() === "" ? [] : results;
+  const { tallasOptions, coloresOptions } = useMemo(() => {
+    const tSet = new Set<string>();
+    const cSet = new Set<string>();
+    for (const g of optionSource) {
+      for (const v of g.variantes) {
+        if (v.saldo <= 0) continue;
+        if (v.talla) tSet.add(v.talla);
+        if (v.color) cSet.add(v.color);
+      }
+    }
+    const tallas = Array.from(tSet).sort((a, b) => {
+      const na = Number(a);
+      const nb = Number(b);
+      if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb;
+      return a.localeCompare(b, "es");
+    });
+    const colores = Array.from(cSet).sort((a, b) => a.localeCompare(b, "es"));
+    return { tallasOptions: tallas, coloresOptions: colores };
+  }, [optionSource]);
+
+  // Clear filters that are no longer available in the current results
+  useEffect(() => {
+    setSelectedTallas((prev) => {
+      const next = new Set(Array.from(prev).filter((t) => tallasOptions.includes(t)));
+      return next.size === prev.size ? prev : next;
+    });
+    setSelectedColores((prev) => {
+      const next = new Set(Array.from(prev).filter((c) => coloresOptions.includes(c)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [tallasOptions, coloresOptions]);
+
+  const filteredResults = useMemo(() => {
+    if (selectedTallas.size === 0 && selectedColores.size === 0) return results;
+    const out: ReferenceGroup[] = [];
+    for (const g of results) {
+      const variantes = g.variantes.filter((v) => {
+        const okT = selectedTallas.size === 0 || selectedTallas.has(v.talla);
+        const okC = selectedColores.size === 0 || selectedColores.has(v.color);
+        return okT && okC;
+      });
+      if (variantes.length === 0) continue;
+      out.push({
+        ...g,
+        variantes,
+        totalSaldo: variantes.reduce((s, v) => s + v.saldo, 0),
+      });
+    }
+    return out;
+  }, [results, selectedTallas, selectedColores]);
+
+  const toggle = (set: Set<string>, value: string) => {
+    const next = new Set(set);
+    if (next.has(value)) next.delete(value);
+    else next.add(value);
+    return next;
+  };
+  const hasActiveFilters = selectedTallas.size > 0 || selectedColores.size > 0;
+
   return (
     <div className="min-h-screen bg-background">
       <Toaster position="top-center" richColors />
@@ -117,6 +181,80 @@ function Index() {
           />
         </div>
 
+        {/* Filters */}
+        {hydrated && rows.length > 0 && query.trim() !== "" && results.length > 0 && (
+          <div className="mt-5 rounded-2xl border border-border bg-card/60 p-4 shadow-xs">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <span className="text-[11px] font-extrabold uppercase tracking-wider text-muted-foreground">
+                Filtrar por talla y color
+              </span>
+              {hasActiveFilters && (
+                <button
+                  onClick={() => {
+                    setSelectedTallas(new Set());
+                    setSelectedColores(new Set());
+                  }}
+                  className="text-xs font-semibold text-accent hover:underline"
+                >
+                  Limpiar filtros
+                </button>
+              )}
+            </div>
+
+            {tallasOptions.length > 0 && (
+              <div className="mb-3">
+                <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80">
+                  Tallas
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {tallasOptions.map((t) => {
+                    const active = selectedTallas.has(t);
+                    return (
+                      <button
+                        key={t}
+                        onClick={() => setSelectedTallas((prev) => toggle(prev, t))}
+                        className={`rounded-full border px-3 py-1 text-xs font-bold transition-colors ${
+                          active
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-background text-foreground border-border hover:border-accent"
+                        }`}
+                      >
+                        {t}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {coloresOptions.length > 0 && (
+              <div>
+                <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80">
+                  Colores
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {coloresOptions.map((c) => {
+                    const active = selectedColores.has(c);
+                    return (
+                      <button
+                        key={c}
+                        onClick={() => setSelectedColores((prev) => toggle(prev, c))}
+                        className={`rounded-full border px-3 py-1 text-xs font-medium capitalize transition-colors ${
+                          active
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-background text-foreground border-border hover:border-accent"
+                        }`}
+                      >
+                        {c.toLowerCase()}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Content states */}
         <div className="mt-6 space-y-4">
           {hydrated && rows.length === 0 && (
@@ -148,7 +286,18 @@ function Index() {
               />
             )}
 
-          {results.map((group) => (
+          {hydrated &&
+            query.trim() !== "" &&
+            results.length > 0 &&
+            filteredResults.length === 0 && (
+              <EmptyState
+                icon={<PackageSearch className="h-8 w-8" />}
+                title="Ninguna variante coincide con los filtros"
+                description="Prueba a quitar alguna talla o color seleccionado."
+              />
+            )}
+
+          {filteredResults.map((group) => (
             <ReferenceCard key={group.referencia} group={group} />
           ))}
         </div>

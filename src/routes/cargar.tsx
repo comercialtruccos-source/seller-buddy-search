@@ -12,6 +12,7 @@ import {
 import { toast, Toaster } from "sonner";
 import {
   parseInventoryCsv,
+  readCsvFileText,
   saveInventory,
 } from "@/lib/inventory";
 import { downloadCsvFromUrl } from "@/lib/shopify";
@@ -93,7 +94,7 @@ function Cargar() {
       setIsUploading(true);
       setUploadedInfo(null);
       
-      const text = await file.text();
+      const text = await readCsvFileText(file);
       const parsed = parseInventoryCsv(text);
       
       if (parsed.length === 0) {
