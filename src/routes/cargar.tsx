@@ -12,6 +12,7 @@ import {
 import { toast, Toaster } from "sonner";
 import {
   parseInventoryCsv,
+  readCsvFileText,
   saveInventory,
 } from "@/lib/inventory";
 import { downloadCsvFromUrl } from "@/lib/shopify";
