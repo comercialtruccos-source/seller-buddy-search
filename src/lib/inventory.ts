@@ -314,12 +314,49 @@ interface InventoryDbRow {
   created_at?: string;
 }
 
+/**
+ * Fix common mojibake produced when a Windows-1252 / Latin-1 CSV is decoded as
+ * UTF-8. Once the bad decode happens, the original byte is replaced by U+FFFD
+ * ("�") and information is lost, so we map known Spanish words back by hand.
+ */
+const MOJIBAKE_WORD_MAP: Array<[RegExp, string]> = [
+  [/Champa\uFFFDa/gi, "Champaña"],
+  [/Casta\uFFFDo/gi, "Castaño"],
+  [/Casta\uFFFDa/gi, "Castaña"],
+  [/Ma\uFFFDana/gi, "Mañana"],
+  [/Pi\uFFFDa/gi, "Piña"],
+  [/A\uFFFDil/gi, "Añil"],
+  [/Se\uFFFDora/gi, "Señora"],
+  [/Caf\uFFFD/gi, "Café"],
+  [/Marr\uFFFDn/gi, "Marrón"],
+  [/Lim\uFFFDn/gi, "Limón"],
+  [/Melocot\uFFFDn/gi, "Melocotón"],
+  [/Salm\uFFFDn/gi, "Salmón"],
+  [/Turqu\uFFFDs/gi, "Turquesa"],
+  [/P\uFFFDrpura/gi, "Púrpura"],
+  [/N\uFFFDcar/gi, "Nácar"],
+  [/Fucs\uFFFDa/gi, "Fucsia"],
+  [/Rub\uFFFD/gi, "Rubí"],
+];
+
+export function fixMojibake(input: string): string {
+  if (!input || !input.includes("\uFFFD")) return input;
+  let out = input;
+  for (const [re, replacement] of MOJIBAKE_WORD_MAP) {
+    out = out.replace(re, (match) =>
+      match === match.toUpperCase() ? replacement.toUpperCase() : replacement,
+    );
+  }
+  // Preserve original casing of the corrected word; leftover � is unrecoverable.
+  return out;
+}
+
 function fromDb(row: InventoryDbRow): InventoryRow {
   return {
     referencia: row.referencia,
-    descripcion: row.descripcion,
+    descripcion: fixMojibake(row.descripcion),
     tallaLote: row.talla_lote,
-    color: row.color,
+    color: fixMojibake(row.color),
     saldo: row.saldo,
     talla: row.talla,
     codColor: row.cod_color,
