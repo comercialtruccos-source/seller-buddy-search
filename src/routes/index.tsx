@@ -125,7 +125,7 @@ function Index() {
       });
     }
     return out;
-  }, [results, selectedTallas, selectedColores]);
+  }, [baseList, selectedTallas, selectedColores, hasActiveFilters]);
 
   const toggle = (set: Set<string>, value: string) => {
     const next = new Set(set);
