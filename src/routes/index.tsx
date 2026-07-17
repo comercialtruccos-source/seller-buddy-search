@@ -10,6 +10,12 @@ import {
   ChevronDown,
   Shirt,
   Copy,
+  Plus,
+  Minus,
+  ShoppingCart,
+  Trash2,
+  Download,
+  X,
 } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import { useQuery } from "@tanstack/react-query";
@@ -24,6 +30,15 @@ import {
   type ReferenceGroup,
 } from "@/lib/inventory";
 import { getShopifyProductImage } from "@/lib/shopify";
+import {
+  addOrderItem,
+  clearOrder,
+  downloadOrderXls,
+  removeOrderItem,
+  setOrderQty,
+  useHydrateOrder,
+  useOrder,
+} from "@/lib/order";
 
 export const Route = createFileRoute("/")({
   component: Index,
