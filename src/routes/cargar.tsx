@@ -8,6 +8,7 @@ import {
   AlertCircle,
   FileWarning,
   Link2,
+  Download,
 } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import {
@@ -36,6 +37,67 @@ function Cargar() {
     filename: string;
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const downloadTemplateCsv = () => {
+    const headers = [
+      "Referencia",
+      "Descripción",
+      "Talla - Lote",
+      "Color",
+      "Saldo",
+      "Talla",
+      "CodColor",
+      "SKU",
+      "PVM UNIT",
+      "PVP UNIT",
+      "Imagen"
+    ];
+    
+    const sampleRows = [
+      [
+        "REF001",
+        "Pantalón Jean Vaquero",
+        "02-01",
+        "AZUL",
+        "10",
+        "02",
+        "01",
+        "SKU-REF001-AZ-02",
+        "45000",
+        "85000",
+        "https://images.unsplash.com/photo-1542272604-787c3835535d?q=80&w=1000"
+      ],
+      [
+        "REF001",
+        "Pantalón Jean Vaquero",
+        "04-01",
+        "AZUL",
+        "5",
+        "04",
+        "01",
+        "SKU-REF001-AZ-04",
+        "45000",
+        "85000",
+        "https://images.unsplash.com/photo-1542272604-787c3835535d?q=80&w=1000"
+      ]
+    ];
+
+    const csvContent = [
+      headers.join(","),
+      ...sampleRows.map(row => row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(","))
+    ].join("\n");
+
+    const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", "plantilla_inventario.csv");
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("Plantilla CSV descargada correctamente.");
+  };
 
   const handleSyncFromUrl = async () => {
     const trimmedUrl = syncUrl.trim();
@@ -182,9 +244,20 @@ function Cargar() {
             <FileSpreadsheet className="h-5 w-5 text-accent" />
             Importar archivo de inventario
           </h2>
-          <p className="text-sm text-muted-foreground mb-6">
+          <p className="text-sm text-muted-foreground mb-4">
             Sube un archivo CSV con las referencias y cantidades actualizadas. Este proceso reemplazará el inventario actual de la base de datos de manera definitiva.
           </p>
+
+          <div className="mb-6 flex">
+            <button
+              onClick={downloadTemplateCsv}
+              className="inline-flex items-center gap-2 text-xs font-bold text-accent hover:text-accent/80 transition-all border border-accent/20 bg-accent/5 px-3 py-1.5 rounded-lg hover:scale-[1.02] active:scale-95 shadow-xs"
+              title="Descargar archivo CSV de ejemplo con las columnas requeridas"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Descargar plantilla/formato CSV
+            </button>
+          </div>
 
           {/* Drag & Drop Area */}
           <div
