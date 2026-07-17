@@ -7,11 +7,8 @@ import {
   Tag,
   Boxes,
   FileWarning,
-  CheckCircle2,
-  Image as ImageIcon,
+  ChevronDown,
   Shirt,
-  Table,
-  LayoutGrid,
   Copy,
 } from "lucide-react";
 import { toast, Toaster } from "sonner";
