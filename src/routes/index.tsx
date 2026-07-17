@@ -187,74 +187,32 @@ function Index() {
 
         {/* Filters */}
         {hydrated && rows.length > 0 && (
-          <div className="mt-5 rounded-2xl border border-border bg-card/60 p-4 shadow-xs">
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <span className="text-[11px] font-extrabold uppercase tracking-wider text-muted-foreground">
-                Filtrar por talla y color
-              </span>
-              {hasActiveFilters && (
-                <button
-                  onClick={() => {
-                    setSelectedTallas(new Set());
-                    setSelectedColores(new Set());
-                  }}
-                  className="text-xs font-semibold text-accent hover:underline"
-                >
-                  Limpiar filtros
-                </button>
-              )}
-            </div>
-
-            {tallasOptions.length > 0 && (
-              <div className="mb-3">
-                <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80">
-                  Tallas
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {tallasOptions.map((t) => {
-                    const active = selectedTallas.has(t);
-                    return (
-                      <button
-                        key={t}
-                        onClick={() => setSelectedTallas((prev) => toggle(prev, t))}
-                        className={`rounded-full border px-3 py-1 text-xs font-bold transition-colors ${
-                          active
-                            ? "bg-primary text-primary-foreground border-primary"
-                            : "bg-background text-foreground border-border hover:border-accent"
-                        }`}
-                      >
-                        {t}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {coloresOptions.length > 0 && (
-              <div>
-                <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80">
-                  Colores
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {coloresOptions.map((c) => {
-                    const active = selectedColores.has(c);
-                    return (
-                      <button
-                        key={c}
-                        onClick={() => setSelectedColores((prev) => toggle(prev, c))}
-                        className={`rounded-full border px-3 py-1 text-xs font-medium capitalize transition-colors ${
-                          active
-                            ? "bg-primary text-primary-foreground border-primary"
-                            : "bg-background text-foreground border-border hover:border-accent"
-                        }`}
-                      >
-                        {c.toLowerCase()}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <FilterDropdown
+              label="Talla"
+              options={tallasOptions}
+              selected={selectedTallas}
+              onToggle={(t) => setSelectedTallas((prev) => toggle(prev, t))}
+              onClear={() => setSelectedTallas(new Set())}
+            />
+            <FilterDropdown
+              label="Color"
+              options={coloresOptions}
+              selected={selectedColores}
+              onToggle={(c) => setSelectedColores((prev) => toggle(prev, c))}
+              onClear={() => setSelectedColores(new Set())}
+              renderOption={(c) => c.toLowerCase()}
+            />
+            {hasActiveFilters && (
+              <button
+                onClick={() => {
+                  setSelectedTallas(new Set());
+                  setSelectedColores(new Set());
+                }}
+                className="text-xs font-semibold text-accent hover:underline"
+              >
+                Limpiar filtros
+              </button>
             )}
           </div>
         )}
