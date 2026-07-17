@@ -10,6 +10,12 @@ import {
   ChevronDown,
   Shirt,
   Copy,
+  Plus,
+  Minus,
+  ShoppingCart,
+  Trash2,
+  Download,
+  X,
 } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import { useQuery } from "@tanstack/react-query";
@@ -24,6 +30,15 @@ import {
   type ReferenceGroup,
 } from "@/lib/inventory";
 import { getShopifyProductImage } from "@/lib/shopify";
+import {
+  addOrderItem,
+  clearOrder,
+  downloadOrderXls,
+  removeOrderItem,
+  setOrderQty,
+  useHydrateOrder,
+  useOrder,
+} from "@/lib/order";
 
 export const Route = createFileRoute("/")({
   component: Index,
@@ -34,6 +49,10 @@ function Index() {
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [hydrated, setHydrated] = useState(false);
+  const [orderOpen, setOrderOpen] = useState(false);
+  useHydrateOrder();
+  const order = useOrder();
+  const orderCount = order.reduce((s, i) => s + i.cantidad, 0);
 
   useEffect(() => {
     let active = true;
@@ -151,6 +170,18 @@ function Index() {
               </p>
             </div>
           </div>
+          <button
+            onClick={() => setOrderOpen(true)}
+            className="relative inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-bold text-accent-foreground shadow-sm transition-transform hover:scale-105"
+          >
+            <ShoppingCart className="h-4 w-4" />
+            <span>Pedido</span>
+            {orderCount > 0 && (
+              <span className="ml-1 rounded-full bg-primary px-2 py-0.5 text-xs font-extrabold text-primary-foreground">
+                {orderCount}
+              </span>
+            )}
+          </button>
         </div>
       </header>
 
@@ -265,6 +296,157 @@ function Index() {
           ))}
         </div>
       </main>
+
+      {orderOpen && <OrderModal order={order} onClose={() => setOrderOpen(false)} />}
+    </div>
+  );
+}
+
+function OrderModal({
+  order,
+  onClose,
+}: {
+  order: ReturnType<typeof useOrder>;
+  onClose: () => void;
+}) {
+  const total = order.reduce((s, i) => s + i.pvm * i.cantidad, 0);
+  const unidades = order.reduce((s, i) => s + i.cantidad, 0);
+
+  const handleDownload = () => {
+    if (order.length === 0) {
+      toast.error("El pedido está vacío.");
+      return;
+    }
+    downloadOrderXls(order);
+    toast.success("Archivo generado. Súbelo a tu sistema de pedidos.");
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4">
+      <div className="flex h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl bg-card shadow-xl sm:rounded-2xl">
+        <div className="flex items-center justify-between border-b border-border bg-primary px-5 py-4 text-primary-foreground">
+          <div className="flex items-center gap-3">
+            <ShoppingCart className="h-5 w-5" />
+            <div>
+              <h2 className="text-base font-bold leading-tight">Pedido actual</h2>
+              <p className="text-xs text-primary-foreground/70">
+                {unidades} unidades · {order.length} referencias
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-lg p-1.5 text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10"
+            aria-label="Cerrar"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4">
+          {order.length === 0 ? (
+            <div className="flex h-full flex-col items-center justify-center text-center text-muted-foreground">
+              <ShoppingCart className="mb-3 h-10 w-10 opacity-30" />
+              <p className="text-sm">
+                No hay artículos en el pedido. Agrega variantes desde los resultados.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {order.map((it) => (
+                <div
+                  key={it.sku}
+                  className="flex items-center gap-3 rounded-xl border border-border bg-background/50 p-3"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="rounded-md bg-primary px-1.5 py-0.5 font-mono text-[10px] font-bold text-primary-foreground">
+                        {it.referencia}
+                      </span>
+                      <span className="text-xs font-semibold text-foreground capitalize">
+                        {it.color}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        · Talla {it.talla}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                      {it.descripcion}
+                    </p>
+                    <p className="mt-1 text-xs font-bold text-primary">
+                      {formatCurrency(it.pvm)} <span className="font-normal text-muted-foreground">c/u</span>
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => setOrderQty(it.sku, it.cantidad - 1)}
+                      className="flex h-7 w-7 items-center justify-center rounded-lg border border-border bg-background transition-colors hover:bg-muted"
+                    >
+                      <Minus className="h-3.5 w-3.5" />
+                    </button>
+                    <input
+                      type="number"
+                      min={1}
+                      max={it.saldo}
+                      value={it.cantidad}
+                      onChange={(e) =>
+                        setOrderQty(it.sku, Number(e.target.value) || 0)
+                      }
+                      className="w-12 rounded-lg border border-border bg-background py-1 text-center text-sm font-bold outline-none focus:border-accent"
+                    />
+                    <button
+                      onClick={() => setOrderQty(it.sku, it.cantidad + 1)}
+                      disabled={it.cantidad >= it.saldo}
+                      className="flex h-7 w-7 items-center justify-center rounded-lg border border-border bg-background transition-colors hover:bg-muted disabled:opacity-40"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={() => removeOrderItem(it.sku)}
+                      className="ml-1 flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                      aria-label="Eliminar"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="border-t border-border bg-muted/30 px-5 py-4">
+          <div className="mb-3 flex items-center justify-between">
+            <span className="text-sm font-semibold text-muted-foreground">
+              Total mayorista
+            </span>
+            <span className="text-xl font-extrabold text-primary">
+              {formatCurrency(total)}
+            </span>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <button
+              onClick={() => {
+                if (order.length === 0) return;
+                if (confirm("¿Vaciar el pedido?")) clearOrder();
+              }}
+              disabled={order.length === 0}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted disabled:opacity-40"
+            >
+              <Trash2 className="h-4 w-4" />
+              Vaciar
+            </button>
+            <button
+              onClick={handleDownload}
+              disabled={order.length === 0}
+              className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-bold text-accent-foreground shadow-sm transition-transform hover:scale-[1.02] disabled:opacity-40 disabled:hover:scale-100"
+            >
+              <Download className="h-4 w-4" />
+              Descargar pedido (.xls)
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -521,23 +703,46 @@ function ReferenceCard({ group }: { group: ReferenceGroup }) {
                   }
 
                   return (
-                    <button
-                      key={v.sku}
-                      disabled={!hasStock}
-                      onClick={() => copySku(v.sku, v.talla, color)}
-                      className={`inline-flex items-center gap-2 border px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-150 group relative ${badgeColor}`}
-                      title={hasStock ? `Click para copiar SKU: ${v.sku}` : "Sin stock disponible"}
-                    >
-                      <span>Talla {v.talla}</span>
-                      <span className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded-md text-[10px] font-extrabold ${
-                        !hasStock ? "bg-muted/50 text-muted-foreground/40" : "bg-primary/15 text-primary dark:bg-accent/20 dark:text-accent"
-                      }`}>
-                        {v.saldo}
-                      </span>
+                    <div key={v.sku} className="inline-flex items-stretch">
+                      <button
+                        disabled={!hasStock}
+                        onClick={() => copySku(v.sku, v.talla, color)}
+                        className={`inline-flex items-center gap-2 border px-3 py-1.5 ${hasStock ? "rounded-l-xl border-r-0" : "rounded-xl"} text-xs font-bold transition-all duration-150 group relative ${badgeColor}`}
+                        title={hasStock ? `Click para copiar SKU: ${v.sku}` : "Sin stock disponible"}
+                      >
+                        <span>Talla {v.talla}</span>
+                        <span className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded-md text-[10px] font-extrabold ${
+                          !hasStock ? "bg-muted/50 text-muted-foreground/40" : "bg-primary/15 text-primary dark:bg-accent/20 dark:text-accent"
+                        }`}>
+                          {v.saldo}
+                        </span>
+                        {hasStock && (
+                          <Copy className="h-3.5 w-3.5 opacity-0 group-hover:opacity-60 transition-opacity ml-0.5" />
+                        )}
+                      </button>
                       {hasStock && (
-                        <Copy className="h-3.5 w-3.5 opacity-0 group-hover:opacity-60 transition-opacity ml-0.5" />
+                        <button
+                          onClick={() => {
+                            addOrderItem({
+                              sku: v.sku,
+                              referencia: group.referencia,
+                              descripcion: group.descripcion,
+                              talla: v.talla,
+                              color,
+                              codColor: v.codColor,
+                              pvm: group.pvm || v.pvm,
+                              saldo: v.saldo,
+                            });
+                            toast.success(`Añadido: ${group.referencia} ${color} T${v.talla}`, { duration: 1500 });
+                          }}
+                          className="inline-flex items-center rounded-r-xl border border-accent bg-accent px-2 text-accent-foreground transition-colors hover:bg-accent/90"
+                          title="Añadir al pedido"
+                          aria-label="Añadir al pedido"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                        </button>
                       )}
-                    </button>
+                    </div>
                   );
                 })}
               </div>
