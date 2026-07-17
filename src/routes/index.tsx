@@ -89,6 +89,12 @@ function Index() {
   const [selectedLineas, setSelectedLineas] = useState<Set<string>>(new Set());
 
   const lineasOptions = useMemo(() => ["T", "B", "P", "R"], []);
+  const lineasLabels: Record<string, string> = {
+    T: "Línea T - Trj",
+    B: "Línea B - Casual",
+    P: "Línea P - Plus Size",
+    R: "Línea R - Rappaz",
+  };
 
   // Filter options based on ALL inventory (independent of query), so filters work without searching first
   const { tallasOptions, coloresOptions } = useMemo(() => {
@@ -251,7 +257,7 @@ function Index() {
                   selected={selectedLineas}
                   onToggle={(l) => setSelectedLineas((prev) => toggle(prev, l))}
                   onClear={() => setSelectedLineas(new Set())}
-                  renderOption={(l) => `Línea ${l}`}
+                  renderOption={(l) => lineasLabels[l] || `Línea ${l}`}
                 />
                 <FilterDropdown
                   label="Talla"
