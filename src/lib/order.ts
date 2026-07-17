@@ -113,6 +113,15 @@ export function downloadOrderXls(order: OrderItem[]) {
       "StrColor",
     ],
   ];
+
+  const formatNumeric = (val: string): string => {
+    const trimmed = (val || "").trim();
+    if (/^\d+$/.test(trimmed)) {
+      return trimmed.padStart(2, "0");
+    }
+    return trimmed;
+  };
+
   for (const it of order) {
     if (it.cantidad <= 0) continue;
     aoa.push([
@@ -120,12 +129,32 @@ export function downloadOrderXls(order: OrderItem[]) {
       it.cantidad,
       it.pvm,
       "01",
-      it.talla,
-      it.codColor,
+      formatNumeric(it.talla),
+      formatNumeric(it.codColor),
     ]);
   }
 
   const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+  // Force columns D, E, F to be treated as string type ('s') to preserve leading zeros in Excel
+  for (let r = 1; r < aoa.length; r++) {
+    // Column D (index 3): IntBodega
+    const cellD = ws[XLSX.utils.encode_cell({ r, c: 3 })];
+    if (cellD) {
+      cellD.t = "s";
+    }
+    // Column E (index 4): StrLote (talla)
+    const cellE = ws[XLSX.utils.encode_cell({ r, c: 4 })];
+    if (cellE) {
+      cellE.t = "s";
+    }
+    // Column F (index 5): StrColor (codColor)
+    const cellF = ws[XLSX.utils.encode_cell({ r, c: 5 })];
+    if (cellF) {
+      cellF.t = "s";
+    }
+  }
+
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "TblDetalleDocumentos");
   const ts = new Date();

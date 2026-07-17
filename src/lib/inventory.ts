@@ -164,14 +164,20 @@ export function parseInventoryCsv(text: string): InventoryRow[] {
     const referencia = cols[0];
     if (!referencia) continue;
 
+    const rawTalla = (cols[5] ?? "").trim();
+    const talla = /^\d+$/.test(rawTalla) ? rawTalla.padStart(2, "0") : rawTalla;
+
+    const rawCodColor = (cols[6] ?? "").trim();
+    const codColor = /^\d+$/.test(rawCodColor) ? rawCodColor.padStart(2, "0") : rawCodColor;
+
     const row: InventoryRow = {
       referencia,
       descripcion: cols[1] ?? "",
       tallaLote: cols[2] ?? "",
       color: cols[3] ?? "",
       saldo: toNumber(cols[4]),
-      talla: cols[5] ?? "",
-      codColor: cols[6] ?? "",
+      talla,
+      codColor,
       sku: cols[7] ?? "",
       pvm: toNumber(cols[8]),
       pvp: toNumber(cols[9]),
