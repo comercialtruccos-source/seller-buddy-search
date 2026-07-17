@@ -389,13 +389,28 @@ function OrderModal({
                       min={1}
                       max={it.saldo}
                       value={it.cantidad}
-                      onChange={(e) =>
-                        setOrderQty(it.sku, Number(e.target.value) || 0)
-                      }
+                      onChange={(e) => {
+                        const targetVal = Number(e.target.value) || 0;
+                        const res = setOrderQty(it.sku, targetVal);
+                        if (res.clamped && targetVal > it.saldo) {
+                          toast.error(
+                            `Solo hay ${it.saldo} unidades disponibles de esta variante.`,
+                            { id: `limit-${it.sku}` }
+                          );
+                        }
+                      }}
                       className="w-12 rounded-lg border border-border bg-background py-1 text-center text-sm font-bold outline-none focus:border-accent"
                     />
                     <button
-                      onClick={() => setOrderQty(it.sku, it.cantidad + 1)}
+                      onClick={() => {
+                        const res = setOrderQty(it.sku, it.cantidad + 1);
+                        if (res.clamped) {
+                          toast.error(
+                            `Solo hay ${it.saldo} unidades disponibles de esta variante.`,
+                            { id: `limit-${it.sku}` }
+                          );
+                        }
+                      }}
                       disabled={it.cantidad >= it.saldo}
                       className="flex h-7 w-7 items-center justify-center rounded-lg border border-border bg-background transition-colors hover:bg-muted disabled:opacity-40"
                     >
@@ -723,7 +738,7 @@ function ReferenceCard({ group }: { group: ReferenceGroup }) {
                       {hasStock && (
                         <button
                           onClick={() => {
-                            addOrderItem({
+                            const result = addOrderItem({
                               sku: v.sku,
                               referencia: group.referencia,
                               descripcion: group.descripcion,
@@ -733,7 +748,24 @@ function ReferenceCard({ group }: { group: ReferenceGroup }) {
                               pvm: group.pvm || v.pvm,
                               saldo: v.saldo,
                             });
-                            toast.success(`Añadido: ${group.referencia} ${color} T${v.talla}`, { duration: 1500 });
+                            if (result.success) {
+                              if (result.isLimit) {
+                                toast.warning(
+                                  `Añadido: ${group.referencia} ${color} T${v.talla} (${result.currentQty} uds. - Límite de stock alcanzado)`,
+                                  { duration: 2500 }
+                                );
+                              } else {
+                                toast.success(
+                                  `Añadido: ${group.referencia} ${color} T${v.talla} (Total: ${result.currentQty} uds.)`,
+                                  { duration: 1500 }
+                                );
+                              }
+                            } else {
+                              toast.error(
+                                `No se pueden añadir más unidades de ${group.referencia} (Talla ${v.talla}). Stock máximo disponible en inventario: ${v.saldo}`,
+                                { duration: 3000 }
+                              );
+                            }
                           }}
                           className="inline-flex items-center rounded-r-xl border border-accent bg-accent px-2 text-accent-foreground transition-colors hover:bg-accent/90"
                           title="Añadir al pedido"

@@ -66,29 +66,44 @@ export function useHydrateOrder() {
   }, []);
 }
 
-export function addOrderItem(item: Omit<OrderItem, "cantidad">, qty = 1) {
+export function addOrderItem(
+  item: Omit<OrderItem, "cantidad">,
+  qty = 1
+): { success: boolean; isLimit: boolean; currentQty: number } {
   const idx = items.findIndex((i) => i.sku === item.sku);
   if (idx >= 0) {
-    const next = { ...items[idx] };
-    next.cantidad = Math.min(item.saldo, next.cantidad + qty);
+    const currentQty = items[idx].cantidad;
+    if (currentQty >= item.saldo) {
+      return { success: false, isLimit: true, currentQty };
+    }
+    const nextQty = Math.min(item.saldo, currentQty + qty);
+    const next = { ...items[idx], cantidad: nextQty };
     items = [...items.slice(0, idx), next, ...items.slice(idx + 1)];
+    emit();
+    return { success: true, isLimit: nextQty === item.saldo, currentQty: nextQty };
   } else {
-    items = [...items, { ...item, cantidad: Math.min(item.saldo, qty) }];
+    const nextQty = Math.min(item.saldo, qty);
+    items = [...items, { ...item, cantidad: nextQty }];
+    emit();
+    return { success: true, isLimit: nextQty === item.saldo, currentQty: nextQty };
   }
-  emit();
 }
 
-export function setOrderQty(sku: string, cantidad: number) {
+export function setOrderQty(sku: string, cantidad: number): { clamped: boolean; nextQty: number } {
   const idx = items.findIndex((i) => i.sku === sku);
-  if (idx < 0) return;
-  const clamped = Math.max(0, Math.min(items[idx].saldo, Math.floor(cantidad)));
-  if (clamped === 0) {
+  if (idx < 0) return { clamped: false, nextQty: 0 };
+  const target = Math.floor(cantidad);
+  const clampedVal = Math.max(0, Math.min(items[idx].saldo, target));
+  const clamped = target > items[idx].saldo || target < 0;
+
+  if (clampedVal === 0) {
     items = items.filter((i) => i.sku !== sku);
   } else {
-    const next = { ...items[idx], cantidad: clamped };
+    const next = { ...items[idx], cantidad: clampedVal };
     items = [...items.slice(0, idx), next, ...items.slice(idx + 1)];
   }
   emit();
+  return { clamped, nextQty: clampedVal };
 }
 
 export function removeOrderItem(sku: string) {
