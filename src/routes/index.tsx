@@ -86,6 +86,9 @@ function Index() {
 
   const [selectedTallas, setSelectedTallas] = useState<Set<string>>(new Set());
   const [selectedColores, setSelectedColores] = useState<Set<string>>(new Set());
+  const [selectedLineas, setSelectedLineas] = useState<Set<string>>(new Set());
+
+  const lineasOptions = useMemo(() => ["T", "B", "P", "R"], []);
 
   // Filter options based on ALL inventory (independent of query), so filters work without searching first
   const { tallasOptions, coloresOptions } = useMemo(() => {
@@ -120,7 +123,7 @@ function Index() {
     });
   }, [tallasOptions, coloresOptions]);
 
-  const hasActiveFilters = selectedTallas.size > 0 || selectedColores.size > 0;
+  const hasActiveFilters = selectedTallas.size > 0 || selectedColores.size > 0 || selectedLineas.size > 0;
 
   // Base list: search results if there's a query, otherwise all groups when filters are active
   const baseList = useMemo(() => {
@@ -133,6 +136,10 @@ function Index() {
     if (!hasActiveFilters) return baseList;
     const out: ReferenceGroup[] = [];
     for (const g of baseList) {
+      const firstChar = g.referencia.trim().charAt(0).toUpperCase();
+      const okL = selectedLineas.size === 0 || selectedLineas.has(firstChar);
+      if (!okL) continue;
+
       const variantes = g.variantes.filter((v) => {
         const okT = selectedTallas.size === 0 || selectedTallas.has(v.talla);
         const okC = selectedColores.size === 0 || selectedColores.has(v.color);
@@ -146,7 +153,7 @@ function Index() {
       });
     }
     return out;
-  }, [baseList, selectedTallas, selectedColores, hasActiveFilters]);
+  }, [baseList, selectedTallas, selectedColores, selectedLineas, hasActiveFilters]);
 
   const toggle = (set: Set<string>, value: string) => {
     const next = new Set(set);
@@ -239,6 +246,14 @@ function Index() {
             {hydrated && rows.length > 0 && (
               <div className="flex flex-wrap items-center gap-2">
                 <FilterDropdown
+                  label="Línea"
+                  options={lineasOptions}
+                  selected={selectedLineas}
+                  onToggle={(l) => setSelectedLineas((prev) => toggle(prev, l))}
+                  onClear={() => setSelectedLineas(new Set())}
+                  renderOption={(l) => `Línea ${l}`}
+                />
+                <FilterDropdown
                   label="Talla"
                   options={tallasOptions}
                   selected={selectedTallas}
@@ -258,6 +273,7 @@ function Index() {
                     onClick={() => {
                       setSelectedTallas(new Set());
                       setSelectedColores(new Set());
+                      setSelectedLineas(new Set());
                     }}
                     className="text-xs font-semibold text-accent hover:underline"
                   >
