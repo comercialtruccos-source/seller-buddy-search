@@ -269,6 +269,100 @@ function Index() {
   );
 }
 
+function FilterDropdown({
+  label,
+  options,
+  selected,
+  onToggle,
+  onClear,
+  renderOption,
+}: {
+  label: string;
+  options: string[];
+  selected: Set<string>;
+  onToggle: (value: string) => void;
+  onClear: () => void;
+  renderOption?: (value: string) => string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [open]);
+
+  const count = selected.size;
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen((prev) => !prev)}
+        className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-sm font-semibold text-foreground shadow-xs transition-colors hover:border-accent"
+      >
+        <span>
+          {label}
+          {count > 0 && (
+            <span className="ml-1.5 rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-bold text-primary-foreground">
+              {count}
+            </span>
+          )}
+        </span>
+        <ChevronDown
+          className={`h-4 w-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full z-20 mt-1 w-56 rounded-xl border border-border bg-card p-2 shadow-md">
+          <div className="mb-1 flex items-center justify-between px-2 py-1">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
+              {label}
+            </span>
+            {count > 0 && (
+              <button
+                onClick={() => {
+                  onClear();
+                }}
+                className="text-[10px] font-semibold text-accent hover:underline"
+              >
+                Limpiar
+              </button>
+            )}
+          </div>
+          <div className="max-h-60 overflow-y-auto pr-1">
+            {options.map((option) => {
+              const active = selected.has(option);
+              return (
+                <label
+                  key={option}
+                  className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-foreground transition-colors hover:bg-muted"
+                >
+                  <input
+                    type="checkbox"
+                    checked={active}
+                    onChange={() => onToggle(option)}
+                    className="h-4 w-4 rounded border-border accent-primary"
+                  />
+                  <span className="capitalize">
+                    {renderOption ? renderOption(option) : option}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function EmptyState({
   icon,
   title,
