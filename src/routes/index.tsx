@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import {
   Search,
   Clock,
@@ -16,9 +16,11 @@ import {
   Trash2,
   Download,
   X,
+  History,
 } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 import {
   formatCurrency,
@@ -38,6 +40,9 @@ import {
   setOrderQty,
   useHydrateOrder,
   useOrder,
+  saveOrderToDb,
+  downloadSavedOrder,
+  deleteOrderFromDb,
 } from "@/lib/order";
 
 export const Route = createFileRoute("/")({
@@ -50,28 +55,26 @@ function Index() {
   const [query, setQuery] = useState("");
   const [hydrated, setHydrated] = useState(false);
   const [orderOpen, setOrderOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"catalogo" | "historial">("catalogo");
   useHydrateOrder();
   const order = useOrder();
   const orderCount = order.reduce((s, i) => s + i.cantidad, 0);
 
-  useEffect(() => {
-    let active = true;
-    (async () => {
-      try {
-        const { rows, updatedAt } = await loadInventory();
-        if (!active) return;
-        setRows(rows);
-        setUpdatedAt(updatedAt);
-      } catch {
-        if (active) toast.error("No se pudo cargar el inventario.");
-      } finally {
-        if (active) setHydrated(true);
-      }
-    })();
-    return () => {
-      active = false;
-    };
+  const reloadInventory = useCallback(async () => {
+    try {
+      const { rows, updatedAt } = await loadInventory();
+      setRows(rows);
+      setUpdatedAt(updatedAt);
+    } catch {
+      toast.error("No se pudo cargar el inventario.");
+    } finally {
+      setHydrated(true);
+    }
   }, []);
+
+  useEffect(() => {
+    reloadInventory();
+  }, [reloadInventory]);
 
   const groups = useMemo(() => groupByReferencia(rows), [rows]);
   const results = useMemo(
@@ -186,118 +189,156 @@ function Index() {
       </header>
 
       <main className="mx-auto max-w-4xl px-4 py-8">
-        {/* Last updated indicator */}
-        <div className="mb-6 flex items-center gap-2 text-sm text-muted-foreground">
-          <Clock className="h-4 w-4 shrink-0" />
-          {!hydrated ? (
-            <span>Cargando…</span>
-          ) : updatedAt ? (
-            <span>
-              Inventario actualizado:{" "}
-              <span className="font-semibold text-foreground">
-                {formatDateTime(updatedAt)}
-              </span>
-            </span>
-          ) : (
-            <span>Aún no has cargado inventario.</span>
-          )}
+        {/* Navigation Tabs */}
+        <div className="mb-6 flex gap-2 border-b border-border pb-px">
+          <button
+            onClick={() => setActiveTab("catalogo")}
+            className={`pb-2.5 px-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${
+              activeTab === "catalogo"
+                ? "border-accent text-accent"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Boxes className="h-4 w-4" />
+            Catálogo e Inventario
+          </button>
+          <button
+            onClick={() => setActiveTab("historial")}
+            className={`pb-2.5 px-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${
+              activeTab === "historial"
+                ? "border-accent text-accent"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <History className="h-4 w-4" />
+            Historial de Pedidos
+          </button>
         </div>
 
-        {/* Search bar */}
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar por referencia, descripción, color o SKU (ej: B0102, cargo, azul)"
-            className="w-full rounded-2xl border border-border bg-card py-4 pl-12 pr-4 text-base shadow-sm outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-accent/30"
-            autoFocus
-          />
-        </div>
+        {activeTab === "catalogo" ? (
+          <div className="space-y-6">
+            {/* Last updated indicator */}
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Clock className="h-4 w-4 shrink-0" />
+              {!hydrated ? (
+                <span>Cargando…</span>
+              ) : updatedAt ? (
+                <span>
+                  Inventario actualizado:{" "}
+                  <span className="font-semibold text-foreground">
+                    {formatDateTime(updatedAt)}
+                  </span>
+                </span>
+              ) : (
+                <span>Aún no has cargado inventario.</span>
+              )}
+            </div>
 
-        {/* Filters */}
-        {hydrated && rows.length > 0 && (
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            <FilterDropdown
-              label="Talla"
-              options={tallasOptions}
-              selected={selectedTallas}
-              onToggle={(t) => setSelectedTallas((prev) => toggle(prev, t))}
-              onClear={() => setSelectedTallas(new Set())}
-            />
-            <FilterDropdown
-              label="Color"
-              options={coloresOptions}
-              selected={selectedColores}
-              onToggle={(c) => setSelectedColores((prev) => toggle(prev, c))}
-              onClear={() => setSelectedColores(new Set())}
-              renderOption={(c) => c.toLowerCase()}
-            />
-            {hasActiveFilters && (
-              <button
-                onClick={() => {
-                  setSelectedTallas(new Set());
-                  setSelectedColores(new Set());
-                }}
-                className="text-xs font-semibold text-accent hover:underline"
-              >
-                Limpiar filtros
-              </button>
+            {/* Search bar */}
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Buscar por referencia, descripción, color o SKU (ej: B0102, cargo, azul)"
+                className="w-full rounded-2xl border border-border bg-card py-4 pl-12 pr-4 text-base shadow-sm outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-accent/30"
+                autoFocus
+              />
+            </div>
+
+            {/* Filters */}
+            {hydrated && rows.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2">
+                <FilterDropdown
+                  label="Talla"
+                  options={tallasOptions}
+                  selected={selectedTallas}
+                  onToggle={(t) => setSelectedTallas((prev) => toggle(prev, t))}
+                  onClear={() => setSelectedTallas(new Set())}
+                />
+                <FilterDropdown
+                  label="Color"
+                  options={coloresOptions}
+                  selected={selectedColores}
+                  onToggle={(c) => setSelectedColores((prev) => toggle(prev, c))}
+                  onClear={() => setSelectedColores(new Set())}
+                  renderOption={(c) => c.toLowerCase()}
+                />
+                {hasActiveFilters && (
+                  <button
+                    onClick={() => {
+                      setSelectedTallas(new Set());
+                      setSelectedColores(new Set());
+                    }}
+                    className="text-xs font-semibold text-accent hover:underline"
+                  >
+                    Limpiar filtros
+                  </button>
+                )}
+              </div>
             )}
+
+            {/* Content states */}
+            <div className="mt-6 space-y-4">
+              {hydrated && rows.length === 0 && (
+                <EmptyState
+                  icon={<FileWarning className="h-8 w-8" />}
+                  title="No hay inventario cargado"
+                  description="Usa el botón «Cargar inventario» en la página de carga para subir tu archivo CSV."
+                />
+              )}
+
+              {hydrated &&
+                rows.length > 0 &&
+                query.trim() === "" &&
+                !hasActiveFilters && (
+                  <EmptyState
+                    icon={<Search className="h-8 w-8" />}
+                    title="Busca o filtra por talla y color"
+                    description={`${groups.length} referencias disponibles. Escribe una referencia o usa los filtros arriba.`}
+                  />
+                )}
+
+              {hydrated &&
+                rows.length > 0 &&
+                query.trim() !== "" &&
+                results.length === 0 && (
+                  <EmptyState
+                    icon={<PackageSearch className="h-8 w-8" />}
+                    title="Sin resultados"
+                    description={`No se encontró ninguna referencia que coincida con «${query}».`}
+                  />
+                )}
+
+              {hydrated &&
+                query.trim() !== "" &&
+                results.length > 0 &&
+                filteredResults.length === 0 && (
+                  <EmptyState
+                    icon={<PackageSearch className="h-8 w-8" />}
+                    title="Ninguna variante coincide con los filtros"
+                    description="Prueba a quitar alguna talla o color seleccionado."
+                  />
+                )}
+
+              {filteredResults.map((group) => (
+                <ReferenceCard key={group.referencia} group={group} />
+              ))}
+            </div>
           </div>
+        ) : (
+          <OrderHistory onOrderDeleted={reloadInventory} />
         )}
-
-        {/* Content states */}
-        <div className="mt-6 space-y-4">
-          {hydrated && rows.length === 0 && (
-            <EmptyState
-              icon={<FileWarning className="h-8 w-8" />}
-              title="No hay inventario cargado"
-              description="Usa el botón «Cargar inventario» para subir tu archivo CSV y empezar a consultar referencias."
-            />
-          )}
-
-          {hydrated &&
-            rows.length > 0 &&
-            query.trim() === "" &&
-            !hasActiveFilters && (
-              <EmptyState
-                icon={<Search className="h-8 w-8" />}
-                title="Busca o filtra por talla y color"
-                description={`${groups.length} referencias disponibles. Escribe una referencia o usa los filtros arriba.`}
-              />
-            )}
-
-          {hydrated &&
-            rows.length > 0 &&
-            query.trim() !== "" &&
-            results.length === 0 && (
-              <EmptyState
-                icon={<PackageSearch className="h-8 w-8" />}
-                title="Sin resultados"
-                description={`No se encontró ninguna referencia que coincida con «${query}».`}
-              />
-            )}
-
-          {hydrated &&
-            query.trim() !== "" &&
-            results.length > 0 &&
-            filteredResults.length === 0 && (
-              <EmptyState
-                icon={<PackageSearch className="h-8 w-8" />}
-                title="Ninguna variante coincide con los filtros"
-                description="Prueba a quitar alguna talla o color seleccionado."
-              />
-            )}
-
-          {filteredResults.map((group) => (
-            <ReferenceCard key={group.referencia} group={group} />
-          ))}
-        </div>
       </main>
 
-      {orderOpen && <OrderModal order={order} onClose={() => setOrderOpen(false)} />}
+      {orderOpen && (
+        <OrderModal
+          order={order}
+          onClose={() => setOrderOpen(false)}
+          onOrderSaved={reloadInventory}
+        />
+      )}
     </div>
   );
 }
@@ -305,20 +346,55 @@ function Index() {
 function OrderModal({
   order,
   onClose,
+  onOrderSaved,
 }: {
   order: ReturnType<typeof useOrder>;
   onClose: () => void;
+  onOrderSaved?: () => void;
 }) {
+  const [customerName, setCustomerName] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
   const total = order.reduce((s, i) => s + i.pvm * i.cantidad, 0);
   const unidades = order.reduce((s, i) => s + i.cantidad, 0);
 
-  const handleDownload = () => {
+  const handleSaveAndDownload = async () => {
     if (order.length === 0) {
       toast.error("El pedido está vacío.");
       return;
     }
-    downloadOrderXls(order);
-    toast.success("Archivo generado. Súbelo a tu sistema de pedidos.");
+    const name = customerName.trim();
+    if (!name) {
+      toast.error("Por favor, ingresa el nombre del cliente para guardar el pedido.");
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      toast.loading("Validando inventario y guardando pedido…", { id: "save-order" });
+      
+      // Save order to DB (validates availability)
+      await saveOrderToDb(name, order);
+      
+      // Download XLS
+      downloadOrderXls(order, name);
+      
+      toast.success("¡Pedido guardado y descargado exitosamente!", { id: "save-order" });
+      
+      // Clear order and refresh inventory stock in parent
+      clearOrder();
+      onOrderSaved?.();
+      onClose();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(`No se pudo guardar: ${err.message || "error desconocido"}`, {
+        id: "save-order",
+        duration: 6000,
+      });
+      // Refresh inventory so they see the actual current stock
+      onOrderSaved?.();
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -431,6 +507,22 @@ function OrderModal({
         </div>
 
         <div className="border-t border-border bg-muted/30 px-5 py-4">
+          {order.length > 0 && (
+            <div className="mb-4">
+              <label htmlFor="customerName" className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1.5">
+                Nombre del Cliente
+              </label>
+              <input
+                id="customerName"
+                type="text"
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                placeholder="Ingresa el nombre del cliente para guardar el pedido"
+                className="w-full rounded-xl border border-border bg-background px-3.5 py-2 text-sm font-semibold outline-none focus:border-accent"
+                disabled={isSaving}
+              />
+            </div>
+          )}
           <div className="mb-3 flex items-center justify-between">
             <span className="text-sm font-semibold text-muted-foreground">
               Total mayorista
@@ -445,19 +537,19 @@ function OrderModal({
                 if (order.length === 0) return;
                 if (confirm("¿Vaciar el pedido?")) clearOrder();
               }}
-              disabled={order.length === 0}
+              disabled={order.length === 0 || isSaving}
               className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted disabled:opacity-40"
             >
               <Trash2 className="h-4 w-4" />
               Vaciar
             </button>
             <button
-              onClick={handleDownload}
-              disabled={order.length === 0}
+              onClick={handleSaveAndDownload}
+              disabled={order.length === 0 || isSaving}
               className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-bold text-accent-foreground shadow-sm transition-transform hover:scale-[1.02] disabled:opacity-40 disabled:hover:scale-100"
             >
               <Download className="h-4 w-4" />
-              Descargar pedido (.xls)
+              {isSaving ? "Guardando..." : "Guardar y Descargar (.xls)"}
             </button>
           </div>
         </div>
@@ -817,6 +909,150 @@ function PriceBlock({
           </span>
         )}
       </div>
+    </div>
+  );
+}
+
+function OrderHistory({ onOrderDeleted }: { onOrderDeleted?: () => void }) {
+  const [orders, setOrders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchName, setSearchName] = useState("");
+
+  const fetchOrdersList = useCallback(async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("orders")
+        .select(`
+          id,
+          customer_name,
+          total_amount,
+          created_at,
+          order_items (
+            cantidad
+          )
+        `)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setOrders(data || []);
+    } catch (err: any) {
+      toast.error(`Error al cargar el historial: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchOrdersList();
+  }, [fetchOrdersList]);
+
+  const handleDelete = async (id: string, name: string) => {
+    if (
+      !confirm(
+        `¿Estás seguro de eliminar el pedido de "${name}"? Esto liberará las unidades reservadas en el inventario.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      toast.loading("Eliminando pedido…", { id: "delete-order" });
+      await deleteOrderFromDb(id);
+      toast.success("Pedido eliminado y stock liberado.", { id: "delete-order" });
+      fetchOrdersList();
+      onOrderDeleted?.();
+    } catch (err: any) {
+      toast.error(`No se pudo eliminar: ${err.message}`, { id: "delete-order" });
+    }
+  };
+
+  const filteredOrders = useMemo(() => {
+    const q = searchName.trim().toLowerCase();
+    if (!q) return orders;
+    return orders.filter((o) => o.customer_name.toLowerCase().includes(q));
+  }, [orders, searchName]);
+
+  if (loading && orders.length === 0) {
+    return (
+      <div className="flex h-64 flex-col items-center justify-center text-center text-muted-foreground">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-accent border-t-transparent mb-3" />
+        <p className="text-sm">Cargando historial de pedidos…</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Search client name */}
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+        <input
+          type="text"
+          value={searchName}
+          onChange={(e) => setSearchName(e.target.value)}
+          placeholder="Buscar pedidos por nombre del cliente..."
+          className="w-full rounded-2xl border border-border bg-card py-4 pl-12 pr-4 text-base shadow-sm outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-accent/30"
+        />
+      </div>
+
+      {filteredOrders.length === 0 ? (
+        <div className="flex h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card p-6 text-center text-muted-foreground">
+          <Clock className="mb-3 h-10 w-10 opacity-30" />
+          <p className="text-sm font-semibold">No se encontraron pedidos</p>
+          <p className="text-xs text-muted-foreground/75 mt-1">
+            {searchName ? "Prueba con otro nombre o término." : "Los pedidos guardados aparecerán aquí."}
+          </p>
+        </div>
+      ) : (
+        <div className="grid gap-3">
+          {filteredOrders.map((o) => {
+            const unitsCount =
+              o.order_items?.reduce((s: number, i: any) => s + (i.cantidad || 0), 0) || 0;
+            return (
+              <div
+                key={o.id}
+                className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm hover:border-accent/30 transition-all duration-150"
+              >
+                <div className="space-y-1.5 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-base font-bold text-foreground truncate">
+                      {o.customer_name}
+                    </span>
+                    <span className="inline-flex items-center rounded-full bg-accent/15 px-2.5 py-0.5 text-xs font-bold text-accent dark:bg-accent/20">
+                      {unitsCount} {unitsCount === 1 ? "unidad" : "unidades"}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span>Pedido: {o.id.substring(0, 8).toUpperCase()}</span>
+                    <span>•</span>
+                    <span>{formatDateTime(o.created_at)}</span>
+                  </div>
+                  <p className="text-sm font-extrabold text-primary">
+                    Total: {formatCurrency(o.total_amount)}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 self-end sm:self-center">
+                  <button
+                    onClick={() => downloadSavedOrder(o.id, o.customer_name)}
+                    className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-sm font-bold text-accent-foreground shadow-sm transition-transform hover:scale-105"
+                  >
+                    <Download className="h-4 w-4" />
+                    <span>Descargar (.xls)</span>
+                  </button>
+                  <button
+                    onClick={() => handleDelete(o.id, o.customer_name)}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                    title="Eliminar pedido y liberar stock"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

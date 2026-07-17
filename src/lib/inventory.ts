@@ -409,6 +409,18 @@ export async function loadInventory(): Promise<{
   rows: InventoryRow[];
   updatedAt: string | null;
 }> {
+  // Fetch reserved quantities from order_items
+  const { data: orderedData, error: orderedError } = await supabase
+    .from("order_items")
+    .select("sku, cantidad");
+
+  const orderedQtys: Record<string, number> = {};
+  if (!orderedError && orderedData) {
+    for (const item of orderedData) {
+      orderedQtys[item.sku] = (orderedQtys[item.sku] || 0) + item.cantidad;
+    }
+  }
+
   const pageSize = 1000;
   let from = 0;
   const all: InventoryDbRow[] = [];
@@ -428,7 +440,13 @@ export async function loadInventory(): Promise<{
   }
   const data = all;
 
-  const rows = (data ?? []).map(fromDb);
+  const rows = (data ?? []).map(fromDb).map((r) => {
+    const reserved = orderedQtys[r.sku] || 0;
+    return {
+      ...r,
+      saldo: Math.max(0, r.saldo - reserved),
+    };
+  });
   const updatedAt = (data ?? []).reduce<string | null>((latest, row) => {
     const created = (row as InventoryDbRow).created_at ?? null;
     if (!created) return latest;

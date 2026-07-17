@@ -1,5 +1,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 import * as XLSX from "xlsx";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 export interface OrderItem {
   sku: string;
@@ -116,8 +118,7 @@ export function clearOrder() {
   emit();
 }
 
-/** Build & download the CARGA_PEDIDOS .xls file with the exact format required. */
-export function downloadOrderXls(order: OrderItem[]) {
+export function downloadOrderXls(order: OrderItem[], customerName?: string) {
   const aoa: (string | number)[][] = [
     [
       "StrProducto",
@@ -174,6 +175,131 @@ export function downloadOrderXls(order: OrderItem[]) {
   XLSX.utils.book_append_sheet(wb, ws, "TblDetalleDocumentos");
   const ts = new Date();
   const pad = (n: number) => String(n).padStart(2, "0");
-  const fname = `CARGA_PEDIDOS_${ts.getFullYear()}${pad(ts.getMonth() + 1)}${pad(ts.getDate())}_${pad(ts.getHours())}${pad(ts.getMinutes())}.xls`;
+  const suffix = customerName ? `_${customerName.toUpperCase().replace(/[^A-Z0-9]/g, "_")}` : "";
+  const fname = `CARGA_PEDIDOS${suffix}_${ts.getFullYear()}${pad(ts.getMonth() + 1)}${pad(ts.getDate())}_${pad(ts.getHours())}${pad(ts.getMinutes())}.xls`;
   XLSX.writeFile(wb, fname, { bookType: "biff8" });
+}
+
+export async function saveOrderToDb(customerName: string, items: OrderItem[]): Promise<string> {
+  const skus = items.map((it) => it.sku);
+
+  // 1. Fetch current inventory for these SKUs to check original stock
+  const { data: invData, error: invError } = await supabase
+    .from("inventory")
+    .select("sku, referencia, talla, color, saldo")
+    .in("sku", skus);
+  if (invError) throw new Error(`Error al verificar inventario: ${invError.message}`);
+
+  // 2. Fetch current ordered quantities for these SKUs
+  const { data: orderedData, error: orderedError } = await supabase
+    .from("order_items")
+    .select("sku, cantidad")
+    .in("sku", skus);
+  if (orderedError) throw new Error(`Error al verificar pedidos existentes: ${orderedError.message}`);
+
+  const orderedMap: Record<string, number> = {};
+  if (orderedData) {
+    for (const ord of orderedData) {
+      orderedMap[ord.sku] = (orderedMap[ord.sku] || 0) + ord.cantidad;
+    }
+  }
+
+  // 3. Check stock availability
+  const errors: string[] = [];
+  for (const it of items) {
+    const inv = invData?.find((i) => i.sku === it.sku);
+    if (!inv) {
+      errors.push(`La referencia ${it.referencia} (Talla ${it.talla}, SKU ${it.sku}) no existe en el inventario.`);
+      continue;
+    }
+    const reserved = orderedMap[it.sku] || 0;
+    const available = Math.max(0, inv.saldo - reserved);
+    if (it.cantidad > available) {
+      errors.push(
+        `${it.referencia} - T${it.talla} (${it.color}): Solicitado ${it.cantidad}, Disponible real: ${available} (ya reservado en otros pedidos).`
+      );
+    }
+  }
+
+  if (errors.length > 0) {
+    throw new Error(errors.join("\n"));
+  }
+
+  // 4. Insert order header
+  const totalAmount = items.reduce((s, i) => s + i.pvm * i.cantidad, 0);
+  const { data: orderData, error: orderError } = await supabase
+    .from("orders")
+    .insert({
+      customer_name: customerName.trim(),
+      total_amount: totalAmount,
+    })
+    .select()
+    .single();
+
+  if (orderError) throw orderError;
+
+  // 5. Insert order items
+  const itemsToInsert = items.map((it) => ({
+    order_id: orderData.id,
+    sku: it.sku,
+    referencia: it.referencia,
+    descripcion: it.descripcion,
+    talla: it.talla,
+    color: it.color,
+    cod_color: it.codColor,
+    pvm: it.pvm,
+    cantidad: it.cantidad,
+  }));
+
+  const { error: itemsError } = await supabase
+    .from("order_items")
+    .insert(itemsToInsert);
+
+  if (itemsError) {
+    // Cleanup parent order on failure
+    await supabase.from("orders").delete().eq("id", orderData.id);
+    throw itemsError;
+  }
+
+  return orderData.id;
+}
+
+export async function downloadSavedOrder(orderId: string, customerName: string) {
+  const { data, error } = await supabase
+    .from("order_items")
+    .select("*")
+    .eq("order_id", orderId);
+
+  if (error) {
+    toast.error(`Error al obtener los detalles del pedido: ${error.message}`);
+    return;
+  }
+
+  if (!data || data.length === 0) {
+    toast.error("El pedido no contiene artículos.");
+    return;
+  }
+
+  const orderItems: OrderItem[] = data.map((item) => ({
+    sku: item.sku,
+    referencia: item.referencia,
+    descripcion: item.descripcion,
+    talla: item.talla,
+    color: item.color,
+    codColor: item.cod_color,
+    pvm: Number(item.pvm),
+    saldo: 99999, // dummy stock value for export
+    cantidad: item.cantidad,
+  }));
+
+  downloadOrderXls(orderItems, customerName);
+}
+
+export async function deleteOrderFromDb(orderId: string): Promise<void> {
+  const { error } = await supabase
+    .from("orders")
+    .delete()
+    .eq("id", orderId);
+
+  if (error) throw error;
 }

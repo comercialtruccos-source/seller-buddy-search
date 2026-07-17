@@ -62,6 +62,77 @@ export type Database = {
         }
         Relationships: []
       }
+      orders: {
+        Row: {
+          id: string
+          customer_name: string
+          total_amount: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          customer_name: string
+          total_amount?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          customer_name?: string
+          total_amount?: number
+          created_at?: string
+        }
+        Relationships: []
+      }
+      order_items: {
+        Row: {
+          id: string
+          order_id: string
+          sku: string
+          referencia: string
+          descripcion: string
+          talla: string
+          color: string
+          cod_color: string
+          pvm: number
+          cantidad: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          order_id: string
+          sku: string
+          referencia: string
+          descripcion?: string
+          talla?: string
+          color?: string
+          cod_color?: string
+          pvm?: number
+          cantidad?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          order_id?: string
+          sku?: string
+          referencia?: string
+          descripcion?: string
+          talla?: string
+          color?: string
+          cod_color?: string
+          pvm?: number
+          cantidad?: number
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
     }
     Views: {
       [_ in never]: never
