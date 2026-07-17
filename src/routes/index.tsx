@@ -170,6 +170,18 @@ function Index() {
               </p>
             </div>
           </div>
+          <button
+            onClick={() => setOrderOpen(true)}
+            className="relative inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-bold text-accent-foreground shadow-sm transition-transform hover:scale-105"
+          >
+            <ShoppingCart className="h-4 w-4" />
+            <span>Pedido</span>
+            {orderCount > 0 && (
+              <span className="ml-1 rounded-full bg-primary px-2 py-0.5 text-xs font-extrabold text-primary-foreground">
+                {orderCount}
+              </span>
+            )}
+          </button>
         </div>
       </header>
 
