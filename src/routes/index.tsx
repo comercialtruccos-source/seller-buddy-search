@@ -53,6 +53,9 @@ function Index() {
   useHydrateOrder();
   const order = useOrder();
   const orderCount = order.reduce((s, i) => s + i.cantidad, 0);
+
+  useEffect(() => {
+    let active = true;
     (async () => {
       try {
         const { rows, updatedAt } = await loadInventory();
