@@ -50,6 +50,7 @@ function Cargar() {
       "SKU",
       "PVM UNIT",
       "PVP UNIT",
+      "Precio USD",
       "Imagen"
     ];
     
@@ -65,6 +66,7 @@ function Cargar() {
         "SKU-REF001-AZ-02",
         "45000",
         "85000",
+        "12.50",
         "https://images.unsplash.com/photo-1542272604-787c3835535d?q=80&w=1000"
       ],
       [
@@ -78,6 +80,7 @@ function Cargar() {
         "SKU-REF001-AZ-04",
         "45000",
         "85000",
+        "12.50",
         "https://images.unsplash.com/photo-1542272604-787c3835535d?q=80&w=1000"
       ]
     ];

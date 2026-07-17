@@ -24,6 +24,7 @@ export type Database = {
           image_url: string
           pvm: number
           pvp: number
+          precio_usd: number
           referencia: string
           saldo: number
           sku: string
@@ -39,6 +40,7 @@ export type Database = {
           image_url?: string
           pvm?: number
           pvp?: number
+          precio_usd?: number
           referencia: string
           saldo?: number
           sku?: string
@@ -54,6 +56,7 @@ export type Database = {
           image_url?: string
           pvm?: number
           pvp?: number
+          precio_usd?: number
           referencia?: string
           saldo?: number
           sku?: string

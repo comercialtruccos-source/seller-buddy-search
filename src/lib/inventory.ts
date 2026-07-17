@@ -9,6 +9,7 @@ export interface InventoryRow {
   sku: string;
   pvm: number; // precio mayorista (PVM UNIT)
   pvp: number; // precio detal (PVP UNIT)
+  precioUsd: number; // precio en dólares (USD)
   imageUrl?: string;
 }
 
@@ -17,6 +18,7 @@ export interface ReferenceGroup {
   descripcion: string;
   pvm: number;
   pvp: number;
+  precioUsd: number;
   totalSaldo: number;
   variantes: InventoryRow[];
   imageUrl?: string;
@@ -155,6 +157,9 @@ export function parseInventoryCsv(text: string): InventoryRow[] {
   const photoIdx = headers.findIndex(
     (h) => h.includes("foto") || h.includes("imagen") || h.includes("image")
   );
+  const usdIdx = headers.findIndex(
+    (h) => h.includes("usd") || h.includes("dolar") || h.includes("dólar") || h.includes("dol")
+  );
 
   const dataLines = lines.slice(1);
   const rows: InventoryRow[] = [];
@@ -170,6 +175,13 @@ export function parseInventoryCsv(text: string): InventoryRow[] {
     const rawCodColor = (cols[6] ?? "").trim();
     const codColor = /^\d+$/.test(rawCodColor) ? rawCodColor.padStart(2, "0") : rawCodColor;
 
+    let precioUsd = 0;
+    if (usdIdx !== -1 && cols[usdIdx]) {
+      precioUsd = toNumber(cols[usdIdx]);
+    } else if (cols[10] && !isValidImageUrl(cols[10])) {
+      precioUsd = toNumber(cols[10]);
+    }
+
     const row: InventoryRow = {
       referencia,
       descripcion: cols[1] ?? "",
@@ -181,12 +193,15 @@ export function parseInventoryCsv(text: string): InventoryRow[] {
       sku: cols[7] ?? "",
       pvm: toNumber(cols[8]),
       pvp: toNumber(cols[9]),
+      precioUsd,
     };
 
     let rawImgUrl = "";
     if (photoIdx !== -1 && cols[photoIdx]) {
       rawImgUrl = cols[photoIdx];
-    } else if (cols[10]) {
+    } else if (cols[11]) {
+      rawImgUrl = cols[11];
+    } else if (cols[10] && isValidImageUrl(cols[10])) {
       rawImgUrl = cols[10];
     }
 
@@ -213,6 +228,7 @@ export function groupByReferencia(rows: InventoryRow[]): ReferenceGroup[] {
       // Keep the max known prices in case of inconsistencies.
       existing.pvm = existing.pvm || row.pvm;
       existing.pvp = existing.pvp || row.pvp;
+      existing.precioUsd = existing.precioUsd || row.precioUsd;
       if (!existing.imageUrl && row.imageUrl) {
         existing.imageUrl = row.imageUrl;
       }
@@ -222,6 +238,7 @@ export function groupByReferencia(rows: InventoryRow[]): ReferenceGroup[] {
         descripcion: row.descripcion,
         pvm: row.pvm,
         pvp: row.pvp,
+        precioUsd: row.precioUsd,
         totalSaldo: row.saldo,
         variantes: [row],
         imageUrl: row.imageUrl,
@@ -307,6 +324,17 @@ export function formatCurrency(value: number): string {
   return currencyFormatter.format(value);
 }
 
+const usdFormatter = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+export function formatUsd(value: number): string {
+  return usdFormatter.format(value);
+}
+
 const dateTimeFormatter = new Intl.DateTimeFormat("es-CO", {
   dateStyle: "medium",
   timeStyle: "short",
@@ -331,6 +359,7 @@ interface InventoryDbRow {
   sku: string;
   pvm: number;
   pvp: number;
+  precio_usd?: number;
   image_url?: string;
   created_at?: string;
 }
@@ -384,6 +413,7 @@ function fromDb(row: InventoryDbRow): InventoryRow {
     sku: row.sku,
     pvm: row.pvm,
     pvp: row.pvp,
+    precioUsd: row.precio_usd ?? 0,
     imageUrl: row.image_url ?? "",
   };
 }
@@ -400,6 +430,7 @@ function toDb(row: InventoryRow): InventoryDbRow {
     sku: row.sku,
     pvm: row.pvm,
     pvp: row.pvp,
+    precio_usd: row.precioUsd,
     image_url: row.imageUrl ?? "",
   };
 }

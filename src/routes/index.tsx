@@ -26,6 +26,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   formatCurrency,
   formatDateTime,
+  formatUsd,
   groupByReferencia,
   loadInventory,
   searchReferences,
@@ -785,7 +786,7 @@ function ReferenceCard({ group }: { group: ReferenceGroup }) {
         </div>
 
         {/* Pricing Cards */}
-        <div className="px-5 pb-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className={`px-5 pb-4 grid grid-cols-1 ${group.precioUsd && group.precioUsd > 0 ? "sm:grid-cols-3" : "sm:grid-cols-2"} gap-3`}>
           <PriceBlock
             label="Precio Detal (PVP)"
             value={formatCurrency(group.pvp)}
@@ -794,7 +795,15 @@ function ReferenceCard({ group }: { group: ReferenceGroup }) {
           <PriceBlock
             label="Precio Mayorista (PVM)"
             value={formatCurrency(group.pvm)}
+            badge="Mayorista"
           />
+          {group.precioUsd !== undefined && group.precioUsd > 0 && (
+            <PriceBlock
+              label="Precio Dólares (USD)"
+              value={formatUsd(group.precioUsd)}
+              badge="USD"
+            />
+          )}
         </div>
 
         {/* Inventory Header */}
@@ -900,10 +909,12 @@ function PriceBlock({
   label,
   value,
   highlight,
+  badge,
 }: {
   label: string;
   value: string;
   highlight?: boolean;
+  badge?: string;
 }) {
   return (
     <div className={`rounded-xl border p-4 transition-all duration-200 ${
@@ -921,10 +932,16 @@ function PriceBlock({
         }`}>
           {value}
         </span>
-        {!highlight && (
-          <span className="text-[9px] font-extrabold bg-accent/25 text-primary px-1.5 py-0.5 rounded-md uppercase tracking-wider select-none animate-pulse-slow">
-            Mayorista
+        {badge ? (
+          <span className="text-[9px] font-extrabold bg-accent/25 text-primary px-1.5 py-0.5 rounded-md uppercase tracking-wider select-none">
+            {badge}
           </span>
+        ) : (
+          !highlight && (
+            <span className="text-[9px] font-extrabold bg-accent/25 text-primary px-1.5 py-0.5 rounded-md uppercase tracking-wider select-none animate-pulse-slow">
+              Mayorista
+            </span>
+          )
         )}
       </div>
     </div>
