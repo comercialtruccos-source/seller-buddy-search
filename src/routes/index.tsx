@@ -17,6 +17,7 @@ import {
   Download,
   X,
   History,
+  Save,
 } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import { useQuery } from "@tanstack/react-query";
@@ -357,7 +358,17 @@ function OrderModal({
   const total = order.reduce((s, i) => s + i.pvm * i.cantidad, 0);
   const unidades = order.reduce((s, i) => s + i.cantidad, 0);
 
-  const handleSaveAndDownload = async () => {
+  const handleDownloadOnly = () => {
+    if (order.length === 0) {
+      toast.error("El pedido está vacío.");
+      return;
+    }
+    const name = customerName.trim();
+    downloadOrderXls(order, name || undefined);
+    toast.success("Archivo Excel generado y descargado con éxito.");
+  };
+
+  const handleSaveToDb = async () => {
     if (order.length === 0) {
       toast.error("El pedido está vacío.");
       return;
@@ -375,10 +386,7 @@ function OrderModal({
       // Save order to DB (validates availability)
       await saveOrderToDb(name, order);
       
-      // Download XLS
-      downloadOrderXls(order, name);
-      
-      toast.success("¡Pedido guardado y descargado exitosamente!", { id: "save-order" });
+      toast.success("¡Pedido guardado exitosamente en la base de datos!", { id: "save-order" });
       
       // Clear order and refresh inventory stock in parent
       clearOrder();
@@ -531,25 +539,35 @@ function OrderModal({
               {formatCurrency(total)}
             </span>
           </div>
-          <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="flex flex-col gap-2">
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  if (order.length === 0) return;
+                  if (confirm("¿Vaciar el pedido?")) clearOrder();
+                }}
+                disabled={order.length === 0 || isSaving}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted disabled:opacity-40"
+              >
+                <Trash2 className="h-4 w-4" />
+                Vaciar
+              </button>
+              <button
+                onClick={handleDownloadOnly}
+                disabled={order.length === 0 || isSaving}
+                className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-accent/30 bg-accent/10 px-4 py-2.5 text-sm font-bold text-primary transition-all hover:bg-accent/20 disabled:opacity-40"
+              >
+                <Download className="h-4 w-4" />
+                Descargar Excel (.xls)
+              </button>
+            </div>
             <button
-              onClick={() => {
-                if (order.length === 0) return;
-                if (confirm("¿Vaciar el pedido?")) clearOrder();
-              }}
+              onClick={handleSaveToDb}
               disabled={order.length === 0 || isSaving}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted disabled:opacity-40"
+              className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3 text-sm font-bold text-accent-foreground shadow-sm transition-transform hover:scale-[1.01] active:scale-95 disabled:opacity-40 disabled:hover:scale-100"
             >
-              <Trash2 className="h-4 w-4" />
-              Vaciar
-            </button>
-            <button
-              onClick={handleSaveAndDownload}
-              disabled={order.length === 0 || isSaving}
-              className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-bold text-accent-foreground shadow-sm transition-transform hover:scale-[1.02] disabled:opacity-40 disabled:hover:scale-100"
-            >
-              <Download className="h-4 w-4" />
-              {isSaving ? "Guardando..." : "Guardar y Descargar (.xls)"}
+              <Save className="h-4 w-4" />
+              {isSaving ? "Guardando..." : "Guardar Pedido en Base de Datos"}
             </button>
           </div>
         </div>
