@@ -703,23 +703,46 @@ function ReferenceCard({ group }: { group: ReferenceGroup }) {
                   }
 
                   return (
-                    <button
-                      key={v.sku}
-                      disabled={!hasStock}
-                      onClick={() => copySku(v.sku, v.talla, color)}
-                      className={`inline-flex items-center gap-2 border px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-150 group relative ${badgeColor}`}
-                      title={hasStock ? `Click para copiar SKU: ${v.sku}` : "Sin stock disponible"}
-                    >
-                      <span>Talla {v.talla}</span>
-                      <span className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded-md text-[10px] font-extrabold ${
-                        !hasStock ? "bg-muted/50 text-muted-foreground/40" : "bg-primary/15 text-primary dark:bg-accent/20 dark:text-accent"
-                      }`}>
-                        {v.saldo}
-                      </span>
+                    <div key={v.sku} className="inline-flex items-stretch">
+                      <button
+                        disabled={!hasStock}
+                        onClick={() => copySku(v.sku, v.talla, color)}
+                        className={`inline-flex items-center gap-2 border px-3 py-1.5 ${hasStock ? "rounded-l-xl border-r-0" : "rounded-xl"} text-xs font-bold transition-all duration-150 group relative ${badgeColor}`}
+                        title={hasStock ? `Click para copiar SKU: ${v.sku}` : "Sin stock disponible"}
+                      >
+                        <span>Talla {v.talla}</span>
+                        <span className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded-md text-[10px] font-extrabold ${
+                          !hasStock ? "bg-muted/50 text-muted-foreground/40" : "bg-primary/15 text-primary dark:bg-accent/20 dark:text-accent"
+                        }`}>
+                          {v.saldo}
+                        </span>
+                        {hasStock && (
+                          <Copy className="h-3.5 w-3.5 opacity-0 group-hover:opacity-60 transition-opacity ml-0.5" />
+                        )}
+                      </button>
                       {hasStock && (
-                        <Copy className="h-3.5 w-3.5 opacity-0 group-hover:opacity-60 transition-opacity ml-0.5" />
+                        <button
+                          onClick={() => {
+                            addOrderItem({
+                              sku: v.sku,
+                              referencia: group.referencia,
+                              descripcion: group.descripcion,
+                              talla: v.talla,
+                              color,
+                              codColor: v.codColor,
+                              pvm: group.pvm || v.pvm,
+                              saldo: v.saldo,
+                            });
+                            toast.success(`Añadido: ${group.referencia} ${color} T${v.talla}`, { duration: 1500 });
+                          }}
+                          className="inline-flex items-center rounded-r-xl border border-accent bg-accent px-2 text-accent-foreground transition-colors hover:bg-accent/90"
+                          title="Añadir al pedido"
+                          aria-label="Añadir al pedido"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                        </button>
                       )}
-                    </button>
+                    </div>
                   );
                 })}
               </div>
