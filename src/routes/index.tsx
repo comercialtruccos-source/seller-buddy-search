@@ -49,9 +49,10 @@ function Index() {
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [hydrated, setHydrated] = useState(false);
-
-  useEffect(() => {
-    let active = true;
+  const [orderOpen, setOrderOpen] = useState(false);
+  useHydrateOrder();
+  const order = useOrder();
+  const orderCount = order.reduce((s, i) => s + i.cantidad, 0);
     (async () => {
       try {
         const { rows, updatedAt } = await loadInventory();
