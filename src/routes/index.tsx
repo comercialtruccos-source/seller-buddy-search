@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Search,
   Clock,
@@ -7,11 +7,8 @@ import {
   Tag,
   Boxes,
   FileWarning,
-  CheckCircle2,
-  Image as ImageIcon,
+  ChevronDown,
   Shirt,
-  Table,
-  LayoutGrid,
   Copy,
 } from "lucide-react";
 import { toast, Toaster } from "sonner";
@@ -190,74 +187,32 @@ function Index() {
 
         {/* Filters */}
         {hydrated && rows.length > 0 && (
-          <div className="mt-5 rounded-2xl border border-border bg-card/60 p-4 shadow-xs">
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <span className="text-[11px] font-extrabold uppercase tracking-wider text-muted-foreground">
-                Filtrar por talla y color
-              </span>
-              {hasActiveFilters && (
-                <button
-                  onClick={() => {
-                    setSelectedTallas(new Set());
-                    setSelectedColores(new Set());
-                  }}
-                  className="text-xs font-semibold text-accent hover:underline"
-                >
-                  Limpiar filtros
-                </button>
-              )}
-            </div>
-
-            {tallasOptions.length > 0 && (
-              <div className="mb-3">
-                <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80">
-                  Tallas
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {tallasOptions.map((t) => {
-                    const active = selectedTallas.has(t);
-                    return (
-                      <button
-                        key={t}
-                        onClick={() => setSelectedTallas((prev) => toggle(prev, t))}
-                        className={`rounded-full border px-3 py-1 text-xs font-bold transition-colors ${
-                          active
-                            ? "bg-primary text-primary-foreground border-primary"
-                            : "bg-background text-foreground border-border hover:border-accent"
-                        }`}
-                      >
-                        {t}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {coloresOptions.length > 0 && (
-              <div>
-                <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80">
-                  Colores
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {coloresOptions.map((c) => {
-                    const active = selectedColores.has(c);
-                    return (
-                      <button
-                        key={c}
-                        onClick={() => setSelectedColores((prev) => toggle(prev, c))}
-                        className={`rounded-full border px-3 py-1 text-xs font-medium capitalize transition-colors ${
-                          active
-                            ? "bg-primary text-primary-foreground border-primary"
-                            : "bg-background text-foreground border-border hover:border-accent"
-                        }`}
-                      >
-                        {c.toLowerCase()}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <FilterDropdown
+              label="Talla"
+              options={tallasOptions}
+              selected={selectedTallas}
+              onToggle={(t) => setSelectedTallas((prev) => toggle(prev, t))}
+              onClear={() => setSelectedTallas(new Set())}
+            />
+            <FilterDropdown
+              label="Color"
+              options={coloresOptions}
+              selected={selectedColores}
+              onToggle={(c) => setSelectedColores((prev) => toggle(prev, c))}
+              onClear={() => setSelectedColores(new Set())}
+              renderOption={(c) => c.toLowerCase()}
+            />
+            {hasActiveFilters && (
+              <button
+                onClick={() => {
+                  setSelectedTallas(new Set());
+                  setSelectedColores(new Set());
+                }}
+                className="text-xs font-semibold text-accent hover:underline"
+              >
+                Limpiar filtros
+              </button>
             )}
           </div>
         )}
@@ -310,6 +265,100 @@ function Index() {
           ))}
         </div>
       </main>
+    </div>
+  );
+}
+
+function FilterDropdown({
+  label,
+  options,
+  selected,
+  onToggle,
+  onClear,
+  renderOption,
+}: {
+  label: string;
+  options: string[];
+  selected: Set<string>;
+  onToggle: (value: string) => void;
+  onClear: () => void;
+  renderOption?: (value: string) => string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [open]);
+
+  const count = selected.size;
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen((prev) => !prev)}
+        className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-sm font-semibold text-foreground shadow-xs transition-colors hover:border-accent"
+      >
+        <span>
+          {label}
+          {count > 0 && (
+            <span className="ml-1.5 rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-bold text-primary-foreground">
+              {count}
+            </span>
+          )}
+        </span>
+        <ChevronDown
+          className={`h-4 w-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full z-20 mt-1 w-56 rounded-xl border border-border bg-card p-2 shadow-md">
+          <div className="mb-1 flex items-center justify-between px-2 py-1">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
+              {label}
+            </span>
+            {count > 0 && (
+              <button
+                onClick={() => {
+                  onClear();
+                }}
+                className="text-[10px] font-semibold text-accent hover:underline"
+              >
+                Limpiar
+              </button>
+            )}
+          </div>
+          <div className="max-h-60 overflow-y-auto pr-1">
+            {options.map((option) => {
+              const active = selected.has(option);
+              return (
+                <label
+                  key={option}
+                  className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-foreground transition-colors hover:bg-muted"
+                >
+                  <input
+                    type="checkbox"
+                    checked={active}
+                    onChange={() => onToggle(option)}
+                    className="h-4 w-4 rounded border-border accent-primary"
+                  />
+                  <span className="capitalize">
+                    {renderOption ? renderOption(option) : option}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
