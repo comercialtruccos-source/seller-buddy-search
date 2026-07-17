@@ -18,6 +18,8 @@ import {
   X,
   History,
   Save,
+  Eye,
+  ExternalLink,
 } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import { useQuery } from "@tanstack/react-query";
@@ -87,6 +89,13 @@ function Index() {
   const [selectedTallas, setSelectedTallas] = useState<Set<string>>(new Set());
   const [selectedColores, setSelectedColores] = useState<Set<string>>(new Set());
   const [selectedLineas, setSelectedLineas] = useState<Set<string>>(new Set());
+  const [previewImage, setPreviewImage] = useState<{
+    src: string;
+    alt: string;
+    description: string;
+    refCode: string;
+    shopifyUrl?: string;
+  } | null>(null);
 
   const lineasOptions = useMemo(() => ["T", "B", "P", "R"], []);
   const lineasLabels: Record<string, string> = {
@@ -333,7 +342,11 @@ function Index() {
                 )}
 
               {filteredResults.map((group) => (
-                <ReferenceCard key={group.referencia} group={group} />
+                <ReferenceCard
+                  key={group.referencia}
+                  group={group}
+                  onPreviewImage={setPreviewImage}
+                />
               ))}
             </div>
           </div>
@@ -364,6 +377,13 @@ function Index() {
           order={order}
           onClose={() => setOrderOpen(false)}
           onOrderSaved={reloadInventory}
+        />
+      )}
+
+      {previewImage && (
+        <ImageModal
+          image={previewImage}
+          onClose={() => setPreviewImage(null)}
         />
       )}
     </div>
@@ -718,7 +738,19 @@ function EmptyState({
   );
 }
 
-function ReferenceCard({ group }: { group: ReferenceGroup }) {
+function ReferenceCard({
+  group,
+  onPreviewImage,
+}: {
+  group: ReferenceGroup;
+  onPreviewImage?: (img: {
+    src: string;
+    alt: string;
+    description: string;
+    refCode: string;
+    shopifyUrl?: string;
+  }) => void;
+}) {
   // Query Shopify search suggestion API to fetch product image in live mode
   const { data: shopifyProduct, isLoading } = useQuery({
     queryKey: ["shopifyProduct", group.referencia],
@@ -762,11 +794,20 @@ function ReferenceCard({ group }: { group: ReferenceGroup }) {
             <Boxes className="h-8 w-8 text-accent animate-spin" />
           </div>
         ) : imageUrl ? (
-          <a
-            href={shopifyUrl || "#"}
-            target={shopifyUrl ? "_blank" : undefined}
-            rel="noopener noreferrer"
-            className={`block h-full w-full group relative ${shopifyUrl ? "cursor-pointer" : "cursor-default"}`}
+          <button
+            onClick={() => {
+              if (onPreviewImage) {
+                onPreviewImage({
+                  src: imageUrl,
+                  alt: group.descripcion,
+                  description: group.descripcion,
+                  refCode: group.referencia,
+                  shopifyUrl: shopifyUrl || undefined,
+                });
+              }
+            }}
+            className="block h-full w-full group relative cursor-zoom-in overflow-hidden"
+            title="Click para ampliar imagen"
           >
             <img
               src={imageUrl}
@@ -774,14 +815,12 @@ function ReferenceCard({ group }: { group: ReferenceGroup }) {
               className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
               loading="lazy"
             />
-            {shopifyUrl && (
-              <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-center pb-3">
-                <span className="bg-background/90 backdrop-blur-xs text-[10px] font-bold text-foreground px-2.5 py-1 rounded-full shadow-sm">
-                  Ver en tienda
-                </span>
+            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-background/95 text-foreground shadow-md transition-transform duration-300 scale-90 group-hover:scale-100">
+                <Eye className="h-5 w-5" />
               </div>
-            )}
-          </a>
+            </div>
+          </button>
         ) : (
           <div className="flex flex-col items-center justify-center text-muted-foreground/30 p-4 border border-dashed border-muted-foreground/20 rounded-xl w-full h-full min-h-[120px]">
             <Shirt className="h-8 w-8 mb-1.5 text-muted-foreground/35 stroke-1" />
@@ -1113,6 +1152,70 @@ function OrderHistory({ onOrderDeleted }: { onOrderDeleted?: () => void }) {
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+function ImageModal({
+  image,
+  onClose,
+}: {
+  image: { src: string; alt: string; description: string; refCode: string; shopifyUrl?: string };
+  onClose: () => void;
+}) {
+  return (
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md"
+    >
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 rounded-full bg-black/40 p-2.5 text-white/80 hover:bg-black/60 transition-colors hover:text-white"
+        aria-label="Cerrar vista"
+      >
+        <X className="h-6 w-6" />
+      </button>
+
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="relative flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-card border border-border shadow-2xl"
+      >
+        {/* Image wrapper */}
+        <div className="relative flex-1 overflow-hidden bg-muted/20 flex items-center justify-center">
+          <img
+            src={image.src}
+            alt={image.alt}
+            className="max-h-[65vh] w-full object-contain"
+          />
+        </div>
+
+        {/* Info footer */}
+        <div className="bg-card border-t border-border p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="rounded-md bg-primary px-2 py-0.5 font-mono text-xs font-bold text-primary-foreground tracking-wide">
+                  {image.refCode}
+                </span>
+              </div>
+              <h3 className="text-sm font-bold text-foreground leading-tight truncate" title={image.description}>
+                {image.description}
+              </h3>
+            </div>
+            {image.shopifyUrl && (
+              <a
+                href={image.shopifyUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-accent px-4 py-2 text-xs font-bold text-accent-foreground shadow-sm transition-transform hover:scale-105 active:scale-95"
+              >
+                <span>Ver tienda</span>
+                <ExternalLink className="h-3 w-3" />
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
