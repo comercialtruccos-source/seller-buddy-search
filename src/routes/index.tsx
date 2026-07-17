@@ -161,32 +161,18 @@ function Index() {
 
       {/* Header */}
       <header className="border-b border-border bg-primary text-primary-foreground">
-        <div className="mx-auto flex max-w-4xl flex-col gap-4 px-4 py-6 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-accent text-accent-foreground">
-              <PackageSearch className="h-6 w-6" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold leading-tight">
-                Buscador de Referencias
-              </h1>
-              <p className="text-sm text-primary-foreground/70">
-                Consulta de precios detal y mayorista
-              </p>
-            </div>
+        <div className="mx-auto flex max-w-4xl items-center gap-3 px-4 py-6">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-accent text-accent-foreground">
+            <PackageSearch className="h-6 w-6" />
           </div>
-          <button
-            onClick={() => setOrderOpen(true)}
-            className="relative inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-bold text-accent-foreground shadow-sm transition-transform hover:scale-105"
-          >
-            <ShoppingCart className="h-4 w-4" />
-            <span>Pedido</span>
-            {orderCount > 0 && (
-              <span className="ml-1 rounded-full bg-primary px-2 py-0.5 text-xs font-extrabold text-primary-foreground">
-                {orderCount}
-              </span>
-            )}
-          </button>
+          <div>
+            <h1 className="text-xl font-bold leading-tight">
+              Buscador de Referencias
+            </h1>
+            <p className="text-sm text-primary-foreground/70">
+              Consulta de precios detal y mayorista
+            </p>
+          </div>
         </div>
       </header>
 
@@ -333,6 +319,23 @@ function Index() {
           <OrderHistory onOrderDeleted={reloadInventory} />
         )}
       </main>
+
+      {/* Floating Action Button (FAB) for Current Order */}
+      <button
+        onClick={() => setOrderOpen(true)}
+        className="fixed bottom-6 right-6 z-40 flex items-center gap-2.5 rounded-full bg-accent px-5 py-4 text-sm font-bold text-accent-foreground shadow-2xl transition-all duration-300 hover:scale-110 active:scale-95 hover:shadow-accent/25 hover:shadow-xl"
+        aria-label="Ver pedido actual"
+      >
+        <div className="relative">
+          <ShoppingCart className="h-5 w-5" />
+          {orderCount > 0 && (
+            <span className="absolute -top-3.5 -right-3.5 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-extrabold text-destructive-foreground animate-pulse">
+              {orderCount}
+            </span>
+          )}
+        </div>
+        <span>Ver Pedido</span>
+      </button>
 
       {orderOpen && (
         <OrderModal
