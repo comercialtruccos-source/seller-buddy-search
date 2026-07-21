@@ -9,6 +9,7 @@ import {
   FileWarning,
   Link2,
   Download,
+  DollarSign,
 } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import {
@@ -37,6 +38,18 @@ function Cargar() {
     filename: string;
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [trmValue, setTrmValue] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("trm_value") || "4000";
+    }
+    return "4000";
+  });
+
+  const handleTrmChange = (val: string) => {
+    setTrmValue(val);
+    localStorage.setItem("trm_value", val);
+  };
 
   const downloadTemplateCsv = () => {
     const headers = [
@@ -109,6 +122,12 @@ function Cargar() {
       return;
     }
 
+    const trmNum = parseFloat(trmValue);
+    if (!trmValue || isNaN(trmNum) || trmNum <= 0) {
+      toast.error("Por favor ingresa un valor de TRM válido y mayor a 0 antes de sincronizar.");
+      return;
+    }
+
     try {
       setIsSyncing(true);
       setUploadedInfo(null);
@@ -120,7 +139,7 @@ function Cargar() {
       
       // Fetch via server-side function to bypass browser CORS block and provide clear errors
       const text = await downloadCsvFromUrl({ data: trimmedUrl });
-      const parsed = parseInventoryCsv(text);
+      const parsed = parseInventoryCsv(text, trmNum);
       
       if (parsed.length === 0) {
         toast.error("No se encontraron registros válidos. Verifica que la URL sea un CSV con el formato correcto.", { id: "sync-inventory" });
@@ -155,12 +174,18 @@ function Cargar() {
       return;
     }
 
+    const trmNum = parseFloat(trmValue);
+    if (!trmValue || isNaN(trmNum) || trmNum <= 0) {
+      toast.error("Por favor ingresa un valor de TRM válido y mayor a 0 antes de cargar.");
+      return;
+    }
+
     try {
       setIsUploading(true);
       setUploadedInfo(null);
       
       const text = await readCsvFileText(file);
-      const parsed = parseInventoryCsv(text);
+      const parsed = parseInventoryCsv(text, trmNum);
       
       if (parsed.length === 0) {
         toast.error("El archivo no contiene referencias válidas o el formato es incorrecto.");
@@ -250,6 +275,34 @@ function Cargar() {
           <p className="text-sm text-muted-foreground mb-4">
             Sube un archivo CSV con las referencias y cantidades actualizadas. Este proceso reemplazará el inventario actual de la base de datos de manera definitiva.
           </p>
+
+          {/* Configuración de TRM */}
+          <div className="bg-muted/40 border border-border rounded-xl p-4 mb-6 shadow-xs">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
+              <DollarSign className="h-4 w-4 text-accent" />
+              Configuración de TRM (Manual)
+            </h3>
+            <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
+              Configura el valor de la TRM para calcular automáticamente el precio en dólares de cada artículo.
+              <br />
+              <strong className="text-accent font-semibold">Fórmula:</strong> <code className="bg-background/80 px-1 py-0.5 rounded text-foreground border border-border/50 text-[11px]">((Precio Mayorista - 19%) + $1.000) / TRM</code>
+            </p>
+            <div className="flex items-center gap-3">
+              <div className="relative w-40">
+                <span className="absolute left-3 top-2 text-sm text-muted-foreground font-medium">$</span>
+                <input
+                  type="number"
+                  value={trmValue}
+                  onChange={(e) => handleTrmChange(e.target.value)}
+                  placeholder="Ej. 4000"
+                  min="1"
+                  step="any"
+                  className="w-full rounded-lg border border-border bg-background pl-7 pr-3 py-1.5 text-sm text-foreground focus:border-accent focus:ring-1 focus:ring-accent outline-hidden"
+                />
+              </div>
+              <span className="text-xs text-muted-foreground">COP por Dólar (ej. 4050)</span>
+            </div>
+          </div>
 
           <div className="mb-6 flex">
             <button

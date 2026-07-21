@@ -131,7 +131,7 @@ function isValidImageUrl(url: string | undefined): boolean {
   return u.includes(".") || u.includes("/");
 }
 
-export function parseInventoryCsv(text: string): InventoryRow[] {
+export function parseInventoryCsv(text: string, trm?: number): InventoryRow[] {
   // Remove UTF-8 BOM if present
   let cleanText = text;
   if (cleanText.startsWith("\ufeff")) {
@@ -175,11 +175,18 @@ export function parseInventoryCsv(text: string): InventoryRow[] {
     const rawCodColor = (cols[6] ?? "").trim();
     const codColor = /^\d+$/.test(rawCodColor) ? rawCodColor.padStart(2, "0") : rawCodColor;
 
+    const pvm = toNumber(cols[8]);
     let precioUsd = 0;
-    if (usdIdx !== -1 && cols[usdIdx]) {
-      precioUsd = toNumber(cols[usdIdx]);
-    } else if (cols[10] && !isValidImageUrl(cols[10])) {
-      precioUsd = toNumber(cols[10]);
+    if (trm && trm > 0) {
+      // Formula: ((valor mayorista - 19%) + 1000) / TRM
+      // pvm * 0.81 is PVM minus 19%
+      precioUsd = Math.round((((pvm * 0.81) + 1000) / trm) * 100) / 100;
+    } else {
+      if (usdIdx !== -1 && cols[usdIdx]) {
+        precioUsd = toNumber(cols[usdIdx]);
+      } else if (cols[10] && !isValidImageUrl(cols[10])) {
+        precioUsd = toNumber(cols[10]);
+      }
     }
 
     const row: InventoryRow = {
@@ -191,7 +198,7 @@ export function parseInventoryCsv(text: string): InventoryRow[] {
       talla,
       codColor,
       sku: cols[7] ?? "",
-      pvm: toNumber(cols[8]),
+      pvm,
       pvp: toNumber(cols[9]),
       precioUsd,
     };
