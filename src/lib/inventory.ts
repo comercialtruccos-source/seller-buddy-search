@@ -524,3 +524,50 @@ export async function saveInventory(rows: InventoryRow[]): Promise<string> {
 
   return data?.[0]?.created_at ?? new Date().toISOString();
 }
+
+/** Recalculate all USD prices in the database using the provided TRM. */
+export async function updateAllPricesWithTrm(trm: number): Promise<number> {
+  if (!trm || trm <= 0) {
+    throw new Error("La TRM debe ser un número mayor a 0.");
+  }
+
+  // 1. Fetch all rows currently in the database
+  const pageSize = 1000;
+  let from = 0;
+  const all: any[] = [];
+  while (true) {
+    const { data, error } = await supabase
+      .from("inventory")
+      .select("*")
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    const batch = data ?? [];
+    all.push(...batch);
+    if (batch.length < pageSize) break;
+    from += pageSize;
+  }
+
+  if (all.length === 0) return 0;
+
+  // 2. Recalculate precio_usd for each row
+  const updatedRows = all.map((row) => {
+    const pvm = Number(row.pvm) || 0;
+    const precioUsd = Math.round((((pvm * 0.81) + 1000) / trm) * 100) / 100;
+    return {
+      ...row,
+      precio_usd: precioUsd,
+    };
+  });
+
+  // 3. Upsert them back in batches of 500
+  const batchSize = 500;
+  for (let i = 0; i < updatedRows.length; i += batchSize) {
+    const batch = updatedRows.slice(i, i + batchSize);
+    const { error: upsertError } = await supabase
+      .from("inventory")
+      .upsert(batch);
+    if (upsertError) throw upsertError;
+  }
+
+  return updatedRows.length;
+}

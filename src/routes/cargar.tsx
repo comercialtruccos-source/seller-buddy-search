@@ -16,6 +16,7 @@ import {
   parseInventoryCsv,
   readCsvFileText,
   saveInventory,
+  updateAllPricesWithTrm,
 } from "@/lib/inventory";
 import { downloadCsvFromUrl } from "@/lib/shopify";
 
@@ -45,10 +46,35 @@ function Cargar() {
     }
     return "4000";
   });
+  const [isUpdatingPrices, setIsUpdatingPrices] = useState(false);
 
   const handleTrmChange = (val: string) => {
     setTrmValue(val);
     localStorage.setItem("trm_value", val);
+  };
+
+  const handleUpdateAllPrices = async () => {
+    const trmNum = parseFloat(trmValue);
+    if (!trmValue || isNaN(trmNum) || trmNum <= 0) {
+      toast.error("Por favor ingresa un valor de TRM válido y mayor a 0.");
+      return;
+    }
+
+    try {
+      setIsUpdatingPrices(true);
+      toast.loading("Actualizando todos los precios en la base de datos…", { id: "update-prices" });
+      const count = await updateAllPricesWithTrm(trmNum);
+      toast.success(
+        `¡Éxito! Se actualizaron los precios en dólares de ${count} registros con la TRM de $${trmNum.toLocaleString("es-CO")} COP.`,
+        { id: "update-prices" }
+      );
+    } catch (error: any) {
+      console.error(error);
+      const errMsg = error.message || error.details || error.hint || "error desconocido";
+      toast.error(`Error al actualizar los precios: ${errMsg}`, { id: "update-prices" });
+    } finally {
+      setIsUpdatingPrices(false);
+    }
   };
 
   const downloadTemplateCsv = () => {
@@ -287,20 +313,31 @@ function Cargar() {
               <br />
               <strong className="text-accent font-semibold">Fórmula:</strong> <code className="bg-background/80 px-1 py-0.5 rounded text-foreground border border-border/50 text-[11px]">((Precio Mayorista - 19%) + $1.000) / TRM</code>
             </p>
-            <div className="flex items-center gap-3">
-              <div className="relative w-40">
-                <span className="absolute left-3 top-2 text-sm text-muted-foreground font-medium">$</span>
-                <input
-                  type="number"
-                  value={trmValue}
-                  onChange={(e) => handleTrmChange(e.target.value)}
-                  placeholder="Ej. 4000"
-                  min="1"
-                  step="any"
-                  className="w-full rounded-lg border border-border bg-background pl-7 pr-3 py-1.5 text-sm text-foreground focus:border-accent focus:ring-1 focus:ring-accent outline-hidden"
-                />
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              <div className="flex items-center gap-2">
+                <div className="relative w-36">
+                  <span className="absolute left-3 top-2 text-sm text-muted-foreground font-medium">$</span>
+                  <input
+                    type="number"
+                    value={trmValue}
+                    onChange={(e) => handleTrmChange(e.target.value)}
+                    placeholder="Ej. 4000"
+                    min="1"
+                    step="any"
+                    disabled={isUpdatingPrices || isUploading || isSyncing}
+                    className="w-full rounded-lg border border-border bg-background pl-7 pr-3 py-1.5 text-sm text-foreground focus:border-accent focus:ring-1 focus:ring-accent outline-hidden disabled:opacity-50"
+                  />
+                </div>
+                <span className="text-xs text-muted-foreground">COP por Dólar</span>
               </div>
-              <span className="text-xs text-muted-foreground">COP por Dólar (ej. 4050)</span>
+              
+              <button
+                onClick={handleUpdateAllPrices}
+                disabled={isUpdatingPrices || isUploading || isSyncing || !trmValue}
+                className="sm:ml-auto inline-flex items-center justify-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-xs font-bold text-accent-foreground hover:bg-accent/90 transition-all shadow-xs active:scale-[0.98] disabled:opacity-50 select-none cursor-pointer"
+              >
+                {isUpdatingPrices ? "Actualizando precios..." : "Actualizar precios de la Plataforma"}
+              </button>
             </div>
           </div>
 
@@ -321,12 +358,12 @@ function Cargar() {
             onDragOver={handleDrag}
             onDragLeave={handleDrag}
             onDrop={handleDrop}
-            onClick={() => !isUploading && fileInputRef.current?.click()}
+            onClick={() => !isUploading && !isUpdatingPrices && fileInputRef.current?.click()}
             className={`relative border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all duration-300 flex flex-col items-center justify-center ${
               dragActive
                 ? "border-accent bg-accent/10 scale-[1.02]"
                 : "border-border hover:border-accent hover:bg-muted/50"
-            } ${isUploading ? "pointer-events-none opacity-60" : ""}`}
+            } ${isUploading || isUpdatingPrices ? "pointer-events-none opacity-60" : ""}`}
           >
             <input
               ref={fileInputRef}
@@ -334,13 +371,13 @@ function Cargar() {
               accept=".csv,text/csv"
               className="hidden"
               onChange={onInputChange}
-              disabled={isUploading}
+              disabled={isUploading || isUpdatingPrices}
             />
 
             <div className={`mb-4 flex h-16 w-16 items-center justify-center rounded-full transition-colors ${
               dragActive ? "bg-accent text-accent-foreground" : "bg-muted text-muted-foreground"
             }`}>
-              <Upload className={`h-8 w-8 ${isUploading ? "animate-bounce" : ""}`} />
+              <Upload className={`h-8 w-8 ${isUploading || isUpdatingPrices ? "animate-bounce" : ""}`} />
             </div>
 
             {isUploading ? (
@@ -386,7 +423,7 @@ function Cargar() {
               />
               <button
                 onClick={handleSyncFromUrl}
-                disabled={isSyncing || isUploading || !syncUrl.trim()}
+                disabled={isSyncing || isUploading || isUpdatingPrices || !syncUrl.trim()}
                 className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary px-5 py-2.5 text-xs font-bold text-primary-foreground hover:bg-primary/95 transition-all shadow-xs active:scale-[0.98] disabled:opacity-50 select-none cursor-pointer"
               >
                 {isSyncing ? "Sincronizando..." : "Sincronizar"}
