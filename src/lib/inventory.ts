@@ -178,9 +178,9 @@ export function parseInventoryCsv(text: string, trm?: number): InventoryRow[] {
     const pvm = toNumber(cols[8]);
     let precioUsd = 0;
     if (trm && trm > 0) {
-      // Formula: ((valor mayorista - 19%) + 1000) / TRM
-      // pvm * 0.81 is PVM minus 19%
-      precioUsd = Math.round((((pvm * 0.81) + 1000) / trm) * 100) / 100;
+      // Formula: ((valor mayorista / 1.19) + 1000) / TRM
+      // pvm / 1.19 removes 19% IVA
+      precioUsd = Math.floor((((pvm / 1.19) + 1000) / trm) * 100) / 100;
     } else {
       if (usdIdx !== -1 && cols[usdIdx]) {
         precioUsd = toNumber(cols[usdIdx]);
@@ -552,7 +552,8 @@ export async function updateAllPricesWithTrm(trm: number): Promise<number> {
   // 2. Recalculate precio_usd for each row
   const updatedRows = all.map((row) => {
     const pvm = Number(row.pvm) || 0;
-    const precioUsd = Math.round((((pvm * 0.81) + 1000) / trm) * 100) / 100;
+    // pvm / 1.19 removes 19% IVA
+    const precioUsd = Math.floor((((pvm / 1.19) + 1000) / trm) * 100) / 100;
     return {
       ...row,
       precio_usd: precioUsd,

@@ -309,9 +309,9 @@ function Cargar() {
               Configuración de TRM (Manual)
             </h3>
             <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
-              Configura el valor de la TRM para calcular automáticamente el precio en dólares de cada artículo.
+              Configura el valor de la TRM para calcular automáticamente el precio en dólares de cada artículo (redondeado al precio menor).
               <br />
-              <strong className="text-accent font-semibold">Fórmula:</strong> <code className="bg-background/80 px-1 py-0.5 rounded text-foreground border border-border/50 text-[11px]">((Precio Mayorista - 19%) + $1.000) / TRM</code>
+              <strong className="text-accent font-semibold">Fórmula:</strong> <code className="bg-background/80 px-1 py-0.5 rounded text-foreground border border-border/50 text-[11px]">((Precio Mayorista / 1.19) + $1.000) / TRM</code>
             </p>
             <div className="flex flex-col sm:flex-row sm:items-center gap-3">
               <div className="flex items-center gap-2">
