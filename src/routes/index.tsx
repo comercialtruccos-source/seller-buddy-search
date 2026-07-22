@@ -1251,50 +1251,11 @@ function ReferenceCard({
                         Stock: {suggestion.totalSaldo}
                       </span>
                     </div>
-                    {/* Compact Variants List */}
-                    <div className="flex gap-1.5 overflow-x-auto pb-1 mt-auto custom-scrollbar">
-                      {suggestion.variantes
-                        .filter(v => {
-                          const s = localBodega && v.saldosPorBodega ? v.saldosPorBodega[localBodega] || 0 : v.saldo;
-                          return s > 0;
-                        })
-                        .map(v => (
-                        <button
-                          key={v.sku}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const s = localBodega && v.saldosPorBodega ? v.saldosPorBodega[localBodega] || 0 : v.saldo;
-                            const result = addOrderItem({
-                              sku: v.sku,
-                              referencia: suggestion.referencia,
-                              descripcion: suggestion.descripcion,
-                              talla: v.talla,
-                              color: v.color || "Sin color",
-                              codColor: v.codColor,
-                              pvm: suggestion.pvm || v.pvm,
-                              saldo: s,
-                            });
-                            if (result.success) {
-                              if (result.isLimit) {
-                                toast.warning(`Añadido: ${suggestion.referencia} ${v.color} T${v.talla} (Límite alcanzado)`);
-                              } else {
-                                toast.success(`Añadido: ${suggestion.referencia} ${v.color} T${v.talla}`);
-                              }
-                            } else {
-                              toast.error(`No hay stock de ${suggestion.referencia}`);
-                            }
-                          }}
-                          className="flex items-center gap-1 bg-background border border-border rounded-md px-1.5 py-1 text-[9px] hover:bg-primary/5 hover:border-primary/40 hover:text-primary transition-all whitespace-nowrap shrink-0 group/mini"
-                          title={`Agregar ${v.color} Talla ${v.talla} (${localBodega && v.saldosPorBodega ? v.saldosPorBodega[localBodega] || 0 : v.saldo} uds)`}
-                        >
-                          <div 
-                            className="w-2.5 h-2.5 rounded-full shadow-inner border border-black/10"
-                            style={{ backgroundColor: colorToHex(v.color || "Sin color") }}
-                          />
-                          <span className="font-bold">T{v.talla}</span>
-                          <Plus className="w-2.5 h-2.5 opacity-40 group-hover/mini:opacity-100" />
-                        </button>
-                      ))}
+                    <div className="mt-auto pt-1">
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-accent/10 text-accent group-hover:bg-accent group-hover:text-accent-foreground rounded-md text-[10px] font-bold uppercase tracking-wider transition-colors">
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>Ver Info</span>
+                      </div>
                     </div>
                   </div>
                 </div>
