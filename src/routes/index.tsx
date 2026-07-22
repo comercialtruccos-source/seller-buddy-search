@@ -1545,17 +1545,18 @@ function ProductModal({
       onClick={onClose}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md overflow-y-auto"
     >
+      <button
+        onClick={onClose}
+        className="fixed top-4 right-4 z-[60] rounded-full bg-black/40 p-2.5 text-white/80 hover:bg-black/60 transition-colors hover:text-white"
+        aria-label="Cerrar"
+      >
+        <X className="h-6 w-6" />
+      </button>
+
       <div 
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-4xl my-auto animate-in fade-in zoom-in duration-300"
+        className="relative w-full max-w-4xl my-auto mt-12 mb-auto animate-in fade-in zoom-in duration-300"
       >
-        <button
-          onClick={onClose}
-          className="absolute -top-12 right-0 rounded-full bg-black/40 p-2 text-white/80 hover:bg-black/60 transition-colors hover:text-white"
-          aria-label="Cerrar"
-        >
-          <X className="h-6 w-6" />
-        </button>
         <ReferenceCard 
           group={product} 
           allGroups={allGroups} 
