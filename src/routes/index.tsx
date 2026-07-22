@@ -1270,25 +1270,25 @@ function PriceBlock({
           DESTACADO
         </div>
       )}
-      <div className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider ${highlight ? "text-primary/80" : "text-muted-foreground/70"}`}>
-        <Tag className="h-3.5 w-3.5" />
-        {label}
+      <div className={`flex items-start gap-1.5 text-[10px] font-bold uppercase tracking-wider ${highlight ? "text-primary/80" : "text-muted-foreground/70"}`}>
+        <Tag className="h-3.5 w-3.5 shrink-0 mt-[2px]" />
+        <span className="leading-tight">{label}</span>
       </div>
-      <div className="mt-1 flex items-baseline gap-2">
+      <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <span className={`text-2xl font-extrabold tracking-tighter ${
           highlight ? "text-primary" : "text-foreground/80"
         }`}>
           {value}
         </span>
         {badge ? (
-          <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded-md uppercase tracking-wider select-none ${
+          <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded-md uppercase tracking-wider select-none shrink-0 ${
             highlight ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
           }`}>
             {badge}
           </span>
         ) : (
           !highlight && (
-            <span className="text-[9px] font-extrabold bg-muted text-muted-foreground px-1.5 py-0.5 rounded-md uppercase tracking-wider select-none">
+            <span className="text-[9px] font-extrabold bg-muted text-muted-foreground px-1.5 py-0.5 rounded-md uppercase tracking-wider select-none shrink-0">
               Minorista
             </span>
           )
