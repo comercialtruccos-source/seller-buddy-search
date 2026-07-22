@@ -860,6 +860,9 @@ function ReferenceCard({
       const firstChar = g.referencia.charAt(0).toUpperCase();
       if (firstChar === "M") return false;
 
+      // Only recommend products that have an image
+      if (!g.imageUrl) return false;
+
       const desc = (g.descripcion || "").toUpperCase();
       const isRealTopGarment = 
         desc.includes("BLUSA") ||
@@ -882,9 +885,9 @@ function ReferenceCard({
       });
     });
 
-    // Sort by stock descending and take top 5
+    // Sort by stock descending and take top 3
     tops.sort((a, b) => b.totalSaldo - a.totalSaldo);
-    return tops.slice(0, 5);
+    return tops.slice(0, 3);
   }, [allGroups, group.referencia, variantsByColor]);
 
   // Click-to-copy SKU handler
