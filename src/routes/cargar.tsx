@@ -48,6 +48,7 @@ function Cargar() {
     }
     return "4000";
   });
+  
   const [isUpdatingPrices, setIsUpdatingPrices] = useState(false);
 
   const handleTrmChange = (val: string) => {
@@ -356,7 +357,7 @@ function Cargar() {
             Importar archivo de inventario
           </h2>
           <p className="text-sm text-muted-foreground mb-4">
-            Sube un archivo CSV con las referencias y cantidades actualizadas. Este proceso reemplazará el inventario actual de la base de datos de manera definitiva.
+            Sube un archivo CSV o pega el contenido desde Excel. El sistema detectará las bodegas automáticamente y **sólo reemplazará** el saldo de las bodegas presentes en el archivo.
           </p>
 
           {/* Configuración de TRM */}

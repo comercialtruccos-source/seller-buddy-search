@@ -11,6 +11,7 @@ export interface InventoryRow {
   pvp: number; // precio detal (PVP UNIT)
   precioUsd: number; // precio en dólares (USD)
   imageUrl?: string;
+  bodega?: string;
 }
 
 export interface ReferenceGroup {
@@ -20,6 +21,7 @@ export interface ReferenceGroup {
   pvp: number;
   precioUsd: number;
   totalSaldo: number;
+  saldosPorBodega: Record<string, number>;
   variantes: InventoryRow[];
   imageUrl?: string;
 }
@@ -159,61 +161,116 @@ export function parseInventoryCsv(text: string, trm?: number): InventoryRow[] {
     separator = ";";
   }
 
-  // Parse headers using the detected separator
-  const headers = parseLine(lines[0], separator).map((h) => h.toLowerCase());
-  const photoIdx = headers.findIndex(
-    (h) => h.includes("foto") || h.includes("imagen") || h.includes("image")
-  );
-  const usdIdx = headers.findIndex(
-    (h) => h.includes("usd") || h.includes("dolar") || h.includes("dólar") || h.includes("dol")
+  const firstLineCols = parseLine(lines[0], separator);
+  let headers = firstLineCols.map((h) => h.toLowerCase().trim());
+  
+  // Detect if the first line is actually a header row
+  const isHeaderRow = headers.some(h => 
+    h.includes("referencia") || h.includes("bodega") || h.includes("descripci") || h.includes("saldo")
   );
 
-  const dataLines = lines.slice(1);
+  const dataLines = isHeaderRow ? lines.slice(1) : lines;
+  const colCount = firstLineCols.length;
+
+  const photoIdx = isHeaderRow ? headers.findIndex((h) => h.includes("foto") || h.includes("imagen") || h.includes("image") || h === "img") : (colCount >= 12 ? 11 : 10);
+  const usdIdx = isHeaderRow ? headers.findIndex((h) => h.includes("usd") || h.includes("dolar") || h.includes("dólar") || h.includes("dol")) : -1;
+
+  // Dynamic index detection with smart fallbacks
+  const getIdx = (matchers: string[], exact = false) => {
+    if (isHeaderRow) {
+      return headers.findIndex(h => matchers.some(m => exact ? h === m : h.includes(m)));
+    }
+    return -1; // If no headers, rely on layout-based fallbacks below
+  };
+
+  let iRef = getIdx(["referencia"], true);
+  let iBodega = getIdx(["bodega", "almacen", "almacén"], true);
+  let iDesc = getIdx(["descripci"]);
+  let iTallaLote = getIdx(["lote", "talla -"]);
+  let iColor = getIdx(["color"], true);
+  let iSaldo = getIdx(["saldo", "cantidad"]);
+  let iTalla = getIdx(["talla"], true);
+  let iCodColor = getIdx(["codcolor", "cod_color"]);
+  let iSku = getIdx(["sku"], true);
+  let iPvm = getIdx(["pvm"]);
+  let iPvp = getIdx(["pvp"]);
+
+  // Fallbacks for data without headers (or if exact column names weren't found)
+  // Heuristic: If colCount >= 12, or if the second column (index 1) looks like a bodega name
+  const isNewFormat = colCount >= 12 || 
+    (firstLineCols[1] && (firstLineCols[1].toUpperCase().includes("PRINCIPAL") || firstLineCols[1].toUpperCase().includes("VENTA")));
+
+  if (isNewFormat && iBodega === -1 && iRef === -1) {
+    // New format with Bodega (12 columns)
+    if (iRef === -1) iRef = 0;
+    if (iBodega === -1) iBodega = 1;
+    if (iDesc === -1) iDesc = 2;
+    if (iTallaLote === -1) iTallaLote = 3;
+    if (iColor === -1) iColor = 4;
+    if (iSaldo === -1) iSaldo = 5;
+    if (iTalla === -1) iTalla = 6;
+    if (iCodColor === -1) iCodColor = 7;
+    if (iSku === -1) iSku = 8;
+    if (iPvm === -1) iPvm = 9;
+    if (iPvp === -1) iPvp = 10;
+  } else if (!isNewFormat && iBodega === -1 && iRef === -1) {
+    // Old format without Bodega (10 or 11 columns)
+    if (iRef === -1) iRef = 0;
+    if (iDesc === -1) iDesc = 1;
+    if (iTallaLote === -1) iTallaLote = 2;
+    if (iColor === -1) iColor = 3;
+    if (iSaldo === -1) iSaldo = 4;
+    if (iTalla === -1) iTalla = 5;
+    if (iCodColor === -1) iCodColor = 6;
+    if (iSku === -1) iSku = 7;
+    if (iPvm === -1) iPvm = 8;
+    if (iPvp === -1) iPvp = 9;
+  }
+
   const rows: InventoryRow[] = [];
 
   for (const line of dataLines) {
     const cols = parseLine(line, separator);
-    const referencia = cols[0];
+    const referencia = cols[iRef];
     if (!referencia) continue;
 
-    const rawTalla = (cols[5] ?? "").trim();
+    const rawTalla = (cols[iTalla] ?? "").trim();
     const talla = /^\d+$/.test(rawTalla) ? rawTalla.padStart(2, "0") : rawTalla;
 
-    const rawCodColor = (cols[6] ?? "").trim();
+    const rawCodColor = (cols[iCodColor] ?? "").trim();
     const codColor = /^\d+$/.test(rawCodColor) ? rawCodColor.padStart(2, "0") : rawCodColor;
 
-    const pvm = toNumber(cols[8]);
+    const pvm = toNumber(cols[iPvm]);
     let precioUsd = 0;
     if (trm && trm > 0) {
-      // Formula: ((valor mayorista / 1.19) + 1000) / TRM
-      // pvm / 1.19 removes 19% IVA
       precioUsd = Math.ceil((((pvm / 1.19) + 1000) / trm) * 100) / 100;
     } else {
       if (usdIdx !== -1 && cols[usdIdx]) {
         precioUsd = toNumber(cols[usdIdx]);
-      } else if (cols[10] && !isValidImageUrl(cols[10])) {
+      } else if (cols[10] && !isValidImageUrl(cols[10])) { // fallback for backwards compatibility
         precioUsd = toNumber(cols[10]);
       }
     }
 
     const row: InventoryRow = {
       referencia,
-      descripcion: cols[1] ?? "",
-      tallaLote: cols[2] ?? "",
-      color: cols[3] ?? "",
-      saldo: toNumber(cols[4]),
+      descripcion: cols[iDesc] ?? "",
+      tallaLote: cols[iTallaLote] ?? "",
+      color: cols[iColor] ?? "",
+      saldo: toNumber(cols[iSaldo]),
       talla,
       codColor,
-      sku: cols[7] ?? "",
+      sku: cols[iSku] ?? "",
       pvm,
-      pvp: toNumber(cols[9]),
+      pvp: toNumber(cols[iPvp]),
       precioUsd,
+      bodega: iBodega !== -1 ? (cols[iBodega] || "PRINCIPAL 1004").trim() : "PRINCIPAL 1004"
     };
 
     let rawImgUrl = "";
     if (photoIdx !== -1 && cols[photoIdx]) {
       rawImgUrl = cols[photoIdx];
-    } else if (cols[11]) {
+    } else if (cols[11] && !isHeaderRow) { // fallback
       rawImgUrl = cols[11];
     } else if (cols[10] && isValidImageUrl(cols[10])) {
       rawImgUrl = cols[10];
@@ -237,8 +294,14 @@ export function groupByReferencia(rows: InventoryRow[]): ReferenceGroup[] {
   for (const row of rows) {
     const existing = map.get(row.referencia);
     if (existing) {
-      existing.variantes.push(row);
+      const existingVariant = existing.variantes.find(v => v.sku === row.sku);
+      if (existingVariant) {
+        existingVariant.saldo += row.saldo;
+      } else {
+        existing.variantes.push({ ...row });
+      }
       existing.totalSaldo += row.saldo;
+      existing.saldosPorBodega[row.bodega || "PRINCIPAL 1004"] = (existing.saldosPorBodega[row.bodega || "PRINCIPAL 1004"] || 0) + row.saldo;
       // Keep the max known prices in case of inconsistencies.
       existing.pvm = existing.pvm || row.pvm;
       existing.pvp = existing.pvp || row.pvp;
@@ -254,7 +317,8 @@ export function groupByReferencia(rows: InventoryRow[]): ReferenceGroup[] {
         pvp: row.pvp,
         precioUsd: row.precioUsd,
         totalSaldo: row.saldo,
-        variantes: [row],
+        saldosPorBodega: { [row.bodega || "PRINCIPAL 1004"]: row.saldo },
+        variantes: [{ ...row }],
         imageUrl: row.imageUrl,
       });
     }
@@ -375,6 +439,7 @@ interface InventoryDbRow {
   pvp: number;
   precio_usd?: number;
   image_url?: string;
+  bodega?: string;
   created_at?: string;
 }
 
@@ -429,6 +494,7 @@ function fromDb(row: InventoryDbRow): InventoryRow {
     pvp: row.pvp,
     precioUsd: row.precio_usd ?? 0,
     imageUrl: row.image_url ?? "",
+    bodega: row.bodega ?? "PRINCIPAL 1004",
   };
 }
 
@@ -446,6 +512,7 @@ function toDb(row: InventoryRow): InventoryDbRow {
     pvp: row.pvp,
     precio_usd: row.precioUsd,
     image_url: row.imageUrl ?? "",
+    bodega: row.bodega ?? "PRINCIPAL 1004",
   };
 }
 
@@ -502,17 +569,22 @@ export async function loadInventory(): Promise<{
   return { rows, updatedAt };
 }
 
-/** Replace the entire shared inventory with a new dataset. */
+/** Replace the shared inventory. Replaces data only for the bodegas present in the payload. */
 export async function saveInventory(rows: InventoryRow[]): Promise<string> {
-  // Clear existing inventory.
+  const bodegasToReplace = Array.from(new Set([
+    ...rows.map(r => r.bodega || "PRINCIPAL 1004"),
+    "Principal" // Limpiar la data corrupta que se guardó con el fallback antiguo
+  ]));
+
+  // Clear existing inventory for the detected bodegas.
   const { error: deleteError } = await supabase
     .from("inventory")
     .delete()
-    .not("id", "is", null);
+    .in("bodega", bodegasToReplace);
   if (deleteError) throw deleteError;
 
   // Insert new records in batches.
-  const payload = rows.map(toDb);
+  const payload = rows.map((r) => toDb({ ...r, bodega: r.bodega || "PRINCIPAL 1004" }));
   const batchSize = 500;
   for (let i = 0; i < payload.length; i += batchSize) {
     const batch = payload.slice(i, i + batchSize);

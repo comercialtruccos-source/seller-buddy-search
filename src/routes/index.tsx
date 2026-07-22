@@ -842,6 +842,11 @@ function ReferenceCard({
                 <Boxes className="h-3.5 w-3.5" />
                 {group.totalSaldo} unidades
               </span>
+              {Object.entries(group.saldosPorBodega).map(([bodega, saldo]) => (
+                <span key={bodega} className="inline-flex items-center gap-1.5 rounded-md bg-accent/10 px-2 py-0.5 text-[10px] font-bold text-accent border border-accent/20">
+                  {bodega}: {saldo}
+                </span>
+              ))}
             </div>
             <h2 className="mt-2 text-xl font-bold text-foreground tracking-tight">
               {group.descripcion}
