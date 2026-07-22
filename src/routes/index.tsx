@@ -1543,36 +1543,38 @@ function ProductModal({
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md overflow-y-auto"
+      className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-md"
     >
-      <button
-        onClick={onClose}
-        className="fixed top-4 right-4 z-[60] rounded-full bg-black/40 p-2.5 text-white/80 hover:bg-black/60 transition-colors hover:text-white"
-        aria-label="Cerrar"
-      >
-        <X className="h-6 w-6" />
-      </button>
-
-      <div 
-        onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-4xl my-auto mt-12 mb-auto animate-in fade-in zoom-in duration-300 flex flex-col items-center"
-      >
-        <div className="w-full">
-          <ReferenceCard 
-            group={product} 
-            allGroups={allGroups} 
-            onPreviewImage={onPreviewImage} 
-            onPreviewProduct={onPreviewProduct} 
-          />
-        </div>
-        
+      <div className="flex min-h-full items-center justify-center p-4 py-12 sm:p-6">
         <button
           onClick={onClose}
-          className="mt-6 mb-12 rounded-full bg-white/10 px-8 py-3 font-semibold text-white backdrop-blur-md border border-white/20 hover:bg-white/20 transition-colors shadow-lg flex items-center gap-2"
+          className="fixed top-4 right-4 z-[60] rounded-full bg-black/40 p-2.5 text-white/80 hover:bg-black/60 transition-colors hover:text-white"
+          aria-label="Cerrar"
         >
-          <X className="h-5 w-5" />
-          <span>Cerrar Vista</span>
+          <X className="h-6 w-6" />
         </button>
+
+        <div 
+          onClick={(e) => e.stopPropagation()}
+          className="relative w-full max-w-4xl flex flex-col items-center animate-in fade-in zoom-in duration-300"
+        >
+          <div className="w-full">
+            <ReferenceCard 
+              group={product} 
+              allGroups={allGroups} 
+              onPreviewImage={onPreviewImage} 
+              onPreviewProduct={onPreviewProduct} 
+            />
+          </div>
+          
+          <button
+            onClick={onClose}
+            className="mt-6 mb-12 rounded-full bg-white/10 px-8 py-3 font-semibold text-white backdrop-blur-md border border-white/20 hover:bg-white/20 transition-colors shadow-lg flex items-center gap-2"
+          >
+            <X className="h-5 w-5" />
+            <span>Cerrar Vista</span>
+          </button>
+        </div>
       </div>
     </div>
   );
