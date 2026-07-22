@@ -113,6 +113,7 @@ function Index() {
     refCode: string;
     shopifyUrl?: string;
   } | null>(null);
+  const [previewProduct, setPreviewProduct] = useState<ReferenceGroup | null>(null);
 
   const lineasOptions = useMemo(() => ["T", "B", "P", "R"], []);
   const lineasLabels: Record<string, string> = {
@@ -415,6 +416,7 @@ function Index() {
                   group={group}
                   allGroups={groups}
                   onPreviewImage={setPreviewImage}
+                  onPreviewProduct={setPreviewProduct}
                 />
               ))}
             </div>
@@ -453,6 +455,16 @@ function Index() {
         <ImageModal
           image={previewImage}
           onClose={() => setPreviewImage(null)}
+        />
+      )}
+
+      {previewProduct && (
+        <ProductModal
+          product={previewProduct}
+          allGroups={groups}
+          onPreviewImage={setPreviewImage}
+          onPreviewProduct={setPreviewProduct}
+          onClose={() => setPreviewProduct(null)}
         />
       )}
     </div>
@@ -811,6 +823,7 @@ function ReferenceCard({
   group,
   allGroups,
   onPreviewImage,
+  onPreviewProduct,
 }: {
   group: ReferenceGroup;
   allGroups?: ReferenceGroup[];
@@ -821,6 +834,7 @@ function ReferenceCard({
     refCode: string;
     shopifyUrl?: string;
   }) => void;
+  onPreviewProduct?: (product: ReferenceGroup) => void;
 }) {
   // Query Shopify search suggestion API to fetch product image in live mode
   const { data: shopifyProduct, isLoading } = useQuery({
@@ -1193,8 +1207,9 @@ function ReferenceCard({
                   key={suggestion.referencia}
                   className="flex gap-3 p-3 rounded-xl border border-border bg-card/50 hover:bg-accent/5 hover:border-accent/30 transition-all cursor-pointer group"
                   onClick={() => {
-                    // Quick scroll to top or trigger search if needed, but for now we just show details
-                    if (onPreviewImage && suggestion.imageUrl) {
+                    if (onPreviewProduct) {
+                      onPreviewProduct(suggestion);
+                    } else if (onPreviewImage && suggestion.imageUrl) {
                       onPreviewImage({
                         src: suggestion.imageUrl,
                         alt: suggestion.descripcion,
@@ -1546,6 +1561,46 @@ function ImageModal({
             )}
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function ProductModal({
+  product,
+  allGroups,
+  onPreviewImage,
+  onPreviewProduct,
+  onClose,
+}: {
+  product: ReferenceGroup;
+  allGroups?: ReferenceGroup[];
+  onPreviewImage?: (img: any) => void;
+  onPreviewProduct?: (product: ReferenceGroup) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md overflow-y-auto"
+    >
+      <div 
+        onClick={(e) => e.stopPropagation()}
+        className="relative w-full max-w-4xl my-auto animate-in fade-in zoom-in duration-300"
+      >
+        <button
+          onClick={onClose}
+          className="absolute -top-12 right-0 rounded-full bg-black/40 p-2 text-white/80 hover:bg-black/60 transition-colors hover:text-white"
+          aria-label="Cerrar"
+        >
+          <X className="h-6 w-6" />
+        </button>
+        <ReferenceCard 
+          group={product} 
+          allGroups={allGroups} 
+          onPreviewImage={onPreviewImage} 
+          onPreviewProduct={onPreviewProduct} 
+        />
       </div>
     </div>
   );
