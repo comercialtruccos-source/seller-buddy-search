@@ -854,46 +854,70 @@ function ReferenceCard({
     if (availableColors.size === 0) return [];
 
     // Find tops (not pants, matching color)
-    const tops = allGroups.filter((g) => {
-      if (g.referencia === group.referencia) return false;
+    const topsWithScore: { group: ReferenceGroup; matchingStock: number }[] = [];
+    
+    allGroups.forEach((g) => {
+      if (g.referencia === group.referencia) return;
       
       // M is for Muestras/fake items.
       const topInitial = g.referencia.charAt(0).toUpperCase();
-      if (topInitial === "M") return false;
+      if (topInitial === "M") return;
 
       // Ensure men's pants (R) only get men's tops (R) recommendations,
       // and women's pants (T, B, P) do not get men's tops (R).
-      if (pantInitial === "R" && topInitial !== "R") return false;
-      if (pantInitial !== "R" && topInitial === "R") return false;
+      if (pantInitial === "R" && topInitial !== "R") return;
+      if (pantInitial !== "R" && topInitial === "R") return;
 
       // Only recommend products that have an image
-      if (!g.imageUrl) return false;
+      if (!g.imageUrl) return;
 
       const desc = (g.descripcion || "").toUpperCase();
       const isRealTopGarment = 
-        desc.includes("BLUSA") ||
-        desc.includes("CHAQUETA") ||
-        desc.includes("CAMISETA") ||
-        desc.includes("BODY") ||
-        desc.includes("CROP") ||
-        desc.includes("TOP") ||
-        desc.includes("CHALECO") ||
-        desc.includes("BUSO") ||
-        desc.includes("CAMISERO") ||
+        desc.includes("BLUSA") || desc.includes("CHAQUETA") || desc.includes("CAMISETA") ||
+        desc.includes("BODY") || desc.includes("CROP") || desc.includes("TOP") ||
+        desc.includes("CHALECO") || desc.includes("BUSO") || desc.includes("CAMISERO") ||
         desc.includes("SUETER");
 
-      if (!isRealTopGarment) return false;
+      if (!isRealTopGarment) return;
 
-      // Check if top has any color matching the pant's colors
-      return g.variantes.some((v) => {
+      // Check if top has any color matching the pant's colors (flexible match)
+      let matchingStock = 0;
+      g.variantes.forEach((v) => {
         const topColor = (v.color || "Sin color").toUpperCase();
-        return availableColors.has(topColor) && v.saldo > 0;
+        // Flexible match: "AZUL OSCURO" matches "AZUL", "BLANCO/NEGRO" matches "NEGRO"
+        const isMatch = Array.from(availableColors).some(ac => 
+          ac.includes(topColor) || topColor.includes(ac)
+        );
+        if (isMatch) {
+          matchingStock += v.saldo;
+        }
       });
+
+      if (matchingStock > 0) {
+        topsWithScore.push({ group: g, matchingStock });
+      }
     });
 
-    // Sort by stock descending and take top 3
-    tops.sort((a, b) => b.totalSaldo - a.totalSaldo);
-    return tops.slice(0, 3);
+    // Sort by the stock of the MATCHING color specifically, descending
+    topsWithScore.sort((a, b) => b.matchingStock - a.matchingStock);
+    
+    // Take the top 15 highest-stock candidates to add variety
+    const topCandidates = topsWithScore.slice(0, 15).map(t => t.group);
+
+    // Deterministic shuffle based on the current product's reference so it doesn't flicker
+    let hash = 0;
+    for (let i = 0; i < group.referencia.length; i++) {
+      hash = Math.imul(31, hash) + group.referencia.charCodeAt(i) | 0;
+    }
+    const rand = () => {
+      hash = Math.imul(1664525, hash) + 1013904223 | 0;
+      return (hash >>> 0) / 4294967296;
+    };
+
+    topCandidates.sort(() => rand() - 0.5);
+
+    // Return exactly up to 3
+    return topCandidates.slice(0, 3);
   }, [allGroups, group.referencia, variantsByColor]);
 
   // Click-to-copy SKU handler
