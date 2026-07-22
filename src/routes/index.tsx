@@ -845,7 +845,8 @@ function ReferenceCard({
     if (!allGroups) return [];
     
     // Check if this is a pant (lines T, B, P, R)
-    const isPant = ["T", "B", "P", "R"].includes(group.referencia.charAt(0).toUpperCase());
+    const pantInitial = group.referencia.charAt(0).toUpperCase();
+    const isPant = ["T", "B", "P", "R"].includes(pantInitial);
     if (!isPant) return [];
 
     // Get all colors of this pant that are currently in stock
@@ -857,8 +858,13 @@ function ReferenceCard({
       if (g.referencia === group.referencia) return false;
       
       // M is for Muestras/fake items.
-      const firstChar = g.referencia.charAt(0).toUpperCase();
-      if (firstChar === "M") return false;
+      const topInitial = g.referencia.charAt(0).toUpperCase();
+      if (topInitial === "M") return false;
+
+      // Ensure men's pants (R) only get men's tops (R) recommendations,
+      // and women's pants (T, B, P) do not get men's tops (R).
+      if (pantInitial === "R" && topInitial !== "R") return false;
+      if (pantInitial !== "R" && topInitial === "R") return false;
 
       // Only recommend products that have an image
       if (!g.imageUrl) return false;
