@@ -857,12 +857,11 @@ function ReferenceCard({
       if (g.referencia === group.referencia) return false;
       
       const firstChar = g.referencia.charAt(0).toUpperCase();
-      const isTop = !["T", "B", "P", "R"].includes(firstChar);
+      // T, B, P, R are pants. M might be Muestras/Material.
+      const isTop = !["T", "B", "P", "R", "M"].includes(firstChar);
       
-      // Ensure it's a real product (PVM > 10000 to avoid $1 dummy items)
-      // and ensure the description indicates it's a top garment
       const desc = (g.descripcion || "").toUpperCase();
-      const isRealTopGarment = g.pvm > 10000 && (
+      const isRealTopGarment = 
         desc.includes("BLUSA") ||
         desc.includes("CHAQUETA") ||
         desc.includes("CAMISETA") ||
@@ -870,8 +869,7 @@ function ReferenceCard({
         desc.includes("CROP") ||
         desc.includes("TOP") ||
         desc.includes("CHALECO") ||
-        desc.includes("SUETER")
-      );
+        desc.includes("SUETER");
 
       if (!isTop || !isRealTopGarment) return false;
 
