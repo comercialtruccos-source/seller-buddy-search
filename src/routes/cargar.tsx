@@ -203,6 +203,12 @@ function Cargar() {
       return;
     }
 
+    // Interceptar el mensaje temporal que coloca Excel Online en el portapapeles
+    if (text.toLowerCase().includes("recuperando datos") || text.toLowerCase().includes("retrieving data")) {
+      toast.error("Excel Online aún está preparando los datos. Por favor espera unos segundos en Excel, vuelve a copiar (Ctrl+C) y pega de nuevo.", { duration: 5000 });
+      return;
+    }
+
     const trmNum = parseFloat(trmValue);
     if (!trmValue || isNaN(trmNum) || trmNum <= 0) {
       toast.error("Por favor ingresa un valor de TRM válido y mayor a 0 antes de cargar.");
