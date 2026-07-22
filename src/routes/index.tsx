@@ -858,7 +858,22 @@ function ReferenceCard({
       
       const firstChar = g.referencia.charAt(0).toUpperCase();
       const isTop = !["T", "B", "P", "R"].includes(firstChar);
-      if (!isTop) return false;
+      
+      // Ensure it's a real product (PVM > 10000 to avoid $1 dummy items)
+      // and ensure the description indicates it's a top garment
+      const desc = (g.descripcion || "").toUpperCase();
+      const isRealTopGarment = g.pvm > 10000 && (
+        desc.includes("BLUSA") ||
+        desc.includes("CHAQUETA") ||
+        desc.includes("CAMISETA") ||
+        desc.includes("BODY") ||
+        desc.includes("CROP") ||
+        desc.includes("TOP") ||
+        desc.includes("CHALECO") ||
+        desc.includes("SUETER")
+      );
+
+      if (!isTop || !isRealTopGarment) return false;
 
       // Check if top has any color matching the pant's colors
       return g.variantes.some((v) => {
