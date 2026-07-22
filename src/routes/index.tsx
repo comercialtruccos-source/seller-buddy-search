@@ -397,6 +397,7 @@ function Index() {
                 <ReferenceCard
                   key={group.referencia}
                   group={group}
+                  allGroups={groups}
                   onPreviewImage={setPreviewImage}
                 />
               ))}
@@ -792,9 +793,11 @@ function EmptyState({
 
 function ReferenceCard({
   group,
+  allGroups,
   onPreviewImage,
 }: {
   group: ReferenceGroup;
+  allGroups?: ReferenceGroup[];
   onPreviewImage?: (img: {
     src: string;
     alt: string;
@@ -836,6 +839,38 @@ function ReferenceCard({
     // Sort colors alphabetically
     return Object.entries(grouped).sort((a, b) => a[0].localeCompare(b[0]));
   }, [group.variantes, localBodega]);
+
+  // Completa el Look logic
+  const crossSellSuggestions = useMemo(() => {
+    if (!allGroups) return [];
+    
+    // Check if this is a pant (lines T, B, P, R)
+    const isPant = ["T", "B", "P", "R"].includes(group.referencia.charAt(0).toUpperCase());
+    if (!isPant) return [];
+
+    // Get all colors of this pant that are currently in stock
+    const availableColors = new Set(variantsByColor.map(([color]) => color.toUpperCase()));
+    if (availableColors.size === 0) return [];
+
+    // Find tops (not pants, matching color)
+    const tops = allGroups.filter((g) => {
+      if (g.referencia === group.referencia) return false;
+      
+      const firstChar = g.referencia.charAt(0).toUpperCase();
+      const isTop = !["T", "B", "P", "R"].includes(firstChar);
+      if (!isTop) return false;
+
+      // Check if top has any color matching the pant's colors
+      return g.variantes.some((v) => {
+        const topColor = (v.color || "Sin color").toUpperCase();
+        return availableColors.has(topColor) && v.saldo > 0;
+      });
+    });
+
+    // Sort by stock descending and take top 5
+    tops.sort((a, b) => b.totalSaldo - a.totalSaldo);
+    return tops.slice(0, 5);
+  }, [allGroups, group.referencia, variantsByColor]);
 
   // Click-to-copy SKU handler
   const copySku = (sku: string, talla: string, color: string) => {
@@ -1044,6 +1079,76 @@ function ReferenceCard({
             </div>
           ))}
         </div>
+
+        {/* Completa el Look Section */}
+        {crossSellSuggestions.length > 0 && (
+          <div className="mt-8 pt-6 border-t border-border">
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-xl">✨</span>
+              <h4 className="text-sm font-bold uppercase tracking-wider text-foreground">
+                Completa el Look
+              </h4>
+              <span className="text-xs text-muted-foreground ml-auto bg-accent/10 px-2 py-1 rounded-full">
+                Opciones para combinar
+              </span>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {crossSellSuggestions.map((suggestion) => (
+                <div 
+                  key={suggestion.referencia}
+                  className="flex gap-3 p-3 rounded-xl border border-border bg-card/50 hover:bg-accent/5 hover:border-accent/30 transition-all cursor-pointer group"
+                  onClick={() => {
+                    // Quick scroll to top or trigger search if needed, but for now we just show details
+                    if (onPreviewImage && suggestion.imageUrl) {
+                      onPreviewImage({
+                        src: suggestion.imageUrl,
+                        alt: suggestion.descripcion,
+                        description: `Combinación: ${suggestion.descripcion}`,
+                        refCode: suggestion.referencia
+                      });
+                    } else {
+                      toast.info(`Busca la referencia ${suggestion.referencia} para ver tallas disponibles.`);
+                    }
+                  }}
+                >
+                  <div className="w-16 h-20 shrink-0 bg-muted/30 rounded-lg overflow-hidden relative">
+                    {suggestion.imageUrl ? (
+                      <img 
+                        src={suggestion.imageUrl} 
+                        alt={suggestion.referencia}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground/40 bg-accent/5">
+                        <Shirt className="h-6 w-6 mb-1" />
+                        <span className="text-[9px] font-medium tracking-wider">SIN FOTO</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex flex-col justify-center overflow-hidden">
+                    <div className="text-xs font-bold text-foreground truncate">
+                      {suggestion.referencia}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground truncate mb-1" title={suggestion.descripcion}>
+                      {suggestion.descripcion}
+                    </div>
+                    <div className="flex items-center gap-2 mt-auto">
+                      <span className="text-xs font-extrabold text-primary">
+                        {formatCurrency(suggestion.pvm)}
+                      </span>
+                      <span className="text-[10px] bg-accent/10 text-accent-foreground px-1.5 py-0.5 rounded-md font-medium">
+                        Stock: {suggestion.totalSaldo}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
       </div>
     </article>
   );
