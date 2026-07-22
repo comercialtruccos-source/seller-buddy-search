@@ -1221,20 +1221,65 @@ function ReferenceCard({
                       </div>
                     )}
                   </div>
-                  <div className="flex flex-col justify-center overflow-hidden">
+                  <div className="flex flex-col flex-1 overflow-hidden">
                     <div className="text-xs font-bold text-foreground truncate">
                       {suggestion.referencia}
                     </div>
                     <div className="text-[10px] text-muted-foreground truncate mb-1" title={suggestion.descripcion}>
                       {suggestion.descripcion}
                     </div>
-                    <div className="flex items-center gap-2 mt-auto">
+                    <div className="flex items-center gap-2 mb-2">
                       <span className="text-xs font-extrabold text-primary">
                         {formatCurrency(suggestion.pvm)}
                       </span>
-                      <span className="text-[10px] bg-accent/10 text-accent-foreground px-1.5 py-0.5 rounded-md font-medium">
+                      <span className="text-[9px] bg-accent/10 text-accent-foreground px-1.5 py-0.5 rounded-md font-medium">
                         Stock: {suggestion.totalSaldo}
                       </span>
+                    </div>
+                    {/* Compact Variants List */}
+                    <div className="flex gap-1.5 overflow-x-auto pb-1 mt-auto custom-scrollbar">
+                      {suggestion.variantes
+                        .filter(v => {
+                          const s = localBodega && v.saldosPorBodega ? v.saldosPorBodega[localBodega] || 0 : v.saldo;
+                          return s > 0;
+                        })
+                        .map(v => (
+                        <button
+                          key={v.sku}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const s = localBodega && v.saldosPorBodega ? v.saldosPorBodega[localBodega] || 0 : v.saldo;
+                            const result = addOrderItem({
+                              sku: v.sku,
+                              referencia: suggestion.referencia,
+                              descripcion: suggestion.descripcion,
+                              talla: v.talla,
+                              color: v.color || "Sin color",
+                              codColor: v.codColor,
+                              pvm: suggestion.pvm || v.pvm,
+                              saldo: s,
+                            });
+                            if (result.success) {
+                              if (result.isLimit) {
+                                toast.warning(`Añadido: ${suggestion.referencia} ${v.color} T${v.talla} (Límite alcanzado)`);
+                              } else {
+                                toast.success(`Añadido: ${suggestion.referencia} ${v.color} T${v.talla}`);
+                              }
+                            } else {
+                              toast.error(`No hay stock de ${suggestion.referencia}`);
+                            }
+                          }}
+                          className="flex items-center gap-1 bg-background border border-border rounded-md px-1.5 py-1 text-[9px] hover:bg-primary/5 hover:border-primary/40 hover:text-primary transition-all whitespace-nowrap shrink-0 group/mini"
+                          title={`Agregar ${v.color} Talla ${v.talla} (${localBodega && v.saldosPorBodega ? v.saldosPorBodega[localBodega] || 0 : v.saldo} uds)`}
+                        >
+                          <div 
+                            className="w-2.5 h-2.5 rounded-full shadow-inner border border-black/10"
+                            style={{ backgroundColor: colorToHex(v.color || "Sin color") }}
+                          />
+                          <span className="font-bold">T{v.talla}</span>
+                          <Plus className="w-2.5 h-2.5 opacity-40 group-hover/mini:opacity-100" />
+                        </button>
+                      ))}
                     </div>
                   </div>
                 </div>
