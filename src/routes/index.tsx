@@ -811,6 +811,8 @@ function ReferenceCard({
     enabled: !group.imageUrl, // Only fetch if we don't have a custom image URL in inventory data
   });
 
+  const [localBodega, setLocalBodega] = useState<string | null>(null);
+
   const imageUrl = group.imageUrl || shopifyProduct?.imageUrl;
   const shopifyUrl = shopifyProduct?.shopifyUrl;
 
@@ -818,13 +820,22 @@ function ReferenceCard({
   const variantsByColor = useMemo(() => {
     const grouped: Record<string, InventoryRow[]> = {};
     for (const v of group.variantes) {
-      const color = v.color || "Sin color";
+      let activeSaldo = v.saldo;
+      if (localBodega && v.saldosPorBodega) {
+        activeSaldo = v.saldosPorBodega[localBodega] || 0;
+      }
+      
+      if (activeSaldo <= 0) continue;
+      
+      const vCopy = { ...v, saldo: activeSaldo };
+      const color = vCopy.color || "Sin color";
+      
       if (!grouped[color]) grouped[color] = [];
-      grouped[color].push(v);
+      grouped[color].push(vCopy);
     }
     // Sort colors alphabetically
     return Object.entries(grouped).sort((a, b) => a[0].localeCompare(b[0]));
-  }, [group.variantes]);
+  }, [group.variantes, localBodega]);
 
   // Click-to-copy SKU handler
   const copySku = (sku: string, talla: string, color: string) => {
@@ -892,13 +903,25 @@ function ReferenceCard({
               </span>
               <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
                 <Boxes className="h-3.5 w-3.5" />
-                {group.totalSaldo} unidades
+                {localBodega ? (group.saldosPorBodega[localBodega] || 0) : group.totalSaldo} unidades
               </span>
-              {Object.entries(group.saldosPorBodega).map(([bodega, saldo]) => (
-                <span key={bodega} className="inline-flex items-center gap-1.5 rounded-md bg-accent/10 px-2 py-0.5 text-[10px] font-bold text-accent border border-accent/20">
-                  {bodega}: {saldo}
-                </span>
-              ))}
+              {Object.entries(group.saldosPorBodega).map(([bodega, saldo]) => {
+                const isSelected = localBodega === bodega;
+                return (
+                  <button 
+                    key={bodega}
+                    onClick={() => setLocalBodega(isSelected ? null : bodega)}
+                    className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[10px] font-bold border transition-colors cursor-pointer ${
+                      isSelected 
+                        ? "bg-accent text-accent-foreground border-accent hover:bg-accent/90" 
+                        : "bg-accent/10 text-accent border-accent/20 hover:bg-accent/20"
+                    }`}
+                    title={`Ver stock solo en ${bodega}`}
+                  >
+                    {bodega}: {saldo}
+                  </button>
+                );
+              })}
             </div>
             <h2 className="mt-2 text-xl font-bold text-foreground tracking-tight">
               {group.descripcion}
