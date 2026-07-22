@@ -1100,10 +1100,11 @@ function ReferenceCard({
           <div className="mt-8 pt-6 border-t border-border">
             <div className="flex items-center gap-2 mb-4">
               <span className="text-xl">✨</span>
-              <h4 className="text-sm font-bold uppercase tracking-wider text-foreground">
-                Completa el Look
+              <h4 className="font-bold text-gray-800 text-sm uppercase tracking-wide">
+                ¡Sugiere al cliente complementar su pedido!
               </h4>
-              <span className="text-xs text-muted-foreground ml-auto bg-accent/10 px-2 py-1 rounded-full">
+              <div className="flex-1" />
+              <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
                 Opciones para combinar
               </span>
             </div>
