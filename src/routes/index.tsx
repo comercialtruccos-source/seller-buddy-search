@@ -914,7 +914,7 @@ function ReferenceCard({
             highlight
           />
           <PriceBlock
-            label="Precio Mayorista (PVM)"
+            label="Precio Mayorista (PVM) - IVA incluido"
             value={formatCurrency(group.pvm)}
             badge="Mayorista"
           />
