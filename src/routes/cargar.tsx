@@ -40,7 +40,7 @@ function Cargar() {
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [pasteText, setPasteText] = useState("");
+  const pasteRef = useRef<HTMLTextAreaElement>(null);
 
   const [trmValue, setTrmValue] = useState<string>(() => {
     if (typeof window !== "undefined") {
@@ -197,7 +197,7 @@ function Cargar() {
   };
 
   const handlePasteText = async () => {
-    const text = pasteText.trim();
+    const text = pasteRef.current?.value?.trim() || "";
     if (!text) {
       toast.error("Por favor pega el texto del inventario antes de continuar.");
       return;
@@ -229,7 +229,7 @@ function Cargar() {
         filename: "Texto pegado desde el portapapeles",
       });
       
-      setPasteText(""); // clear the textarea
+      if (pasteRef.current) pasteRef.current.value = ""; // clear the textarea
       toast.success(
         `¡Éxito! Se cargaron ${parsed.length} registros desde el texto pegado.`,
         { id: "save-inventory" }
@@ -466,14 +466,13 @@ function Cargar() {
             </p>
             <div className="flex flex-col gap-3">
               <textarea
-                value={pasteText}
-                onChange={(e) => setPasteText(e.target.value)}
+                ref={pasteRef}
                 placeholder="Pega aquí el contenido de tu inventario (incluyendo la fila de encabezados)..."
                 className="w-full min-h-32 rounded-xl border border-border bg-background px-3.5 py-3 text-sm text-foreground focus:border-accent focus:ring-1 focus:ring-accent outline-none resize-y"
               />
               <button
                 onClick={handlePasteText}
-                disabled={isUploading || isUpdatingPrices || isSyncing || !pasteText.trim()}
+                disabled={isUploading || isUpdatingPrices || isSyncing}
                 className="self-end inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary px-5 py-2.5 text-xs font-bold text-primary-foreground hover:bg-primary/95 transition-all shadow-xs active:scale-[0.98] disabled:opacity-50 select-none cursor-pointer"
               >
                 {isUploading ? "Procesando..." : "Cargar desde texto"}
