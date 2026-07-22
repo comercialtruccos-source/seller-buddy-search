@@ -49,6 +49,22 @@ import {
   deleteOrderFromDb,
 } from "@/lib/order";
 
+const colorToHex = (colorStr: string) => {
+  const c = colorStr.toLowerCase();
+  if (c.includes('azul')) return '#1E40AF';
+  if (c.includes('negro')) return '#171717';
+  if (c.includes('blanco')) return '#FFFFFF';
+  if (c.includes('rojo')) return '#DC2626';
+  if (c.includes('verde')) return '#166534';
+  if (c.includes('amarillo')) return '#FACC15';
+  if (c.includes('rosa') || c.includes('fucsia')) return '#DB2777';
+  if (c.includes('naranja')) return '#EA580C';
+  if (c.includes('cafe') || c.includes('marrón')) return '#78350F';
+  if (c.includes('gris')) return '#525252';
+  if (c.includes('crudo') || c.includes('beige') || c.includes('arena')) return '#F5F5DC';
+  return '#9CA3AF';
+};
+
 export const Route = createFileRoute("/")({
   component: Index,
 });
@@ -957,10 +973,10 @@ function ReferenceCard({
   };
 
   return (
-    <article className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm hover:shadow-md transition-all duration-300 flex flex-col md:flex-row">
+    <article className="overflow-hidden rounded-3xl border border-border/60 bg-card shadow-sm hover:shadow-lg hover:border-border transition-all duration-500 flex flex-col md:flex-row mb-6">
       {/* Product Image Section */}
-      <div className={`relative w-full shrink-0 overflow-hidden border-b md:border-b-0 md:border-r border-border transition-all duration-300 ${
-        imageUrl ? "md:w-48 aspect-[3/4] md:aspect-auto md:min-h-[220px]" : "md:w-36 bg-muted/30 flex flex-col items-center justify-center p-3"
+      <div className={`relative w-full shrink-0 overflow-hidden border-b md:border-b-0 md:border-r border-border/50 bg-muted/10 transition-all duration-300 ${
+        imageUrl ? "md:w-64 lg:w-72 aspect-[3/4] md:aspect-auto md:min-h-[300px]" : "md:w-48 flex flex-col items-center justify-center p-3"
       }`}>
         {isLoading ? (
           <div className="absolute inset-0 bg-muted/60 animate-pulse flex items-center justify-center min-h-[160px] w-full">
@@ -985,17 +1001,17 @@ function ReferenceCard({
             <img
               src={imageUrl}
               alt={group.descripcion}
-              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+              className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
               loading="lazy"
             />
-            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-background/95 text-foreground shadow-md transition-transform duration-300 scale-90 group-hover:scale-100">
-                <Eye className="h-5 w-5" />
+            <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-background/95 text-foreground shadow-xl transition-transform duration-500 scale-75 group-hover:scale-100">
+                <Eye className="h-6 w-6" />
               </div>
             </div>
           </button>
         ) : (
-          <div className="flex flex-col items-center justify-center text-muted-foreground/30 p-4 border border-dashed border-muted-foreground/20 rounded-xl w-full h-full min-h-[120px]">
+          <div className="flex flex-col items-center justify-center text-muted-foreground/30 p-4 border border-dashed border-muted-foreground/20 rounded-2xl w-full h-full min-h-[120px] m-4">
             <Shirt className="h-8 w-8 mb-1.5 text-muted-foreground/35 stroke-1" />
             <span className="text-[11px] font-semibold text-center select-none text-muted-foreground/50">Sin foto</span>
           </div>
@@ -1003,17 +1019,17 @@ function ReferenceCard({
       </div>
 
       {/* Product Info Section */}
-      <div className="flex-1 flex flex-col justify-between">
+      <div className="flex-1 flex flex-col justify-between p-1">
         {/* Card Header */}
-        <div className="px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div className="px-5 py-5 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
           <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-md bg-primary px-2.5 py-0.5 font-mono text-xs font-semibold text-primary-foreground tracking-wide">
+            <div className="flex flex-wrap items-center gap-2 mb-2">
+              <span className="rounded-md bg-foreground px-2.5 py-1 font-mono text-xs font-bold text-background tracking-wider shadow-sm">
                 {group.referencia}
               </span>
-              <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2.5 py-1 text-xs font-bold text-muted-foreground">
                 <Boxes className="h-3.5 w-3.5" />
-                {localBodega ? (group.saldosPorBodega[localBodega] || 0) : group.totalSaldo} unidades
+                {localBodega ? (group.saldosPorBodega[localBodega] || 0) : group.totalSaldo} uds.
               </span>
               {Object.entries(group.saldosPorBodega).map(([bodega, saldo]) => {
                 const isSelected = localBodega === bodega;
@@ -1033,7 +1049,7 @@ function ReferenceCard({
                 );
               })}
             </div>
-            <h2 className="mt-2 text-xl font-bold text-foreground tracking-tight">
+            <h2 className="mt-2 text-2xl font-black text-foreground tracking-tight uppercase">
               {group.descripcion}
             </h2>
           </div>
@@ -1044,12 +1060,12 @@ function ReferenceCard({
           <PriceBlock
             label="Precio Detal (PVP)"
             value={formatCurrency(group.pvp)}
-            highlight
           />
           <PriceBlock
             label="Precio Mayorista (PVM) - IVA incluido"
             value={formatCurrency(group.pvm)}
             badge="Mayorista"
+            highlight
           />
           {group.precioUsd !== undefined && group.precioUsd > 0 && (
             <PriceBlock
@@ -1072,40 +1088,42 @@ function ReferenceCard({
           {variantsByColor.map(([color, variants]) => (
             <div
               key={color}
-              className="flex flex-col sm:flex-row sm:items-start gap-3 border-b border-border/50 last:border-0 pb-4 last:pb-0"
+              className="flex flex-col sm:flex-row sm:items-start gap-4 border-b border-border/50 last:border-0 pb-5 last:pb-0"
             >
-              <div className="flex items-center gap-2 w-32 shrink-0 pt-1">
-                <span className="h-2 w-2 rounded-full bg-accent" />
-                <span className="text-sm font-bold text-foreground capitalize">
+              <div className="flex items-center gap-3 w-40 shrink-0 pt-1">
+                <div 
+                  className="h-4 w-4 rounded-full shadow-inner border border-black/10 ring-2 ring-transparent group-hover:ring-accent/30 transition-all"
+                  style={{ backgroundColor: colorToHex(color) }}
+                />
+                <span className="text-[13px] font-bold text-foreground capitalize tracking-tight">
                   {color}
                 </span>
               </div>
-              <div className="flex flex-wrap gap-2 flex-1">
+              <div className="flex flex-wrap gap-2.5 flex-1">
                 {variants.map((v) => {
                   const hasStock = v.saldo > 0;
 
-                  let badgeColor = "bg-muted text-muted-foreground/60 border-border opacity-30 line-through cursor-not-allowed";
+                  let badgeColor = "bg-muted/30 text-muted-foreground/40 border-transparent opacity-50 cursor-not-allowed";
                   if (hasStock) {
-                    // Unified brand denim blue color palette for all active stock sizes
-                    badgeColor = "bg-accent/10 text-primary border-accent/25 hover:bg-accent/20 dark:bg-accent/15 dark:text-accent dark:border-accent/30 dark:hover:bg-accent/25";
+                    badgeColor = "bg-background text-foreground border-border hover:border-primary/40 hover:bg-primary/5 hover:text-primary transition-all";
                   }
 
                   return (
-                    <div key={v.sku} className="inline-flex items-stretch">
+                    <div key={v.sku} className={`inline-flex items-stretch shadow-xs rounded-xl group/btn transition-all ${hasStock ? 'hover:shadow-sm' : ''}`}>
                       <button
                         disabled={!hasStock}
                         onClick={() => copySku(v.sku, v.talla, color)}
-                        className={`inline-flex items-center gap-2 border px-3 py-1.5 ${hasStock ? "rounded-l-xl border-r-0" : "rounded-xl"} text-xs font-bold transition-all duration-150 group relative ${badgeColor}`}
+                        className={`inline-flex items-center gap-2 border px-3 py-1.5 ${hasStock ? "rounded-l-xl border-r-0" : "rounded-xl"} text-[11.5px] font-bold duration-200 relative ${badgeColor}`}
                         title={hasStock ? `Click para copiar SKU: ${v.sku}` : "Sin stock disponible"}
                       >
-                        <span>Talla {v.talla}</span>
-                        <span className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded-md text-[10px] font-extrabold ${
-                          !hasStock ? "bg-muted/50 text-muted-foreground/40" : "bg-primary/15 text-primary dark:bg-accent/20 dark:text-accent"
+                        <span className="tracking-wide">Talla {v.talla}</span>
+                        <span className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded-md text-[10px] font-extrabold shadow-inner ${
+                          !hasStock ? "bg-muted text-muted-foreground/40" : "bg-primary/10 text-primary border border-primary/10"
                         }`}>
                           {v.saldo}
                         </span>
                         {hasStock && (
-                          <Copy className="h-3.5 w-3.5 opacity-0 group-hover:opacity-60 transition-opacity ml-0.5" />
+                          <Copy className="h-3 w-3 opacity-0 group-hover/btn:opacity-50 transition-opacity ml-0.5" />
                         )}
                       </button>
                       {hasStock && (
@@ -1157,15 +1175,15 @@ function ReferenceCard({
 
         {/* Completa el Look Section */}
         {crossSellSuggestions.length > 0 && (
-          <div className="mt-8 pt-6 border-t border-border">
+          <div className="mt-2 pt-6 border-t border-border/50 bg-gradient-to-b from-transparent to-accent/5 rounded-b-2xl px-5 pb-5">
             <div className="flex items-center gap-2 mb-4">
-              <span className="text-xl">✨</span>
-              <h4 className="font-bold text-gray-800 text-sm uppercase tracking-wide">
-                ¡Sugiere al cliente complementar su pedido!
+              <span className="text-xl animate-bounce">✨</span>
+              <h4 className="font-black text-foreground text-sm uppercase tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/60">
+                ¡Sugiere complementar su pedido!
               </h4>
               <div className="flex-1" />
-              <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
-                Opciones para combinar
+              <span className="text-[10px] font-bold text-muted-foreground bg-muted px-2 py-1 rounded-md uppercase tracking-wider">
+                Completa el Look
               </span>
             </div>
             
@@ -1242,29 +1260,36 @@ function PriceBlock({
   badge?: string;
 }) {
   return (
-    <div className={`rounded-xl border p-4 transition-all duration-200 ${
+    <div className={`relative rounded-2xl border p-4 transition-all duration-300 ${
       highlight 
-        ? "bg-card border-border shadow-xs" 
-        : "bg-accent/5 border-accent/15 shadow-xs"
+        ? "bg-primary/5 border-primary/30 shadow-md transform hover:-translate-y-0.5" 
+        : "bg-card border-border/60 shadow-xs opacity-80 hover:opacity-100"
     }`}>
-      <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        <Tag className="h-3.5 w-3.5 text-muted-foreground/75" />
+      {highlight && (
+        <div className="absolute -top-2.5 right-4 bg-primary text-primary-foreground text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm animate-pulse-slow">
+          DESTACADO
+        </div>
+      )}
+      <div className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider ${highlight ? "text-primary/80" : "text-muted-foreground/70"}`}>
+        <Tag className="h-3.5 w-3.5" />
         {label}
       </div>
       <div className="mt-1 flex items-baseline gap-2">
-        <span className={`text-2xl font-extrabold tracking-tight ${
-          highlight ? "text-foreground" : "text-primary"
+        <span className={`text-2xl font-extrabold tracking-tighter ${
+          highlight ? "text-primary" : "text-foreground/80"
         }`}>
           {value}
         </span>
         {badge ? (
-          <span className="text-[9px] font-extrabold bg-accent/25 text-primary px-1.5 py-0.5 rounded-md uppercase tracking-wider select-none">
+          <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded-md uppercase tracking-wider select-none ${
+            highlight ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
+          }`}>
             {badge}
           </span>
         ) : (
           !highlight && (
-            <span className="text-[9px] font-extrabold bg-accent/25 text-primary px-1.5 py-0.5 rounded-md uppercase tracking-wider select-none animate-pulse-slow">
-              Mayorista
+            <span className="text-[9px] font-extrabold bg-muted text-muted-foreground px-1.5 py-0.5 rounded-md uppercase tracking-wider select-none">
+              Minorista
             </span>
           )
         )}
