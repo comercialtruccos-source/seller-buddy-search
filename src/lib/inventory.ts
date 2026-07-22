@@ -14,6 +14,10 @@ export interface InventoryRow {
   bodega?: string;
 }
 
+export interface VariantGroup extends InventoryRow {
+  saldosPorBodega: Record<string, number>;
+}
+
 export interface ReferenceGroup {
   referencia: string;
   descripcion: string;
@@ -22,7 +26,7 @@ export interface ReferenceGroup {
   precioUsd: number;
   totalSaldo: number;
   saldosPorBodega: Record<string, number>;
-  variantes: InventoryRow[];
+  variantes: VariantGroup[];
   imageUrl?: string;
 }
 
@@ -293,15 +297,18 @@ export function groupByReferencia(rows: InventoryRow[]): ReferenceGroup[] {
   const map = new Map<string, ReferenceGroup>();
   for (const row of rows) {
     const existing = map.get(row.referencia);
+    const bodegaName = row.bodega || "PRINCIPAL 1004";
+    
     if (existing) {
       const existingVariant = existing.variantes.find(v => v.sku === row.sku);
       if (existingVariant) {
         existingVariant.saldo += row.saldo;
+        existingVariant.saldosPorBodega[bodegaName] = (existingVariant.saldosPorBodega[bodegaName] || 0) + row.saldo;
       } else {
-        existing.variantes.push({ ...row });
+        existing.variantes.push({ ...row, saldosPorBodega: { [bodegaName]: row.saldo } });
       }
       existing.totalSaldo += row.saldo;
-      existing.saldosPorBodega[row.bodega || "PRINCIPAL 1004"] = (existing.saldosPorBodega[row.bodega || "PRINCIPAL 1004"] || 0) + row.saldo;
+      existing.saldosPorBodega[bodegaName] = (existing.saldosPorBodega[bodegaName] || 0) + row.saldo;
       // Keep the max known prices in case of inconsistencies.
       existing.pvm = existing.pvm || row.pvm;
       existing.pvp = existing.pvp || row.pvp;
@@ -317,8 +324,8 @@ export function groupByReferencia(rows: InventoryRow[]): ReferenceGroup[] {
         pvp: row.pvp,
         precioUsd: row.precioUsd,
         totalSaldo: row.saldo,
-        saldosPorBodega: { [row.bodega || "PRINCIPAL 1004"]: row.saldo },
-        variantes: [{ ...row }],
+        saldosPorBodega: { [bodegaName]: row.saldo },
+        variantes: [{ ...row, saldosPorBodega: { [bodegaName]: row.saldo } }],
         imageUrl: row.imageUrl,
       });
     }

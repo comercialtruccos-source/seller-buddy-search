@@ -89,6 +89,7 @@ function Index() {
   const [selectedTallas, setSelectedTallas] = useState<Set<string>>(new Set());
   const [selectedColores, setSelectedColores] = useState<Set<string>>(new Set());
   const [selectedLineas, setSelectedLineas] = useState<Set<string>>(new Set());
+  const [selectedBodegas, setSelectedBodegas] = useState<Set<string>>(new Set());
   const [previewImage, setPreviewImage] = useState<{
     src: string;
     alt: string;
@@ -106,14 +107,20 @@ function Index() {
   };
 
   // Filter options based on ALL inventory (independent of query), so filters work without searching first
-  const { tallasOptions, coloresOptions } = useMemo(() => {
+  const { tallasOptions, coloresOptions, bodegasOptions } = useMemo(() => {
     const tSet = new Set<string>();
     const cSet = new Set<string>();
+    const bSet = new Set<string>();
     for (const g of groups) {
       for (const v of g.variantes) {
         if (v.saldo <= 0) continue;
         if (v.talla) tSet.add(v.talla);
         if (v.color) cSet.add(v.color);
+        if (v.saldosPorBodega) {
+          for (const [b, s] of Object.entries(v.saldosPorBodega)) {
+            if (s > 0) bSet.add(b);
+          }
+        }
       }
     }
     const tallas = Array.from(tSet).sort((a, b) => {
@@ -123,7 +130,8 @@ function Index() {
       return a.localeCompare(b, "es");
     });
     const colores = Array.from(cSet).sort((a, b) => a.localeCompare(b, "es"));
-    return { tallasOptions: tallas, coloresOptions: colores };
+    const bodegas = Array.from(bSet).sort((a, b) => a.localeCompare(b, "es"));
+    return { tallasOptions: tallas, coloresOptions: colores, bodegasOptions: bodegas };
   }, [groups]);
 
   // Clear filters that are no longer available
@@ -136,9 +144,13 @@ function Index() {
       const next = new Set(Array.from(prev).filter((c) => coloresOptions.includes(c)));
       return next.size === prev.size ? prev : next;
     });
-  }, [tallasOptions, coloresOptions]);
+    setSelectedBodegas((prev) => {
+      const next = new Set(Array.from(prev).filter((b) => bodegasOptions.includes(b)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [tallasOptions, coloresOptions, bodegasOptions]);
 
-  const hasActiveFilters = selectedTallas.size > 0 || selectedColores.size > 0 || selectedLineas.size > 0;
+  const hasActiveFilters = selectedTallas.size > 0 || selectedColores.size > 0 || selectedLineas.size > 0 || selectedBodegas.size > 0;
 
   // Base list: search results if there's a query, otherwise all groups when filters are active
   const baseList = useMemo(() => {
@@ -155,20 +167,51 @@ function Index() {
       const okL = selectedLineas.size === 0 || selectedLineas.has(firstChar);
       if (!okL) continue;
 
-      const variantes = g.variantes.filter((v) => {
+      const newSaldosPorBodega: Record<string, number> = {};
+      const variantes = g.variantes.map(v => {
+        // Calcular saldo activo de la variante basado en bodegas seleccionadas
+        let activeSaldo = 0;
+        if (selectedBodegas.size === 0) {
+          activeSaldo = v.saldo;
+        } else {
+          for (const b of Array.from(selectedBodegas)) {
+            activeSaldo += (v.saldosPorBodega[b] || 0);
+          }
+        }
+        return { ...v, saldo: activeSaldo };
+      }).filter((v) => {
+        if (v.saldo <= 0) return false;
         const okT = selectedTallas.size === 0 || selectedTallas.has(v.talla);
         const okC = selectedColores.size === 0 || selectedColores.has(v.color);
         return okT && okC;
       });
+
       if (variantes.length === 0) continue;
+      
+      const newTotalSaldo = variantes.reduce((s, v) => s + v.saldo, 0);
+      
+      // Rebuild bodegas summary for the filtered group
+      for (const v of variantes) {
+        if (selectedBodegas.size === 0) {
+          for (const [b, s] of Object.entries(v.saldosPorBodega)) {
+            newSaldosPorBodega[b] = (newSaldosPorBodega[b] || 0) + s;
+          }
+        } else {
+          for (const b of Array.from(selectedBodegas)) {
+            newSaldosPorBodega[b] = (newSaldosPorBodega[b] || 0) + (v.saldosPorBodega[b] || 0);
+          }
+        }
+      }
+
       out.push({
         ...g,
         variantes,
-        totalSaldo: variantes.reduce((s, v) => s + v.saldo, 0),
+        totalSaldo: newTotalSaldo,
+        saldosPorBodega: newSaldosPorBodega,
       });
     }
     return out;
-  }, [baseList, selectedTallas, selectedColores, selectedLineas, hasActiveFilters]);
+  }, [baseList, selectedTallas, selectedColores, selectedLineas, selectedBodegas, hasActiveFilters]);
 
   const toggle = (set: Set<string>, value: string) => {
     const next = new Set(set);
@@ -269,6 +312,14 @@ function Index() {
                   renderOption={(l) => lineasLabels[l] || `Línea ${l}`}
                 />
                 <FilterDropdown
+                  label="Bodega"
+                  options={bodegasOptions}
+                  selected={selectedBodegas}
+                  onToggle={(b) => setSelectedBodegas((prev) => toggle(prev, b))}
+                  onClear={() => setSelectedBodegas(new Set())}
+                  renderOption={(b) => b.toUpperCase()}
+                />
+                <FilterDropdown
                   label="Talla"
                   options={tallasOptions}
                   selected={selectedTallas}
@@ -289,6 +340,7 @@ function Index() {
                       setSelectedTallas(new Set());
                       setSelectedColores(new Set());
                       setSelectedLineas(new Set());
+                      setSelectedBodegas(new Set());
                     }}
                     className="text-xs font-semibold text-accent hover:underline"
                   >
