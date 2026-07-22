@@ -856,10 +856,10 @@ function ReferenceCard({
     const tops = allGroups.filter((g) => {
       if (g.referencia === group.referencia) return false;
       
+      // M is for Muestras/fake items.
       const firstChar = g.referencia.charAt(0).toUpperCase();
-      // T, B, P, R are pants. M might be Muestras/Material.
-      const isTop = !["T", "B", "P", "R", "M"].includes(firstChar);
-      
+      if (firstChar === "M") return false;
+
       const desc = (g.descripcion || "").toUpperCase();
       const isRealTopGarment = 
         desc.includes("BLUSA") ||
@@ -869,9 +869,11 @@ function ReferenceCard({
         desc.includes("CROP") ||
         desc.includes("TOP") ||
         desc.includes("CHALECO") ||
+        desc.includes("BUSO") ||
+        desc.includes("CAMISERO") ||
         desc.includes("SUETER");
 
-      if (!isTop || !isRealTopGarment) return false;
+      if (!isRealTopGarment) return false;
 
       // Check if top has any color matching the pant's colors
       return g.variantes.some((v) => {
