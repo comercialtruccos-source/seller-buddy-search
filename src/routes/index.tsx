@@ -868,6 +868,11 @@ function ReferenceCard({
       if (pantInitial === "R" && topInitial !== "R") return;
       if (pantInitial !== "R" && topInitial === "R") return;
 
+      // Ensure Plus Size pants (P) only get Plus Size tops (P) recommendations,
+      // and regular pants do not get Plus Size tops (P).
+      if (pantInitial === "P" && topInitial !== "P") return;
+      if (pantInitial !== "P" && topInitial === "P") return;
+
       // Only recommend products that have an image
       if (!g.imageUrl) return;
 
