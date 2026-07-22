@@ -1555,14 +1555,24 @@ function ProductModal({
 
       <div 
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-4xl my-auto mt-12 mb-auto animate-in fade-in zoom-in duration-300"
+        className="relative w-full max-w-4xl my-auto mt-12 mb-auto animate-in fade-in zoom-in duration-300 flex flex-col items-center"
       >
-        <ReferenceCard 
-          group={product} 
-          allGroups={allGroups} 
-          onPreviewImage={onPreviewImage} 
-          onPreviewProduct={onPreviewProduct} 
-        />
+        <div className="w-full">
+          <ReferenceCard 
+            group={product} 
+            allGroups={allGroups} 
+            onPreviewImage={onPreviewImage} 
+            onPreviewProduct={onPreviewProduct} 
+          />
+        </div>
+        
+        <button
+          onClick={onClose}
+          className="mt-6 mb-12 rounded-full bg-white/10 px-8 py-3 font-semibold text-white backdrop-blur-md border border-white/20 hover:bg-white/20 transition-colors shadow-lg flex items-center gap-2"
+        >
+          <X className="h-5 w-5" />
+          <span>Cerrar Vista</span>
+        </button>
       </div>
     </div>
   );
