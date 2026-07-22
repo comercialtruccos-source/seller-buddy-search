@@ -885,21 +885,43 @@ function ReferenceCard({
 
       if (!isRealTopGarment) return;
 
-      // Check if top has any color matching the pant's colors (flexible match)
-      let matchingStock = 0;
+      // Calculate score based on color match and stock
+      let score = 0;
+      let hasExactMatch = false;
+      let hasNeutralMatch = false;
+      let relevantStock = 0;
+
       g.variantes.forEach((v) => {
         const topColor = (v.color || "Sin color").toUpperCase();
-        // Flexible match: "AZUL OSCURO" matches "AZUL", "BLANCO/NEGRO" matches "NEGRO"
+        
+        // Exact/flexible match with pant color
         const isMatch = Array.from(availableColors).some(ac => 
           ac.includes(topColor) || topColor.includes(ac)
         );
+        
+        // Neutral colors go well with anything
+        const isNeutral = ["BLANCO", "NEGRO", "CRUDO", "BEIGE", "ARENA", "BLANCA"].some(nc => topColor.includes(nc));
+
         if (isMatch) {
-          matchingStock += v.saldo;
+          hasExactMatch = true;
+          relevantStock += v.saldo;
+        } else if (isNeutral) {
+          hasNeutralMatch = true;
+          relevantStock += v.saldo;
         }
       });
 
-      if (matchingStock > 0) {
-        topsWithScore.push({ group: g, matchingStock });
+      if (hasExactMatch) {
+        score = 100000 + relevantStock;
+      } else if (hasNeutralMatch) {
+        score = 50000 + relevantStock;
+      } else {
+        // Fallback: Just any top with stock
+        score = g.totalSaldo;
+      }
+
+      if (score > 0) {
+        topsWithScore.push({ group: g, matchingStock: score }); // using matchingStock prop as score
       }
     });
 
