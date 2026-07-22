@@ -40,6 +40,8 @@ function Cargar() {
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [pasteText, setPasteText] = useState("");
+
   const [trmValue, setTrmValue] = useState<string>(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("trm_value") || "4000";
@@ -191,6 +193,55 @@ function Cargar() {
       });
     } finally {
       setIsSyncing(false);
+    }
+  };
+
+  const handlePasteText = async () => {
+    const text = pasteText.trim();
+    if (!text) {
+      toast.error("Por favor pega el texto del inventario antes de continuar.");
+      return;
+    }
+
+    const trmNum = parseFloat(trmValue);
+    if (!trmValue || isNaN(trmNum) || trmNum <= 0) {
+      toast.error("Por favor ingresa un valor de TRM válido y mayor a 0 antes de cargar.");
+      return;
+    }
+
+    try {
+      setIsUploading(true);
+      setUploadedInfo(null);
+      
+      const parsed = parseInventoryCsv(text, trmNum);
+      
+      if (parsed.length === 0) {
+        toast.error("No se encontraron registros válidos o el formato es incorrecto.");
+        setIsUploading(false);
+        return;
+      }
+
+      toast.loading("Guardando inventario en Supabase…", { id: "save-inventory" });
+      await saveInventory(parsed);
+      
+      setUploadedInfo({
+        count: parsed.length,
+        filename: "Texto pegado desde el portapapeles",
+      });
+      
+      setPasteText(""); // clear the textarea
+      toast.success(
+        `¡Éxito! Se cargaron ${parsed.length} registros desde el texto pegado.`,
+        { id: "save-inventory" }
+      );
+    } catch (error: any) {
+      console.error(error);
+      const errMsg = error.message || error.details || error.hint || "error desconocido";
+      toast.error(`Error al procesar el texto: ${errMsg}`, {
+        id: "save-inventory",
+      });
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -400,7 +451,40 @@ function Cargar() {
           {/* Divider */}
           <div className="my-6 flex items-center justify-between">
             <span className="h-px bg-border flex-1" />
-            <span className="text-[10px] font-extrabold text-muted-foreground/60 px-3 uppercase tracking-wider">O también</span>
+            <span className="text-[10px] font-extrabold text-muted-foreground/60 px-3 uppercase tracking-wider">O pegar texto</span>
+            <span className="h-px bg-border flex-1" />
+          </div>
+
+          {/* Paste Block */}
+          <div className="bg-muted/30 border border-border/80 rounded-2xl p-5 shadow-xs mb-6">
+            <h3 className="text-sm font-bold text-foreground mb-1 flex items-center gap-2">
+              <FileSpreadsheet className="h-4 w-4 text-accent" />
+              Pegar desde Excel (Portapapeles)
+            </h3>
+            <p className="text-xs text-muted-foreground mb-4 leading-relaxed">
+              Si tienes problemas con archivos, selecciona tus datos en Excel, cópialos y pégalos aquí.
+            </p>
+            <div className="flex flex-col gap-3">
+              <textarea
+                value={pasteText}
+                onChange={(e) => setPasteText(e.target.value)}
+                placeholder="Pega aquí el contenido de tu inventario (incluyendo la fila de encabezados)..."
+                className="w-full min-h-32 rounded-xl border border-border bg-background px-3.5 py-3 text-sm text-foreground focus:border-accent focus:ring-1 focus:ring-accent outline-none resize-y"
+              />
+              <button
+                onClick={handlePasteText}
+                disabled={isUploading || isUpdatingPrices || isSyncing || !pasteText.trim()}
+                className="self-end inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary px-5 py-2.5 text-xs font-bold text-primary-foreground hover:bg-primary/95 transition-all shadow-xs active:scale-[0.98] disabled:opacity-50 select-none cursor-pointer"
+              >
+                {isUploading ? "Procesando..." : "Cargar desde texto"}
+              </button>
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="my-6 flex items-center justify-between">
+            <span className="h-px bg-border flex-1" />
+            <span className="text-[10px] font-extrabold text-muted-foreground/60 px-3 uppercase tracking-wider">O sincronizar URL</span>
             <span className="h-px bg-border flex-1" />
           </div>
 
