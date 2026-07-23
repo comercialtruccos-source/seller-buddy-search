@@ -17,6 +17,7 @@ import {
   Download,
   X,
   History,
+  TrendingUp,
   Save,
   Eye,
   ExternalLink,
@@ -24,6 +25,7 @@ import {
 import { toast, Toaster } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { AnalyticsView } from "@/components/AnalyticsView";
 
 import {
   formatCurrency,
@@ -75,7 +77,7 @@ function Index() {
   const [query, setQuery] = useState("");
   const [hydrated, setHydrated] = useState(false);
   const [orderOpen, setOrderOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"catalogo" | "historial">("catalogo");
+  const [activeTab, setActiveTab] = useState<"catalogo" | "historial" | "analytics">("catalogo");
   useHydrateOrder();
   const order = useOrder();
   const orderCount = order.reduce((s, i) => s + i.cantidad, 0);
@@ -283,9 +285,22 @@ function Index() {
             <History className="h-4 w-4" />
             Historial de Pedidos
           </button>
+          <button
+            onClick={() => setActiveTab("analytics")}
+            className={`pb-2.5 px-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${
+              activeTab === "analytics"
+                ? "border-accent text-accent"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <TrendingUp className="h-4 w-4" />
+            Top Ventas
+          </button>
         </div>
 
-        {activeTab === "catalogo" ? (
+        {activeTab === "analytics" && <AnalyticsView allGroups={groups} />}
+
+        {activeTab === "catalogo" && (
           <div className="space-y-6">
             {/* Last updated indicator */}
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -421,7 +436,9 @@ function Index() {
               ))}
             </div>
           </div>
-        ) : (
+        )}
+
+        {activeTab === "historial" && (
           <OrderHistory onOrderDeleted={reloadInventory} />
         )}
       </main>
