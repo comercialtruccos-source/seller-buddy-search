@@ -13,9 +13,30 @@ export function useVoiceSearch(options: UseVoiceSearchOptions = {}) {
   const [error, setError] = useState<string | null>(null);
 
   const recognitionRef = useRef<any>(null);
+  const onResultRef = useRef(onResult);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    onResultRef.current = onResult;
+  }, [onResult]);
+
+  const handleError = useCallback((event: any) => {
+    setIsListening(false);
+    // Ignore benign abort errors (triggered when stopping or restarting recognition)
+    if (event.error === "aborted") {
+      return;
+    }
+    if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+      setError("Permiso de micrófono denegado.");
+    } else if (event.error === "no-speech") {
+      // Optional: silent or subtle notification
+      setError("No se detectó voz.");
+    } else {
+      setError(`Error de voz: ${event.error}`);
+    }
+  }, []);
+
+  const createRecognition = useCallback(() => {
+    if (typeof window === "undefined") return null;
 
     const SpeechRecognition =
       (window as any).SpeechRecognition ||
@@ -23,7 +44,7 @@ export function useVoiceSearch(options: UseVoiceSearchOptions = {}) {
 
     if (!SpeechRecognition) {
       setIsSupported(false);
-      return;
+      return null;
     }
 
     const recognition = new SpeechRecognition();
@@ -43,26 +64,23 @@ export function useVoiceSearch(options: UseVoiceSearchOptions = {}) {
       }
 
       setTranscript(currentTranscript);
-      if (onResult) {
-        onResult(currentTranscript);
+      if (onResultRef.current) {
+        onResultRef.current(currentTranscript);
       }
     };
 
-    recognition.onerror = (event: any) => {
-      console.error("Speech recognition error:", event.error);
-      setIsListening(false);
-      if (event.error === "not-allowed" || event.error === "service-not-allowed") {
-        setError("Permiso de micrófono denegado.");
-      } else if (event.error === "no-speech") {
-        setError("No se escuchó ningún término.");
-      } else {
-        setError(`Error de voz: ${event.error}`);
-      }
-    };
+    recognition.onerror = handleError;
 
     recognition.onend = () => {
       setIsListening(false);
     };
+
+    return recognition;
+  }, [lang, handleError]);
+
+  useEffect(() => {
+    const recognition = createRecognition();
+    if (!recognition) return;
 
     recognitionRef.current = recognition;
 
@@ -71,62 +89,21 @@ export function useVoiceSearch(options: UseVoiceSearchOptions = {}) {
         try {
           recognitionRef.current.abort();
         } catch {
-          // Clean up silently
+          // Ignore cleanup errors
         }
       }
     };
-  }, [lang, onResult]);
+  }, [createRecognition]);
 
   const startListening = useCallback(() => {
-    const SpeechRecognition =
-      typeof window !== "undefined" &&
-      ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
-
-    if (!SpeechRecognition) {
-      setIsSupported(false);
-      setError("La búsqueda por voz no es compatible con este navegador.");
-      return;
+    if (!recognitionRef.current) {
+      recognitionRef.current = createRecognition();
     }
 
     if (!recognitionRef.current) {
-      const recognition = new SpeechRecognition();
-      recognition.continuous = false;
-      recognition.interimResults = true;
-      recognition.lang = lang;
-
-      recognition.onstart = () => {
-        setIsListening(true);
-        setError(null);
-      };
-
-      recognition.onresult = (event: any) => {
-        let currentTranscript = "";
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          currentTranscript += event.results[i][0].transcript;
-        }
-
-        setTranscript(currentTranscript);
-        if (onResult) {
-          onResult(currentTranscript);
-        }
-      };
-
-      recognition.onerror = (event: any) => {
-        setIsListening(false);
-        if (event.error === "not-allowed" || event.error === "service-not-allowed") {
-          setError("Permiso de micrófono denegado.");
-        } else if (event.error === "no-speech") {
-          setError("No se escuchó ningún término.");
-        } else {
-          setError(`Error de voz: ${event.error}`);
-        }
-      };
-
-      recognition.onend = () => {
-        setIsListening(false);
-      };
-
-      recognitionRef.current = recognition;
+      setIsSupported(false);
+      setError("La búsqueda por voz no es compatible con este navegador.");
+      return;
     }
 
     try {
@@ -136,10 +113,10 @@ export function useVoiceSearch(options: UseVoiceSearchOptions = {}) {
     } catch (err: any) {
       if (err?.name === "InvalidStateError") {
         try {
-          recognitionRef.current.stop();
+          recognitionRef.current.abort();
           setTimeout(() => {
             try {
-              recognitionRef.current.start();
+              recognitionRef.current?.start();
             } catch (e) {
               console.error(e);
             }
@@ -151,7 +128,7 @@ export function useVoiceSearch(options: UseVoiceSearchOptions = {}) {
         console.error("Error starting speech recognition:", err);
       }
     }
-  }, [lang, onResult]);
+  }, [createRecognition]);
 
   const stopListening = useCallback(() => {
     if (recognitionRef.current && isListening) {
