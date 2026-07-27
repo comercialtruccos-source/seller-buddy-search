@@ -26,6 +26,8 @@ import { toast, Toaster } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { AnalyticsView } from "@/components/AnalyticsView";
+import { VoiceSearchButton } from "@/components/VoiceSearchButton";
+
 
 import {
   formatCurrency,
@@ -327,9 +329,22 @@ function Index() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Buscar por referencia, descripción, color o SKU (ej: B0102, cargo, azul)"
-                className="w-full rounded-2xl border border-border bg-card py-4 pl-12 pr-4 text-base shadow-sm outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-accent/30"
+                className="w-full rounded-2xl border border-border bg-card py-4 pl-12 pr-20 text-base shadow-sm outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-accent/30"
                 autoFocus
               />
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                {query && (
+                  <button
+                    type="button"
+                    onClick={() => setQuery("")}
+                    className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg transition-colors"
+                    title="Limpiar búsqueda"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+                <VoiceSearchButton onSearchResult={(val) => setQuery(val)} />
+              </div>
             </div>
 
             {/* Filters */}
@@ -1415,8 +1430,21 @@ function OrderHistory({ onOrderDeleted }: { onOrderDeleted?: () => void }) {
           value={searchName}
           onChange={(e) => setSearchName(e.target.value)}
           placeholder="Buscar pedidos por nombre del cliente..."
-          className="w-full rounded-2xl border border-border bg-card py-4 pl-12 pr-4 text-base shadow-sm outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-accent/30"
+          className="w-full rounded-2xl border border-border bg-card py-4 pl-12 pr-20 text-base shadow-sm outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-accent/30"
         />
+        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+          {searchName && (
+            <button
+              type="button"
+              onClick={() => setSearchName("")}
+              className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg transition-colors"
+              title="Limpiar búsqueda"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+          <VoiceSearchButton onSearchResult={(val) => setSearchName(val)} />
+        </div>
       </div>
 
       {filteredOrders.length === 0 ? (
