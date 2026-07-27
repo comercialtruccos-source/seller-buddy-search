@@ -10,8 +10,12 @@ import {
   Link2,
   Download,
   DollarSign,
+  Bot,
+  Mic,
 } from "lucide-react";
 import { toast, Toaster } from "sonner";
+import { Switch } from "@/components/ui/switch";
+
 import {
   parseInventoryCsv,
   readCsvFileText,
@@ -48,6 +52,26 @@ function Cargar() {
     }
     return "4000";
   });
+
+  const [voiceAssistantEnabled, setVoiceAssistantEnabled] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("voice_assistant_enabled");
+      return saved !== null ? saved === "true" : true;
+    }
+    return true;
+  });
+
+  const handleToggleVoiceAssistant = (checked: boolean) => {
+    setVoiceAssistantEnabled(checked);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("voice_assistant_enabled", String(checked));
+      window.dispatchEvent(new Event("storage"));
+    }
+    toast.success(
+      `Módulo del Asistente de Voz ${checked ? "activado" : "desactivado"} correctamente.`
+    );
+  };
+
   
   const [isUpdatingPrices, setIsUpdatingPrices] = useState(false);
 
@@ -396,6 +420,31 @@ function Cargar() {
               >
                 {isUpdatingPrices ? "Actualizando precios..." : "Actualizar precios de la Plataforma"}
               </button>
+            </div>
+          </div>
+
+          {/* Configuración del Asistente de Voz */}
+          <div className="bg-muted/40 border border-border rounded-xl p-4 mb-6 shadow-xs">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                  <Bot className="h-4 w-4 text-accent" />
+                  Módulo de Asistente de Voz
+                </h3>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Activa o desactiva la búsqueda por voz y el Asistente de Pedidos por Voz en toda la plataforma.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 pl-4">
+                <span className={`text-xs font-bold ${voiceAssistantEnabled ? "text-accent" : "text-muted-foreground"}`}>
+                  {voiceAssistantEnabled ? "Activo" : "Inactivo"}
+                </span>
+                <Switch
+                  checked={voiceAssistantEnabled}
+                  onCheckedChange={handleToggleVoiceAssistant}
+                />
+              </div>
             </div>
           </div>
 

@@ -83,6 +83,30 @@ function Index() {
   const [orderOpen, setOrderOpen] = useState(false);
   const [voiceAssistantOpen, setVoiceAssistantOpen] = useState(false);
   const [voiceCustomerName, setVoiceCustomerName] = useState("");
+  const [voiceEnabled, setVoiceEnabled] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("voice_assistant_enabled");
+      return saved !== null ? saved === "true" : true;
+    }
+    return true;
+  });
+
+  useEffect(() => {
+    const syncVoiceEnabled = () => {
+      if (typeof window !== "undefined") {
+        const saved = localStorage.getItem("voice_assistant_enabled");
+        setVoiceEnabled(saved !== null ? saved === "true" : true);
+      }
+    };
+
+    window.addEventListener("storage", syncVoiceEnabled);
+    window.addEventListener("focus", syncVoiceEnabled);
+    return () => {
+      window.removeEventListener("storage", syncVoiceEnabled);
+      window.removeEventListener("focus", syncVoiceEnabled);
+    };
+  }, []);
+
   const [activeTab, setActiveTab] = useState<"catalogo" | "historial" | "analytics">("catalogo");
   useHydrateOrder();
   const order = useOrder();
@@ -347,7 +371,7 @@ function Index() {
                     <X className="h-4 w-4" />
                   </button>
                 )}
-                <VoiceSearchButton onSearchResult={(val) => setQuery(val)} />
+                {voiceEnabled && <VoiceSearchButton onSearchResult={(val) => setQuery(val)} />}
               </div>
             </div>
 
@@ -464,14 +488,16 @@ function Index() {
 
       {/* Floating Action Buttons for Current Order & Voice Assistant */}
       <div className="fixed bottom-6 right-6 z-40 flex flex-col sm:flex-row items-end sm:items-center gap-3">
-        <button
-          onClick={() => setVoiceAssistantOpen(true)}
-          className="flex items-center gap-2.5 rounded-full bg-primary px-5 py-3.5 text-sm font-bold text-primary-foreground shadow-2xl transition-all duration-300 hover:scale-105 active:scale-95 hover:shadow-primary/30"
-          aria-label="Abrir asistente de pedidos por voz"
-        >
-          <Bot className="h-5 w-5 text-accent animate-pulse" />
-          <span>Asistente de Pedidos por Voz</span>
-        </button>
+        {voiceEnabled && (
+          <button
+            onClick={() => setVoiceAssistantOpen(true)}
+            className="flex items-center gap-2.5 rounded-full bg-primary px-5 py-3.5 text-sm font-bold text-primary-foreground shadow-2xl transition-all duration-300 hover:scale-105 active:scale-95 hover:shadow-primary/30"
+            aria-label="Abrir asistente de pedidos por voz"
+          >
+            <Bot className="h-5 w-5 text-accent animate-pulse" />
+            <span>Asistente de Pedidos por Voz</span>
+          </button>
+        )}
 
         <button
           onClick={() => setOrderOpen(true)}
@@ -1488,7 +1514,7 @@ function OrderHistory({ onOrderDeleted }: { onOrderDeleted?: () => void }) {
               <X className="h-4 w-4" />
             </button>
           )}
-          <VoiceSearchButton onSearchResult={(val) => setSearchName(val)} />
+          {voiceEnabled && <VoiceSearchButton onSearchResult={(val) => setSearchName(val)} />}
         </div>
       </div>
 
