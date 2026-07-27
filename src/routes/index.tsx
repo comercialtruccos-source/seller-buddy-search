@@ -21,12 +21,14 @@ import {
   Save,
   Eye,
   ExternalLink,
+  Bot,
 } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { AnalyticsView } from "@/components/AnalyticsView";
 import { VoiceSearchButton } from "@/components/VoiceSearchButton";
+import { VoiceOrderAssistantModal } from "@/components/VoiceOrderAssistantModal";
 
 
 import {
@@ -79,6 +81,8 @@ function Index() {
   const [query, setQuery] = useState("");
   const [hydrated, setHydrated] = useState(false);
   const [orderOpen, setOrderOpen] = useState(false);
+  const [voiceAssistantOpen, setVoiceAssistantOpen] = useState(false);
+  const [voiceCustomerName, setVoiceCustomerName] = useState("");
   const [activeTab, setActiveTab] = useState<"catalogo" | "historial" | "analytics">("catalogo");
   useHydrateOrder();
   const order = useOrder();
@@ -458,28 +462,69 @@ function Index() {
         )}
       </main>
 
-      {/* Floating Action Button (FAB) for Current Order */}
-      <button
-        onClick={() => setOrderOpen(true)}
-        className="fixed bottom-6 right-6 z-40 flex items-center gap-2.5 rounded-full bg-accent px-5 py-4 text-sm font-bold text-accent-foreground shadow-2xl transition-all duration-300 hover:scale-110 active:scale-95 hover:shadow-accent/25 hover:shadow-xl"
-        aria-label="Ver pedido actual"
-      >
-        <div className="relative">
-          <ShoppingCart className="h-5 w-5" />
-          {orderCount > 0 && (
-            <span className="absolute -top-3.5 -right-3.5 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-extrabold text-destructive-foreground animate-pulse">
-              {orderCount}
-            </span>
-          )}
-        </div>
-        <span>Ver Pedido</span>
-      </button>
+      {/* Floating Action Buttons for Current Order & Voice Assistant */}
+      <div className="fixed bottom-6 right-6 z-40 flex flex-col sm:flex-row items-end sm:items-center gap-3">
+        <button
+          onClick={() => setVoiceAssistantOpen(true)}
+          className="flex items-center gap-2.5 rounded-full bg-primary px-5 py-3.5 text-sm font-bold text-primary-foreground shadow-2xl transition-all duration-300 hover:scale-105 active:scale-95 hover:shadow-primary/30"
+          aria-label="Abrir asistente de pedidos por voz"
+        >
+          <Bot className="h-5 w-5 text-accent animate-pulse" />
+          <span>Asistente de Pedidos por Voz</span>
+        </button>
+
+        <button
+          onClick={() => setOrderOpen(true)}
+          className="flex items-center gap-2.5 rounded-full bg-accent px-5 py-3.5 text-sm font-bold text-accent-foreground shadow-2xl transition-all duration-300 hover:scale-105 active:scale-95 hover:shadow-accent/25"
+          aria-label="Ver pedido actual"
+        >
+          <div className="relative">
+            <ShoppingCart className="h-5 w-5" />
+            {orderCount > 0 && (
+              <span className="absolute -top-3.5 -right-3.5 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-extrabold text-destructive-foreground animate-pulse">
+                {orderCount}
+              </span>
+            )}
+          </div>
+          <span>Ver Pedido ({orderCount})</span>
+        </button>
+      </div>
 
       {orderOpen && (
         <OrderModal
           order={order}
           onClose={() => setOrderOpen(false)}
           onOrderSaved={reloadInventory}
+        />
+      )}
+
+      {voiceAssistantOpen && (
+        <VoiceOrderAssistantModal
+          open={voiceAssistantOpen}
+          onClose={() => setVoiceAssistantOpen(false)}
+          inventory={rows}
+          customerName={voiceCustomerName}
+          setCustomerName={setVoiceCustomerName}
+          onSaveOrder={async () => {
+            if (!voiceCustomerName.trim()) {
+              toast.error("Ingresa el nombre del cliente para guardar.");
+              return;
+            }
+            try {
+              toast.loading("Guardando pedido...", { id: "voice-save" });
+              await saveOrderToDb(voiceCustomerName.trim(), order);
+              toast.success("¡Pedido guardado exitosamente!", { id: "voice-save" });
+              clearOrder();
+              reloadInventory();
+              setVoiceAssistantOpen(false);
+            } catch (err: any) {
+              toast.error(`Error: ${err.message || "Error al guardar"}`, { id: "voice-save" });
+            }
+          }}
+          onDownloadExcel={() => {
+            downloadOrderXls(order, voiceCustomerName.trim() || undefined);
+            toast.success("Excel descargado correctamente.");
+          }}
         />
       )}
 
