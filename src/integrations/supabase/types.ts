@@ -16,15 +16,16 @@ export type Database = {
     Tables: {
       inventory: {
         Row: {
+          bodega: string
           cod_color: string
           color: string
           created_at: string
           descripcion: string
           id: string
           image_url: string
+          precio_usd: number | null
           pvm: number
           pvp: number
-          precio_usd: number
           referencia: string
           saldo: number
           sku: string
@@ -32,15 +33,16 @@ export type Database = {
           talla_lote: string
         }
         Insert: {
+          bodega?: string
           cod_color?: string
           color?: string
           created_at?: string
           descripcion?: string
           id?: string
           image_url?: string
+          precio_usd?: number | null
           pvm?: number
           pvp?: number
-          precio_usd?: number
           referencia: string
           saldo?: number
           sku?: string
@@ -48,83 +50,63 @@ export type Database = {
           talla_lote?: string
         }
         Update: {
+          bodega?: string
           cod_color?: string
           color?: string
           created_at?: string
           descripcion?: string
           id?: string
           image_url?: string
+          precio_usd?: number | null
           pvm?: number
           pvp?: number
-          precio_usd?: number
           referencia?: string
           saldo?: number
           sku?: string
           talla?: string
           talla_lote?: string
-        }
-        Relationships: []
-      }
-      orders: {
-        Row: {
-          id: string
-          customer_name: string
-          total_amount: number
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          customer_name: string
-          total_amount?: number
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          customer_name?: string
-          total_amount?: number
-          created_at?: string
         }
         Relationships: []
       }
       order_items: {
         Row: {
+          cantidad: number
+          cod_color: string
+          color: string
+          created_at: string
+          descripcion: string
           id: string
           order_id: string
-          sku: string
-          referencia: string
-          descripcion: string
-          talla: string
-          color: string
-          cod_color: string
           pvm: number
-          cantidad: number
-          created_at: string
+          referencia: string
+          sku: string
+          talla: string
         }
         Insert: {
+          cantidad?: number
+          cod_color?: string
+          color?: string
+          created_at?: string
+          descripcion?: string
           id?: string
           order_id: string
-          sku: string
-          referencia: string
-          descripcion?: string
-          talla?: string
-          color?: string
-          cod_color?: string
           pvm?: number
-          cantidad?: number
-          created_at?: string
+          referencia: string
+          sku: string
+          talla?: string
         }
         Update: {
+          cantidad?: number
+          cod_color?: string
+          color?: string
+          created_at?: string
+          descripcion?: string
           id?: string
           order_id?: string
-          sku?: string
-          referencia?: string
-          descripcion?: string
-          talla?: string
-          color?: string
-          cod_color?: string
           pvm?: number
-          cantidad?: number
-          created_at?: string
+          referencia?: string
+          sku?: string
+          talla?: string
         }
         Relationships: [
           {
@@ -133,8 +115,29 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "orders"
             referencedColumns: ["id"]
-          }
+          },
         ]
+      }
+      orders: {
+        Row: {
+          created_at: string
+          customer_name: string
+          id: string
+          total_amount: number
+        }
+        Insert: {
+          created_at?: string
+          customer_name: string
+          id?: string
+          total_amount?: number
+        }
+        Update: {
+          created_at?: string
+          customer_name?: string
+          id?: string
+          total_amount?: number
+        }
+        Relationships: []
       }
     }
     Views: {
