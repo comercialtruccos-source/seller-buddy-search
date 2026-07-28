@@ -482,7 +482,7 @@ function Index() {
         )}
 
         {activeTab === "historial" && (
-          <OrderHistory onOrderDeleted={reloadInventory} />
+          <OrderHistory onOrderDeleted={reloadInventory} voiceEnabled={voiceEnabled} />
         )}
       </main>
 
@@ -1422,7 +1422,13 @@ function PriceBlock({
   );
 }
 
-function OrderHistory({ onOrderDeleted }: { onOrderDeleted?: () => void }) {
+function OrderHistory({
+  onOrderDeleted,
+  voiceEnabled = false,
+}: {
+  onOrderDeleted?: () => void;
+  voiceEnabled?: boolean;
+}) {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchName, setSearchName] = useState("");
