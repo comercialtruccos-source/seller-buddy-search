@@ -377,7 +377,7 @@ function Index() {
                     <X className="h-4 w-4" />
                   </button>
                 )}
-                {voiceEnabled && <VoiceSearchButton onSearchResult={(val) => setQuery(val)} />}
+                {voiceSearchEnabled && <VoiceSearchButton onSearchResult={(val) => setQuery(val)} />}
               </div>
             </div>
 
@@ -488,13 +488,13 @@ function Index() {
         )}
 
         {activeTab === "historial" && (
-          <OrderHistory onOrderDeleted={reloadInventory} voiceEnabled={voiceEnabled} />
+          <OrderHistory onOrderDeleted={reloadInventory} voiceEnabled={voiceSearchEnabled} />
         )}
       </main>
 
       {/* Floating Action Buttons for Current Order & Voice Assistant */}
       <div className="fixed bottom-6 right-6 z-40 flex flex-col sm:flex-row items-end sm:items-center gap-3">
-        {voiceEnabled && (
+        {voiceOrderEnabled && (
           <button
             onClick={() => setVoiceAssistantOpen(true)}
             className="flex items-center gap-2.5 rounded-full bg-primary px-5 py-3.5 text-sm font-bold text-primary-foreground shadow-2xl transition-all duration-300 hover:scale-105 active:scale-95 hover:shadow-primary/30"
