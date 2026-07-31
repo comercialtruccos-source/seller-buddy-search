@@ -53,24 +53,39 @@ function Cargar() {
     return "4000";
   });
 
-  const [voiceAssistantEnabled, setVoiceAssistantEnabled] = useState<boolean>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("voice_assistant_enabled");
-      return saved !== null ? saved === "true" : true;
-    }
-    return true;
-  });
+  const readVoiceFlag = (key: string) => {
+    if (typeof window === "undefined") return true;
+    const saved = localStorage.getItem(key);
+    if (saved !== null) return saved === "true";
+    const legacy = localStorage.getItem("voice_assistant_enabled");
+    return legacy !== null ? legacy === "true" : true;
+  };
 
-  const handleToggleVoiceAssistant = (checked: boolean) => {
-    setVoiceAssistantEnabled(checked);
+  const [voiceSearchEnabled, setVoiceSearchEnabled] = useState<boolean>(() =>
+    readVoiceFlag("voice_search_enabled")
+  );
+  const [voiceOrderEnabled, setVoiceOrderEnabled] = useState<boolean>(() =>
+    readVoiceFlag("voice_order_assistant_enabled")
+  );
+
+  const persistVoiceFlag = (key: string, checked: boolean, label: string) => {
     if (typeof window !== "undefined") {
-      localStorage.setItem("voice_assistant_enabled", String(checked));
+      localStorage.setItem(key, String(checked));
       window.dispatchEvent(new Event("storage"));
     }
-    toast.success(
-      `Módulo del Asistente de Voz ${checked ? "activado" : "desactivado"} correctamente.`
-    );
+    toast.success(`${label} ${checked ? "activado" : "desactivado"} correctamente.`);
   };
+
+  const handleToggleVoiceSearch = (checked: boolean) => {
+    setVoiceSearchEnabled(checked);
+    persistVoiceFlag("voice_search_enabled", checked, "Buscador por voz");
+  };
+
+  const handleToggleVoiceOrder = (checked: boolean) => {
+    setVoiceOrderEnabled(checked);
+    persistVoiceFlag("voice_order_assistant_enabled", checked, "Asistente de Pedidos por Voz");
+  };
+
 
   
   const [isUpdatingPrices, setIsUpdatingPrices] = useState(false);
