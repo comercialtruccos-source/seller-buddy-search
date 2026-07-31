@@ -438,30 +438,49 @@ function Cargar() {
             </div>
           </div>
 
-          {/* Configuración del Asistente de Voz */}
-          <div className="bg-muted/40 border border-border rounded-xl p-4 mb-6 shadow-xs">
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                  <Bot className="h-4 w-4 text-accent" />
-                  Módulo de Asistente de Voz
-                </h3>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  Activa o desactiva la búsqueda por voz y el Asistente de Pedidos por Voz en toda la plataforma.
-                </p>
+          {/* Módulos de voz */}
+          <div className="grid gap-3 sm:grid-cols-2 mb-6">
+            <div className="bg-muted/40 border border-border rounded-xl p-4 shadow-xs">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <Mic className="h-4 w-4 text-accent" />
+                    Buscador por voz
+                  </h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Activa o desactiva el micrófono para buscar referencias por voz.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 pl-4">
+                  <span className={`text-xs font-bold ${voiceSearchEnabled ? "text-accent" : "text-muted-foreground"}`}>
+                    {voiceSearchEnabled ? "Activo" : "Inactivo"}
+                  </span>
+                  <Switch checked={voiceSearchEnabled} onCheckedChange={handleToggleVoiceSearch} />
+                </div>
               </div>
+            </div>
 
-              <div className="flex items-center gap-2 pl-4">
-                <span className={`text-xs font-bold ${voiceAssistantEnabled ? "text-accent" : "text-muted-foreground"}`}>
-                  {voiceAssistantEnabled ? "Activo" : "Inactivo"}
-                </span>
-                <Switch
-                  checked={voiceAssistantEnabled}
-                  onCheckedChange={handleToggleVoiceAssistant}
-                />
+            <div className="bg-muted/40 border border-border rounded-xl p-4 shadow-xs">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <Bot className="h-4 w-4 text-accent" />
+                    Asistente de Pedidos por Voz
+                  </h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Activa o desactiva el asistente que arma pedidos dictados por voz.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 pl-4">
+                  <span className={`text-xs font-bold ${voiceOrderEnabled ? "text-accent" : "text-muted-foreground"}`}>
+                    {voiceOrderEnabled ? "Activo" : "Inactivo"}
+                  </span>
+                  <Switch checked={voiceOrderEnabled} onCheckedChange={handleToggleVoiceOrder} />
+                </div>
               </div>
             </div>
           </div>
+
 
           <div className="mb-6 flex">
             <button
