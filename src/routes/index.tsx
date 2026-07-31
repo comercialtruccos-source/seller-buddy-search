@@ -83,20 +83,25 @@ function Index() {
   const [orderOpen, setOrderOpen] = useState(false);
   const [voiceAssistantOpen, setVoiceAssistantOpen] = useState(false);
   const [voiceCustomerName, setVoiceCustomerName] = useState("");
-  const [voiceEnabled, setVoiceEnabled] = useState<boolean>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("voice_assistant_enabled");
-      return saved !== null ? saved === "true" : true;
-    }
-    return true;
-  });
+  const readFlag = (key: string) => {
+    if (typeof window === "undefined") return true;
+    const saved = localStorage.getItem(key);
+    if (saved !== null) return saved === "true";
+    const legacy = localStorage.getItem("voice_assistant_enabled");
+    return legacy !== null ? legacy === "true" : true;
+  };
+
+  const [voiceSearchEnabled, setVoiceSearchEnabled] = useState<boolean>(() =>
+    readFlag("voice_search_enabled")
+  );
+  const [voiceOrderEnabled, setVoiceOrderEnabled] = useState<boolean>(() =>
+    readFlag("voice_order_assistant_enabled")
+  );
 
   useEffect(() => {
     const syncVoiceEnabled = () => {
-      if (typeof window !== "undefined") {
-        const saved = localStorage.getItem("voice_assistant_enabled");
-        setVoiceEnabled(saved !== null ? saved === "true" : true);
-      }
+      setVoiceSearchEnabled(readFlag("voice_search_enabled"));
+      setVoiceOrderEnabled(readFlag("voice_order_assistant_enabled"));
     };
 
     window.addEventListener("storage", syncVoiceEnabled);
@@ -106,6 +111,7 @@ function Index() {
       window.removeEventListener("focus", syncVoiceEnabled);
     };
   }, []);
+
 
   const [activeTab, setActiveTab] = useState<"catalogo" | "historial" | "analytics">("catalogo");
   useHydrateOrder();
@@ -371,7 +377,7 @@ function Index() {
                     <X className="h-4 w-4" />
                   </button>
                 )}
-                {voiceEnabled && <VoiceSearchButton onSearchResult={(val) => setQuery(val)} />}
+                {voiceSearchEnabled && <VoiceSearchButton onSearchResult={(val) => setQuery(val)} />}
               </div>
             </div>
 
@@ -482,13 +488,13 @@ function Index() {
         )}
 
         {activeTab === "historial" && (
-          <OrderHistory onOrderDeleted={reloadInventory} voiceEnabled={voiceEnabled} />
+          <OrderHistory onOrderDeleted={reloadInventory} voiceEnabled={voiceSearchEnabled} />
         )}
       </main>
 
       {/* Floating Action Buttons for Current Order & Voice Assistant */}
       <div className="fixed bottom-6 right-6 z-40 flex flex-col sm:flex-row items-end sm:items-center gap-3">
-        {voiceEnabled && (
+        {voiceOrderEnabled && (
           <button
             onClick={() => setVoiceAssistantOpen(true)}
             className="flex items-center gap-2.5 rounded-full bg-primary px-5 py-3.5 text-sm font-bold text-primary-foreground shadow-2xl transition-all duration-300 hover:scale-105 active:scale-95 hover:shadow-primary/30"

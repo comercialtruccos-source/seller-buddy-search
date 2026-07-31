@@ -202,7 +202,7 @@ export function parseInventoryCsv(text: string, trm?: number): InventoryRow[] {
   // Fallbacks for data without headers (or if exact column names weren't found)
   // Heuristic: If colCount >= 12, or if the second column (index 1) looks like a bodega name
   const isNewFormat = colCount >= 12 || 
-    (firstLineCols[1] && (firstLineCols[1].toUpperCase().includes("PRINCIPAL") || firstLineCols[1].toUpperCase().includes("VENTA") || firstLineCols[1].toUpperCase().includes("FERIAS")));
+    (firstLineCols[1] && (firstLineCols[1].toUpperCase().includes("PRINCIPAL") || firstLineCols[1].toUpperCase().includes("VENTA")));
 
   if (isNewFormat && iBodega === -1 && iRef === -1) {
     // New format with Bodega (12 columns)

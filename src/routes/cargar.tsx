@@ -53,24 +53,39 @@ function Cargar() {
     return "4000";
   });
 
-  const [voiceAssistantEnabled, setVoiceAssistantEnabled] = useState<boolean>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("voice_assistant_enabled");
-      return saved !== null ? saved === "true" : true;
-    }
-    return true;
-  });
+  const readVoiceFlag = (key: string) => {
+    if (typeof window === "undefined") return true;
+    const saved = localStorage.getItem(key);
+    if (saved !== null) return saved === "true";
+    const legacy = localStorage.getItem("voice_assistant_enabled");
+    return legacy !== null ? legacy === "true" : true;
+  };
 
-  const handleToggleVoiceAssistant = (checked: boolean) => {
-    setVoiceAssistantEnabled(checked);
+  const [voiceSearchEnabled, setVoiceSearchEnabled] = useState<boolean>(() =>
+    readVoiceFlag("voice_search_enabled")
+  );
+  const [voiceOrderEnabled, setVoiceOrderEnabled] = useState<boolean>(() =>
+    readVoiceFlag("voice_order_assistant_enabled")
+  );
+
+  const persistVoiceFlag = (key: string, checked: boolean, label: string) => {
     if (typeof window !== "undefined") {
-      localStorage.setItem("voice_assistant_enabled", String(checked));
+      localStorage.setItem(key, String(checked));
       window.dispatchEvent(new Event("storage"));
     }
-    toast.success(
-      `Módulo del Asistente de Voz ${checked ? "activado" : "desactivado"} correctamente.`
-    );
+    toast.success(`${label} ${checked ? "activado" : "desactivado"} correctamente.`);
   };
+
+  const handleToggleVoiceSearch = (checked: boolean) => {
+    setVoiceSearchEnabled(checked);
+    persistVoiceFlag("voice_search_enabled", checked, "Buscador por voz");
+  };
+
+  const handleToggleVoiceOrder = (checked: boolean) => {
+    setVoiceOrderEnabled(checked);
+    persistVoiceFlag("voice_order_assistant_enabled", checked, "Asistente de Pedidos por Voz");
+  };
+
 
   
   const [isUpdatingPrices, setIsUpdatingPrices] = useState(false);
@@ -122,33 +137,31 @@ function Cargar() {
     
     const sampleRows = [
       [
-        "001",
-        "PRINCIPAL 1004",
-        "Camiseta Básica",
-        "LOTE-A",
-        "Blanco",
-        "100",
-        "M",
+        "REF001",
+        "Pantalón Jean Vaquero",
+        "02-01",
+        "AZUL",
+        "10",
+        "02",
         "01",
-        "001-M-01",
-        "25000",
-        "50000",
+        "SKU-REF001-AZ-02",
+        "45000",
+        "85000",
         "12.50",
-        "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?q=80&w=1000"
+        "https://images.unsplash.com/photo-1542272604-787c3835535d?q=80&w=1000"
       ],
       [
-        "002",
-        "BODEGA FERIAS",
-        "Pantalón Jean",
-        "LOTE-B",
-        "Azul",
-        "50",
-        "32",
-        "02",
-        "002-32-02",
-        "60000",
-        "120000",
-        "30.00",
+        "REF001",
+        "Pantalón Jean Vaquero",
+        "04-01",
+        "AZUL",
+        "5",
+        "04",
+        "01",
+        "SKU-REF001-AZ-04",
+        "45000",
+        "85000",
+        "12.50",
         "https://images.unsplash.com/photo-1542272604-787c3835535d?q=80&w=1000"
       ]
     ];
@@ -425,30 +438,49 @@ function Cargar() {
             </div>
           </div>
 
-          {/* Configuración del Asistente de Voz */}
-          <div className="bg-muted/40 border border-border rounded-xl p-4 mb-6 shadow-xs">
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                  <Bot className="h-4 w-4 text-accent" />
-                  Módulo de Asistente de Voz
-                </h3>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  Activa o desactiva la búsqueda por voz y el Asistente de Pedidos por Voz en toda la plataforma.
-                </p>
+          {/* Módulos de voz */}
+          <div className="grid gap-3 sm:grid-cols-2 mb-6">
+            <div className="bg-muted/40 border border-border rounded-xl p-4 shadow-xs">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <Mic className="h-4 w-4 text-accent" />
+                    Buscador por voz
+                  </h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Activa o desactiva el micrófono para buscar referencias por voz.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 pl-4">
+                  <span className={`text-xs font-bold ${voiceSearchEnabled ? "text-accent" : "text-muted-foreground"}`}>
+                    {voiceSearchEnabled ? "Activo" : "Inactivo"}
+                  </span>
+                  <Switch checked={voiceSearchEnabled} onCheckedChange={handleToggleVoiceSearch} />
+                </div>
               </div>
+            </div>
 
-              <div className="flex items-center gap-2 pl-4">
-                <span className={`text-xs font-bold ${voiceAssistantEnabled ? "text-accent" : "text-muted-foreground"}`}>
-                  {voiceAssistantEnabled ? "Activo" : "Inactivo"}
-                </span>
-                <Switch
-                  checked={voiceAssistantEnabled}
-                  onCheckedChange={handleToggleVoiceAssistant}
-                />
+            <div className="bg-muted/40 border border-border rounded-xl p-4 shadow-xs">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <Bot className="h-4 w-4 text-accent" />
+                    Asistente de Pedidos por Voz
+                  </h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Activa o desactiva el asistente que arma pedidos dictados por voz.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 pl-4">
+                  <span className={`text-xs font-bold ${voiceOrderEnabled ? "text-accent" : "text-muted-foreground"}`}>
+                    {voiceOrderEnabled ? "Activo" : "Inactivo"}
+                  </span>
+                  <Switch checked={voiceOrderEnabled} onCheckedChange={handleToggleVoiceOrder} />
+                </div>
               </div>
             </div>
           </div>
+
 
           <div className="mb-6 flex">
             <button
