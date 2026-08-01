@@ -62,15 +62,15 @@ function Cargar() {
     return legacy !== null ? legacy === "true" : true;
   };
 
-  const [voiceSearchEnabled, setVoiceSearchEnabled] = useState<boolean>(() =>
-    readVoiceFlag("voice_search_enabled")
-  );
-  const [voiceOrderEnabled, setVoiceOrderEnabled] = useState<boolean>(() =>
-    readVoiceFlag("voice_order_assistant_enabled")
-  );
-  const [barcodeScannerEnabled, setBarcodeScannerEnabled] = useState<boolean>(() =>
-    readVoiceFlag("barcode_scanner_enabled")
-  );
+  const [voiceSearchEnabled, setVoiceSearchEnabled] = useState<boolean>(true);
+  const [voiceOrderEnabled, setVoiceOrderEnabled] = useState<boolean>(true);
+  const [barcodeScannerEnabled, setBarcodeScannerEnabled] = useState<boolean>(true);
+
+  useEffect(() => {
+    setVoiceSearchEnabled(readVoiceFlag("voice_search_enabled"));
+    setVoiceOrderEnabled(readVoiceFlag("voice_order_assistant_enabled"));
+    setBarcodeScannerEnabled(readVoiceFlag("barcode_scanner_enabled"));
+  }, []);
 
   const persistVoiceFlag = (key: string, checked: boolean, label: string) => {
     if (typeof window !== "undefined") {

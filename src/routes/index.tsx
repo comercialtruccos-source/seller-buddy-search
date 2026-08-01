@@ -93,17 +93,16 @@ function Index() {
     return legacy !== null ? legacy === "true" : true;
   };
 
-  const [voiceSearchEnabled, setVoiceSearchEnabled] = useState<boolean>(() =>
-    readFlag("voice_search_enabled")
-  );
-  const [voiceOrderEnabled, setVoiceOrderEnabled] = useState<boolean>(() =>
-    readFlag("voice_order_assistant_enabled")
-  );
-  const [barcodeScannerEnabled, setBarcodeScannerEnabled] = useState<boolean>(() =>
-    readFlag("barcode_scanner_enabled")
-  );
+  const [voiceSearchEnabled, setVoiceSearchEnabled] = useState<boolean>(true);
+  const [voiceOrderEnabled, setVoiceOrderEnabled] = useState<boolean>(true);
+  const [barcodeScannerEnabled, setBarcodeScannerEnabled] = useState<boolean>(true);
 
   useEffect(() => {
+    // Initial hydration from localStorage
+    setVoiceSearchEnabled(readFlag("voice_search_enabled"));
+    setVoiceOrderEnabled(readFlag("voice_order_assistant_enabled"));
+    setBarcodeScannerEnabled(readFlag("barcode_scanner_enabled"));
+
     const syncVoiceEnabled = () => {
       setVoiceSearchEnabled(readFlag("voice_search_enabled"));
       setVoiceOrderEnabled(readFlag("voice_order_assistant_enabled"));
