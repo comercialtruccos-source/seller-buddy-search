@@ -99,11 +99,15 @@ function Index() {
   const [voiceOrderEnabled, setVoiceOrderEnabled] = useState<boolean>(() =>
     readFlag("voice_order_assistant_enabled")
   );
+  const [barcodeScannerEnabled, setBarcodeScannerEnabled] = useState<boolean>(() =>
+    readFlag("barcode_scanner_enabled")
+  );
 
   useEffect(() => {
     const syncVoiceEnabled = () => {
       setVoiceSearchEnabled(readFlag("voice_search_enabled"));
       setVoiceOrderEnabled(readFlag("voice_order_assistant_enabled"));
+      setBarcodeScannerEnabled(readFlag("barcode_scanner_enabled"));
     };
 
     window.addEventListener("storage", syncVoiceEnabled);
@@ -381,14 +385,16 @@ function Index() {
                   </button>
                 )}
                 {voiceSearchEnabled && <VoiceSearchButton onSearchResult={(val) => setQuery(val)} />}
-                <button
-                  type="button"
-                  onClick={() => setIsScannerOpen(true)}
-                  className="p-2 text-muted-foreground hover:text-foreground rounded-lg transition-colors bg-muted/50 hover:bg-muted"
-                  title="Escanear código de barras"
-                >
-                  <ScanBarcode className="h-5 w-5 text-accent" />
-                </button>
+                {barcodeScannerEnabled && (
+                  <button
+                    type="button"
+                    onClick={() => setIsScannerOpen(true)}
+                    className="p-2 text-muted-foreground hover:text-foreground rounded-lg transition-colors bg-muted/50 hover:bg-muted"
+                    title="Escanear código de barras"
+                  >
+                    <ScanBarcode className="h-5 w-5 text-accent" />
+                  </button>
+                )}
               </div>
             </div>
 

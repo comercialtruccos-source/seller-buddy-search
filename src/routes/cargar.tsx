@@ -12,6 +12,7 @@ import {
   DollarSign,
   Bot,
   Mic,
+  ScanBarcode,
 } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import { Switch } from "@/components/ui/switch";
@@ -67,6 +68,9 @@ function Cargar() {
   const [voiceOrderEnabled, setVoiceOrderEnabled] = useState<boolean>(() =>
     readVoiceFlag("voice_order_assistant_enabled")
   );
+  const [barcodeScannerEnabled, setBarcodeScannerEnabled] = useState<boolean>(() =>
+    readVoiceFlag("barcode_scanner_enabled")
+  );
 
   const persistVoiceFlag = (key: string, checked: boolean, label: string) => {
     if (typeof window !== "undefined") {
@@ -84,6 +88,11 @@ function Cargar() {
   const handleToggleVoiceOrder = (checked: boolean) => {
     setVoiceOrderEnabled(checked);
     persistVoiceFlag("voice_order_assistant_enabled", checked, "Asistente de Pedidos por Voz");
+  };
+
+  const handleToggleBarcodeScanner = (checked: boolean) => {
+    setBarcodeScannerEnabled(checked);
+    persistVoiceFlag("barcode_scanner_enabled", checked, "Escáner de Códigos");
   };
 
 
@@ -438,8 +447,8 @@ function Cargar() {
             </div>
           </div>
 
-          {/* Módulos de voz */}
-          <div className="grid gap-3 sm:grid-cols-2 mb-6">
+          {/* Módulos adicionales */}
+          <div className="grid gap-3 sm:grid-cols-3 mb-6">
             <div className="bg-muted/40 border border-border rounded-xl p-4 shadow-xs">
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
@@ -476,6 +485,26 @@ function Cargar() {
                     {voiceOrderEnabled ? "Activo" : "Inactivo"}
                   </span>
                   <Switch checked={voiceOrderEnabled} onCheckedChange={handleToggleVoiceOrder} />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-muted/40 border border-border rounded-xl p-4 shadow-xs">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <ScanBarcode className="h-4 w-4 text-accent" />
+                    Escáner de Códigos
+                  </h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Usa la cámara para escanear etiquetas de productos.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 pl-4">
+                  <span className={`text-xs font-bold ${barcodeScannerEnabled ? "text-accent" : "text-muted-foreground"}`}>
+                    {barcodeScannerEnabled ? "Activo" : "Inactivo"}
+                  </span>
+                  <Switch checked={barcodeScannerEnabled} onCheckedChange={handleToggleBarcodeScanner} />
                 </div>
               </div>
             </div>
