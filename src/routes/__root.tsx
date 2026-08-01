@@ -153,35 +153,6 @@ function RootComponent() {
         console.log('ServiceWorker registration failed: ', error);
       });
     }
-
-    // Implement Installation Popup logic
-    let deferredPrompt: any;
-    const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
-      deferredPrompt = e;
-      
-      const installButton = document.getElementById('installButton');
-      if (installButton) {
-        installButton.classList.remove('hidden');
-        installButton.classList.add('inline-flex');
-        installButton.onclick = () => {
-          if (deferredPrompt) {
-            deferredPrompt.prompt();
-            deferredPrompt.userChoice.then((choiceResult: any) => {
-              if (choiceResult.outcome === 'accepted') {
-                console.log('User accepted PWA installation');
-              } else {
-                console.log('User declined PWA installation');
-              }
-              deferredPrompt = null;
-            });
-          }
-        };
-      }
-    };
-
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
   }, []);
 
   return (

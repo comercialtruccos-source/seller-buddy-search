@@ -159,6 +159,32 @@ function Index() {
     shopifyUrl?: string;
   } | null>(null);
   const [previewProduct, setPreviewProduct] = useState<ReferenceGroup | null>(null);
+  
+  // PWA Install State
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+  }, []);
+
+  const handleInstallClick = () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then((choiceResult: any) => {
+        if (choiceResult.outcome === 'accepted') {
+          console.log('User accepted PWA installation');
+        } else {
+          console.log('User declined PWA installation');
+        }
+        setDeferredPrompt(null);
+      });
+    }
+  };
 
   const lineasOptions = useMemo(() => ["T", "B", "P", "R"], []);
   const lineasLabels: Record<string, string> = {
@@ -301,13 +327,15 @@ function Index() {
             </p>
           </div>
           <div className="flex-1" />
-          <button
-            id="installButton"
-            className="hidden items-center justify-center gap-1.5 rounded-xl bg-accent px-4 py-2 text-sm font-bold text-accent-foreground shadow-sm hover:bg-accent/90 transition-all"
-          >
-            <Download className="h-4 w-4" />
-            Instalar App
-          </button>
+          {deferredPrompt && (
+            <button
+              onClick={handleInstallClick}
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-accent px-4 py-2 text-sm font-bold text-accent-foreground shadow-sm hover:bg-accent/90 transition-all"
+            >
+              <Download className="h-4 w-4" />
+              Instalar App
+            </button>
+          )}
         </div>
       </header>
 
