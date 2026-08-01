@@ -300,6 +300,14 @@ function Index() {
               Consulta de precios detal y mayorista
             </p>
           </div>
+          <div className="flex-1" />
+          <button
+            id="installButton"
+            className="hidden items-center justify-center gap-1.5 rounded-xl bg-accent px-4 py-2 text-sm font-bold text-accent-foreground shadow-sm hover:bg-accent/90 transition-all"
+          >
+            <Download className="h-4 w-4" />
+            Instalar App
+          </button>
         </div>
       </header>
 
