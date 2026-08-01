@@ -22,6 +22,7 @@ import {
   Eye,
   ExternalLink,
   Bot,
+  ScanBarcode,
 } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import { useQuery } from "@tanstack/react-query";
@@ -29,6 +30,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { AnalyticsView } from "@/components/AnalyticsView";
 import { VoiceSearchButton } from "@/components/VoiceSearchButton";
 import { VoiceOrderAssistantModal } from "@/components/VoiceOrderAssistantModal";
+import { BarcodeScannerModal } from "@/components/BarcodeScannerModal";
 
 
 import {
@@ -114,6 +116,7 @@ function Index() {
 
 
   const [activeTab, setActiveTab] = useState<"catalogo" | "historial" | "analytics">("catalogo");
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
   useHydrateOrder();
   const order = useOrder();
   const orderCount = order.reduce((s, i) => s + i.cantidad, 0);
@@ -378,6 +381,14 @@ function Index() {
                   </button>
                 )}
                 {voiceSearchEnabled && <VoiceSearchButton onSearchResult={(val) => setQuery(val)} />}
+                <button
+                  type="button"
+                  onClick={() => setIsScannerOpen(true)}
+                  className="p-2 text-muted-foreground hover:text-foreground rounded-lg transition-colors bg-muted/50 hover:bg-muted"
+                  title="Escanear código de barras"
+                >
+                  <ScanBarcode className="h-5 w-5 text-accent" />
+                </button>
               </div>
             </div>
 
@@ -576,6 +587,16 @@ function Index() {
           onClose={() => setPreviewProduct(null)}
         />
       )}
+
+      <BarcodeScannerModal
+        open={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+        onScan={(decodedText) => {
+          setQuery(decodedText);
+          setIsScannerOpen(false);
+          toast.success(`Código escaneado: ${decodedText}`);
+        }}
+      />
     </div>
   );
 }
