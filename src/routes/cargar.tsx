@@ -19,6 +19,7 @@ import {
   Trash2,
   Filter,
   Layers,
+  ScanBarcode,
 } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import { Switch } from "@/components/ui/switch";
@@ -73,13 +74,17 @@ function Cargar() {
     return "4000";
   });
 
-  const [voiceAssistantEnabled, setVoiceAssistantEnabled] = useState<boolean>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("voice_assistant_enabled");
-      return saved !== null ? saved === "true" : true;
-    }
-    return true;
-  });
+  const readVoiceFlag = (key: string) => {
+    if (typeof window === "undefined") return true;
+    const saved = localStorage.getItem(key);
+    if (saved !== null) return saved === "true";
+    const legacy = localStorage.getItem("voice_assistant_enabled");
+    return legacy !== null ? legacy === "true" : true;
+  };
+
+  const [voiceSearchEnabled, setVoiceSearchEnabled] = useState<boolean>(true);
+  const [voiceOrderEnabled, setVoiceOrderEnabled] = useState<boolean>(true);
+  const [barcodeScannerEnabled, setBarcodeScannerEnabled] = useState<boolean>(true);
 
   // Bodegas state management
   const [disabledBodegas, setDisabledBodegas] = useState<Set<string>>(() => {
@@ -99,8 +104,12 @@ function Cargar() {
   const [knownBodegas, setKnownBodegas] = useState<string[]>(DEFAULT_BODEGAS);
   const [isPurgingBodegas, setIsPurgingBodegas] = useState(false);
 
-  // Fetch existing bodegas from Supabase on mount
   useEffect(() => {
+    setVoiceSearchEnabled(readVoiceFlag("voice_search_enabled"));
+    setVoiceOrderEnabled(readVoiceFlag("voice_order_assistant_enabled"));
+    setBarcodeScannerEnabled(readVoiceFlag("barcode_scanner_enabled"));
+
+    // Fetch existing bodegas from Supabase on mount
     fetchBodegasFromDb()
       .then((dbBodegas) => {
         if (dbBodegas && dbBodegas.length > 0) {
@@ -115,15 +124,27 @@ function Cargar() {
       });
   }, []);
 
-  const handleToggleVoiceAssistant = (checked: boolean) => {
-    setVoiceAssistantEnabled(checked);
+  const persistVoiceFlag = (key: string, checked: boolean, label: string) => {
     if (typeof window !== "undefined") {
-      localStorage.setItem("voice_assistant_enabled", String(checked));
+      localStorage.setItem(key, String(checked));
       window.dispatchEvent(new Event("storage"));
     }
-    toast.success(
-      `Módulo del Asistente de Voz ${checked ? "activado" : "desactivado"} correctamente.`
-    );
+    toast.success(`${label} ${checked ? "activado" : "desactivado"} correctamente.`);
+  };
+
+  const handleToggleVoiceSearch = (checked: boolean) => {
+    setVoiceSearchEnabled(checked);
+    persistVoiceFlag("voice_search_enabled", checked, "Buscador por voz");
+  };
+
+  const handleToggleVoiceOrder = (checked: boolean) => {
+    setVoiceOrderEnabled(checked);
+    persistVoiceFlag("voice_order_assistant_enabled", checked, "Asistente de Pedidos por Voz");
+  };
+
+  const handleToggleBarcodeScanner = (checked: boolean) => {
+    setBarcodeScannerEnabled(checked);
+    persistVoiceFlag("barcode_scanner_enabled", checked, "Escáner de Códigos");
   };
 
   const [isUpdatingPrices, setIsUpdatingPrices] = useState(false);
@@ -527,7 +548,7 @@ function Cargar() {
             </p>
           </div>
 
-          {/* NUEVO MÓDULO: Control de Bodegas Activas */}
+          {/* MÓDULO: Control de Bodegas Activas */}
           <div className="bg-muted/40 border border-border rounded-xl p-5 shadow-xs">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3 border-b border-border/60 pb-3">
               <div>
@@ -664,24 +685,36 @@ function Cargar() {
             </div>
           </div>
 
-          {/* Configuración del Asistente de Voz */}
-          <div className="bg-muted/40 border border-border rounded-xl p-4 shadow-xs">
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                  <Bot className="h-4 w-4 text-accent" />
-                  Módulo de Asistente de Voz
-                </h3>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  Activa o desactiva la búsqueda por voz y el Asistente de Pedidos por Voz en toda la plataforma.
-                </p>
+          {/* Configuración de Asistentes y Escáner */}
+          <div className="bg-muted/40 border border-border rounded-xl p-4 shadow-xs space-y-4">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <Bot className="h-4 w-4 text-accent" />
+              Módulos de Voz y Escáner
+            </h3>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="flex items-center justify-between p-3 rounded-lg bg-background border border-border">
+                <div className="flex items-center gap-2 min-w-0 pr-2">
+                  <Mic className="h-4 w-4 text-accent shrink-0" />
+                  <span className="text-xs font-semibold text-foreground truncate">Buscador por voz</span>
+                </div>
+                <Switch checked={voiceSearchEnabled} onCheckedChange={handleToggleVoiceSearch} />
               </div>
 
-              <div className="flex items-center gap-2 pl-4">
-                <span className={`text-xs font-bold ${voiceAssistantEnabled ? "text-accent" : "text-muted-foreground"}`}>
-                  {voiceAssistantEnabled ? "Activo" : "Inactivo"}
-                </span>
-                <Switch checked={voiceAssistantEnabled} onCheckedChange={handleToggleVoiceAssistant} />
+              <div className="flex items-center justify-between p-3 rounded-lg bg-background border border-border">
+                <div className="flex items-center gap-2 min-w-0 pr-2">
+                  <Bot className="h-4 w-4 text-accent shrink-0" />
+                  <span className="text-xs font-semibold text-foreground truncate">Asistente Pedidos</span>
+                </div>
+                <Switch checked={voiceOrderEnabled} onCheckedChange={handleToggleVoiceOrder} />
+              </div>
+
+              <div className="flex items-center justify-between p-3 rounded-lg bg-background border border-border">
+                <div className="flex items-center gap-2 min-w-0 pr-2">
+                  <ScanBarcode className="h-4 w-4 text-accent shrink-0" />
+                  <span className="text-xs font-semibold text-foreground truncate">Escáner Códigos</span>
+                </div>
+                <Switch checked={barcodeScannerEnabled} onCheckedChange={handleToggleBarcodeScanner} />
               </div>
             </div>
           </div>

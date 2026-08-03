@@ -22,6 +22,7 @@ import {
   Eye,
   ExternalLink,
   Bot,
+  ScanBarcode,
 } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import { useQuery } from "@tanstack/react-query";
@@ -29,6 +30,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { AnalyticsView } from "@/components/AnalyticsView";
 import { VoiceSearchButton } from "@/components/VoiceSearchButton";
 import { VoiceOrderAssistantModal } from "@/components/VoiceOrderAssistantModal";
+import { BarcodeScannerModal } from "@/components/BarcodeScannerModal";
 
 
 import {
@@ -83,20 +85,28 @@ function Index() {
   const [orderOpen, setOrderOpen] = useState(false);
   const [voiceAssistantOpen, setVoiceAssistantOpen] = useState(false);
   const [voiceCustomerName, setVoiceCustomerName] = useState("");
-  const [voiceEnabled, setVoiceEnabled] = useState<boolean>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("voice_assistant_enabled");
-      return saved !== null ? saved === "true" : true;
-    }
-    return true;
-  });
+  const readFlag = (key: string) => {
+    if (typeof window === "undefined") return true;
+    const saved = localStorage.getItem(key);
+    if (saved !== null) return saved === "true";
+    const legacy = localStorage.getItem("voice_assistant_enabled");
+    return legacy !== null ? legacy === "true" : true;
+  };
+
+  const [voiceSearchEnabled, setVoiceSearchEnabled] = useState<boolean>(true);
+  const [voiceOrderEnabled, setVoiceOrderEnabled] = useState<boolean>(true);
+  const [barcodeScannerEnabled, setBarcodeScannerEnabled] = useState<boolean>(true);
 
   useEffect(() => {
+    // Initial hydration from localStorage
+    setVoiceSearchEnabled(readFlag("voice_search_enabled"));
+    setVoiceOrderEnabled(readFlag("voice_order_assistant_enabled"));
+    setBarcodeScannerEnabled(readFlag("barcode_scanner_enabled"));
+
     const syncVoiceEnabled = () => {
-      if (typeof window !== "undefined") {
-        const saved = localStorage.getItem("voice_assistant_enabled");
-        setVoiceEnabled(saved !== null ? saved === "true" : true);
-      }
+      setVoiceSearchEnabled(readFlag("voice_search_enabled"));
+      setVoiceOrderEnabled(readFlag("voice_order_assistant_enabled"));
+      setBarcodeScannerEnabled(readFlag("barcode_scanner_enabled"));
     };
 
     window.addEventListener("storage", syncVoiceEnabled);
@@ -107,7 +117,9 @@ function Index() {
     };
   }, []);
 
+
   const [activeTab, setActiveTab] = useState<"catalogo" | "historial" | "analytics">("catalogo");
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
   useHydrateOrder();
   const order = useOrder();
   const orderCount = order.reduce((s, i) => s + i.cantidad, 0);
@@ -146,6 +158,32 @@ function Index() {
     shopifyUrl?: string;
   } | null>(null);
   const [previewProduct, setPreviewProduct] = useState<ReferenceGroup | null>(null);
+  
+  // PWA Install State
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+  }, []);
+
+  const handleInstallClick = () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then((choiceResult: any) => {
+        if (choiceResult.outcome === 'accepted') {
+          console.log('User accepted PWA installation');
+        } else {
+          console.log('User declined PWA installation');
+        }
+        setDeferredPrompt(null);
+      });
+    }
+  };
 
   const lineasOptions = useMemo(() => ["T", "B", "P", "R"], []);
   const lineasLabels: Record<string, string> = {
@@ -287,6 +325,16 @@ function Index() {
               Consulta de precios detal y mayorista
             </p>
           </div>
+          <div className="flex-1" />
+          {deferredPrompt && (
+            <button
+              onClick={handleInstallClick}
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-accent px-4 py-2 text-sm font-bold text-accent-foreground shadow-sm hover:bg-accent/90 transition-all"
+            >
+              <Download className="h-4 w-4" />
+              Instalar App
+            </button>
+          )}
         </div>
       </header>
 
@@ -371,7 +419,17 @@ function Index() {
                     <X className="h-4 w-4" />
                   </button>
                 )}
-                {voiceEnabled && <VoiceSearchButton onSearchResult={(val) => setQuery(val)} />}
+                {voiceSearchEnabled && <VoiceSearchButton onSearchResult={(val) => setQuery(val)} />}
+                {barcodeScannerEnabled && (
+                  <button
+                    type="button"
+                    onClick={() => setIsScannerOpen(true)}
+                    className="p-2 text-muted-foreground hover:text-foreground rounded-lg transition-colors bg-muted/50 hover:bg-muted"
+                    title="Escanear código de barras"
+                  >
+                    <ScanBarcode className="h-5 w-5 text-accent" />
+                  </button>
+                )}
               </div>
             </div>
 
@@ -482,13 +540,13 @@ function Index() {
         )}
 
         {activeTab === "historial" && (
-          <OrderHistory onOrderDeleted={reloadInventory} />
+          <OrderHistory onOrderDeleted={reloadInventory} voiceEnabled={voiceSearchEnabled} />
         )}
       </main>
 
       {/* Floating Action Buttons for Current Order & Voice Assistant */}
       <div className="fixed bottom-6 right-6 z-40 flex flex-col sm:flex-row items-end sm:items-center gap-3">
-        {voiceEnabled && (
+        {voiceOrderEnabled && (
           <button
             onClick={() => setVoiceAssistantOpen(true)}
             className="flex items-center gap-2.5 rounded-full bg-primary px-5 py-3.5 text-sm font-bold text-primary-foreground shadow-2xl transition-all duration-300 hover:scale-105 active:scale-95 hover:shadow-primary/30"
@@ -570,6 +628,16 @@ function Index() {
           onClose={() => setPreviewProduct(null)}
         />
       )}
+
+      <BarcodeScannerModal
+        open={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+        onScan={(decodedText) => {
+          setQuery(decodedText);
+          setIsScannerOpen(false);
+          toast.success(`Código escaneado: ${decodedText}`);
+        }}
+      />
     </div>
   );
 }
@@ -1422,7 +1490,13 @@ function PriceBlock({
   );
 }
 
-function OrderHistory({ onOrderDeleted }: { onOrderDeleted?: () => void }) {
+function OrderHistory({
+  onOrderDeleted,
+  voiceEnabled = false,
+}: {
+  onOrderDeleted?: () => void;
+  voiceEnabled?: boolean;
+}) {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchName, setSearchName] = useState("");
