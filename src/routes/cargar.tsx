@@ -159,12 +159,14 @@ function Cargar() {
 
   const persistDisabledBodegas = (set: Set<string>) => {
     if (typeof window !== "undefined") {
-      localStorage.setItem("disabled_bodegas", JSON.stringify(Array.from(set)));
+      const arr = Array.from(set);
+      localStorage.setItem("disabled_bodegas", JSON.stringify(arr));
+      window.dispatchEvent(new CustomEvent("disabled_bodegas_changed", { detail: arr }));
       window.dispatchEvent(new Event("storage"));
     }
   };
 
-  const handleToggleBodega = (bodegaName: string, enabled: boolean) => {
+  const handleToggleBodega = async (bodegaName: string, enabled: boolean) => {
     setDisabledBodegas((prev) => {
       const next = new Set(prev);
       if (enabled) {
@@ -175,6 +177,16 @@ function Cargar() {
       persistDisabledBodegas(next);
       return next;
     });
+
+    if (!enabled) {
+      // Automatically purge records of this newly disabled bodega from Supabase
+      try {
+        await deleteBodegasFromDb([bodegaName]);
+      } catch (e) {
+        console.error("Error purging disabled bodega from DB:", e);
+      }
+    }
+
     toast.success(`Bodega "${bodegaName}" ${enabled ? "ACTIVADA" : "DESACTIVADA"}.`);
   };
 
@@ -182,22 +194,34 @@ function Cargar() {
     setDisabledBodegas(new Set());
     if (typeof window !== "undefined") {
       localStorage.removeItem("disabled_bodegas");
+      window.dispatchEvent(new CustomEvent("disabled_bodegas_changed", { detail: [] }));
       window.dispatchEvent(new Event("storage"));
     }
     toast.success("Todas las bodegas han sido activadas.");
   };
 
-  const handleDisableAllBodegas = () => {
+  const handleDisableAllBodegas = async () => {
     const next = new Set(knownBodegas);
     setDisabledBodegas(next);
     persistDisabledBodegas(next);
+    try {
+      await deleteBodegasFromDb(knownBodegas);
+    } catch (e) {
+      console.error("Error purging disabled bodegas from DB:", e);
+    }
     toast.success("Todas las bodegas han sido desactivadas.");
   };
 
-  const handleDisableAllExceptPrincipal = () => {
-    const next = new Set(knownBodegas.filter((b) => b !== "PRINCIPAL 1004"));
+  const handleDisableAllExceptPrincipal = async () => {
+    const toDisable = knownBodegas.filter((b) => b !== "PRINCIPAL 1004");
+    const next = new Set(toDisable);
     setDisabledBodegas(next);
     persistDisabledBodegas(next);
+    try {
+      await deleteBodegasFromDb(toDisable);
+    } catch (e) {
+      console.error("Error purging disabled bodegas from DB:", e);
+    }
     toast.success("Se activó únicamente la bodega PRINCIPAL 1004.");
   };
 

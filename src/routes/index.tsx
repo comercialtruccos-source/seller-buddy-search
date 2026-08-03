@@ -169,14 +169,32 @@ function Index() {
         }
       }
     };
+
+    handleStorageChange();
+
     window.addEventListener("storage", handleStorageChange);
-    return () => window.removeEventListener("storage", handleStorageChange);
+    window.addEventListener("disabled_bodegas_changed", handleStorageChange);
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("disabled_bodegas_changed", handleStorageChange);
+    };
   }, []);
 
+  const disabledBodegasUpper = useMemo(() => {
+    const set = new Set<string>();
+    for (const b of Array.from(disabledBodegas)) {
+      if (b) set.add(b.trim().toUpperCase());
+    }
+    return set;
+  }, [disabledBodegas]);
+
   const activeRows = useMemo(() => {
-    if (disabledBodegas.size === 0) return rows;
-    return rows.filter((r) => !disabledBodegas.has((r.bodega || "PRINCIPAL 1004").trim()));
-  }, [rows, disabledBodegas]);
+    if (disabledBodegasUpper.size === 0) return rows;
+    return rows.filter((r) => {
+      const bName = (r.bodega || "PRINCIPAL 1004").trim().toUpperCase();
+      return !disabledBodegasUpper.has(bName);
+    });
+  }, [rows, disabledBodegasUpper]);
 
   const groups = useMemo(() => groupByReferencia(activeRows), [activeRows]);
   const results = useMemo(
