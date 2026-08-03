@@ -659,21 +659,44 @@ export async function updateAllPricesWithTrm(trm: number): Promise<number> {
   return updatedRows.length;
 }
 
-/** Fetch all unique bodega names currently stored in the database. */
+/** Fetch all unique bodega names currently stored in the database (paginated for large DBs). */
 export async function fetchBodegasFromDb(): Promise<string[]> {
-  const { data, error } = await supabase
-    .from("inventory")
-    .select("bodega");
-  if (error || !data) return [];
-  
   const set = new Set<string>();
-  for (const r of data) {
-    if (r.bodega) {
-      set.add(r.bodega.trim());
+  const pageSize = 1000;
+  let from = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from("inventory")
+      .select("bodega")
+      .range(from, from + pageSize - 1);
+
+    if (error || !data) break;
+
+    for (const r of data) {
+      if (r.bodega) {
+        set.add(r.bodega.trim());
+      }
     }
+
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+
+  return Array.from(set).sort((a, b) => a.localeCompare(b, "es"));
+}
+
+/** Quickly extract all unique bodega names present in a CSV/Excel text payload. */
+export function extractBodegasFromCsvText(text: string): string[] {
+  if (!text) return [];
+  const parsed = parseInventoryCsv(text);
+  const set = new Set<string>();
+  for (const r of parsed) {
+    if (r.bodega) set.add(r.bodega.trim());
   }
   return Array.from(set).sort((a, b) => a.localeCompare(b, "es"));
 }
+
 
 /** Delete all inventory rows for the specified bodegas. */
 export async function deleteBodegasFromDb(bodegas: string[]): Promise<number> {
