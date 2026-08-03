@@ -658,3 +658,36 @@ export async function updateAllPricesWithTrm(trm: number): Promise<number> {
 
   return updatedRows.length;
 }
+
+/** Fetch all unique bodega names currently stored in the database. */
+export async function fetchBodegasFromDb(): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("inventory")
+    .select("bodega");
+  if (error || !data) return [];
+  
+  const set = new Set<string>();
+  for (const r of data) {
+    if (r.bodega) {
+      set.add(r.bodega.trim());
+    }
+  }
+  return Array.from(set).sort((a, b) => a.localeCompare(b, "es"));
+}
+
+/** Delete all inventory rows for the specified bodegas. */
+export async function deleteBodegasFromDb(bodegas: string[]): Promise<number> {
+  if (!bodegas || bodegas.length === 0) return 0;
+  
+  const cleanBodegas = bodegas.map((b) => b.trim()).filter(Boolean);
+  if (cleanBodegas.length === 0) return 0;
+
+  const { error, count } = await supabase
+    .from("inventory")
+    .delete({ count: "exact" })
+    .in("bodega", cleanBodegas);
+
+  if (error) throw error;
+  return count ?? 0;
+}
+
