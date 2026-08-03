@@ -577,9 +577,10 @@ export async function loadInventory(): Promise<{
 }
 
 /** Replace the shared inventory. Replaces data only for the bodegas present in the payload. */
-export async function saveInventory(rows: InventoryRow[]): Promise<string> {
+export async function saveInventory(rows: InventoryRow[], disabledBodegas: string[] = []): Promise<string> {
   const bodegasToReplace = Array.from(new Set([
     ...rows.map(r => r.bodega || "PRINCIPAL 1004"),
+    ...disabledBodegas,
     "Principal" // Limpiar la data corrupta que se guardó con el fallback antiguo
   ]));
 

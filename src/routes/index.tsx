@@ -140,7 +140,45 @@ function Index() {
     reloadInventory();
   }, [reloadInventory]);
 
-  const groups = useMemo(() => groupByReferencia(rows), [rows]);
+  const [disabledBodegas, setDisabledBodegas] = useState<Set<string>>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("disabled_bodegas");
+      if (saved) {
+        try {
+          return new Set(JSON.parse(saved));
+        } catch (e) {
+          console.error("Error parsing disabled_bodegas", e);
+        }
+      }
+    }
+    return new Set();
+  });
+
+  useEffect(() => {
+    const handleStorageChange = () => {
+      if (typeof window !== "undefined") {
+        const saved = localStorage.getItem("disabled_bodegas");
+        if (saved) {
+          try {
+            setDisabledBodegas(new Set(JSON.parse(saved)));
+          } catch {
+            setDisabledBodegas(new Set());
+          }
+        } else {
+          setDisabledBodegas(new Set());
+        }
+      }
+    };
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, []);
+
+  const activeRows = useMemo(() => {
+    if (disabledBodegas.size === 0) return rows;
+    return rows.filter((r) => !disabledBodegas.has((r.bodega || "PRINCIPAL 1004").trim()));
+  }, [rows, disabledBodegas]);
+
+  const groups = useMemo(() => groupByReferencia(activeRows), [activeRows]);
   const results = useMemo(
     () => searchReferences(groups, query),
     [groups, query],

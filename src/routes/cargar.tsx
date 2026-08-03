@@ -157,6 +157,13 @@ function Cargar() {
     localStorage.setItem("trm_value", val);
   };
 
+  const persistDisabledBodegas = (set: Set<string>) => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("disabled_bodegas", JSON.stringify(Array.from(set)));
+      window.dispatchEvent(new Event("storage"));
+    }
+  };
+
   const handleToggleBodega = (bodegaName: string, enabled: boolean) => {
     setDisabledBodegas((prev) => {
       const next = new Set(prev);
@@ -165,9 +172,7 @@ function Cargar() {
       } else {
         next.add(bodegaName);
       }
-      if (typeof window !== "undefined") {
-        localStorage.setItem("disabled_bodegas", JSON.stringify(Array.from(next)));
-      }
+      persistDisabledBodegas(next);
       return next;
     });
     toast.success(`Bodega "${bodegaName}" ${enabled ? "ACTIVADA" : "DESACTIVADA"}.`);
@@ -177,6 +182,7 @@ function Cargar() {
     setDisabledBodegas(new Set());
     if (typeof window !== "undefined") {
       localStorage.removeItem("disabled_bodegas");
+      window.dispatchEvent(new Event("storage"));
     }
     toast.success("Todas las bodegas han sido activadas.");
   };
@@ -184,18 +190,14 @@ function Cargar() {
   const handleDisableAllBodegas = () => {
     const next = new Set(knownBodegas);
     setDisabledBodegas(next);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("disabled_bodegas", JSON.stringify(Array.from(next)));
-    }
+    persistDisabledBodegas(next);
     toast.success("Todas las bodegas han sido desactivadas.");
   };
 
   const handleDisableAllExceptPrincipal = () => {
     const next = new Set(knownBodegas.filter((b) => b !== "PRINCIPAL 1004"));
     setDisabledBodegas(next);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("disabled_bodegas", JSON.stringify(Array.from(next)));
-    }
+    persistDisabledBodegas(next);
     toast.success("Se activó únicamente la bodega PRINCIPAL 1004.");
   };
 
@@ -221,6 +223,9 @@ function Cargar() {
         id: "purge-bodegas",
       });
       const count = await deleteBodegasFromDb(toDelete);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("storage"));
+      }
       toast.success(
         `¡Éxito! Se eliminaron ${count} registros de bodegas desactivadas en la base de datos.`,
         { id: "purge-bodegas" }
@@ -270,7 +275,7 @@ function Cargar() {
     const skippedCount = parsed.length - activeRows.length;
 
     toast.loading("Guardando inventario en Supabase…", { id: "save-inventory" });
-    await saveInventory(activeRows);
+    await saveInventory(activeRows, Array.from(disabledBodegas));
 
     setUploadedInfo({
       count: activeRows.length,
