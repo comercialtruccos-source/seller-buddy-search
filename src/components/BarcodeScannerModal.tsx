@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import { Html5QrcodeScanner, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import { X } from "lucide-react";
 import { toast } from "sonner";
 
@@ -20,70 +19,91 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
     if (!open) return;
 
     setIsInitializing(true);
-    let scanner: Html5QrcodeScanner | null = null;
+    let scannerInstance: any = null;
+    let isMounted = true;
 
-    try {
-      scanner = new Html5QrcodeScanner(
-        "reader",
-        {
-          fps: 10,
-          qrbox: { width: 250, height: 150 },
-          aspectRatio: 1.0,
-          formatsToSupport: [
-            Html5QrcodeSupportedFormats.EAN_13,
-            Html5QrcodeSupportedFormats.EAN_8,
-            Html5QrcodeSupportedFormats.CODE_128,
-            Html5QrcodeSupportedFormats.CODE_39,
-            Html5QrcodeSupportedFormats.UPC_A,
-            Html5QrcodeSupportedFormats.UPC_E,
-            Html5QrcodeSupportedFormats.QR_CODE,
-          ],
-        },
-        /* verbose= */ false
-      );
+    // Dynamically import html5-qrcode on client side only to prevent SSR crashes
+    import("html5-qrcode")
+      .then(({ Html5QrcodeScanner, Html5QrcodeSupportedFormats }) => {
+        if (!isMounted) return;
 
-      scanner.render(
-        (decodedText) => {
-          // Play a simple beep sound on success if supported by browser
-          try {
-            const context = new (window.AudioContext || (window as any).webkitAudioContext)();
-            const oscillator = context.createOscillator();
-            const gain = context.createGain();
-            oscillator.connect(gain);
-            gain.connect(context.destination);
-            oscillator.type = "sine";
-            oscillator.frequency.value = 800;
-            gain.gain.setValueAtTime(0, context.currentTime);
-            gain.gain.linearRampToValueAtTime(1, context.currentTime + 0.05);
-            gain.gain.linearRampToValueAtTime(0, context.currentTime + 0.2);
-            oscillator.start(context.currentTime);
-            oscillator.stop(context.currentTime + 0.2);
-          } catch (e) {
-            // Ignore if audio isn't supported or allowed yet
+        try {
+          const scanner = new Html5QrcodeScanner(
+            "reader",
+            {
+              fps: 10,
+              qrbox: { width: 250, height: 150 },
+              aspectRatio: 1.0,
+              formatsToSupport: [
+                Html5QrcodeSupportedFormats.EAN_13,
+                Html5QrcodeSupportedFormats.EAN_8,
+                Html5QrcodeSupportedFormats.CODE_128,
+                Html5QrcodeSupportedFormats.CODE_39,
+                Html5QrcodeSupportedFormats.UPC_A,
+                Html5QrcodeSupportedFormats.UPC_E,
+                Html5QrcodeSupportedFormats.QR_CODE,
+              ],
+            },
+            /* verbose= */ false
+          );
+          scannerInstance = scanner;
+
+          scanner.render(
+            (decodedText) => {
+              // Play a simple beep sound on success if supported by browser
+              try {
+                if (typeof window !== "undefined") {
+                  const AudioContextClass =
+                    window.AudioContext || (window as any).webkitAudioContext;
+                  if (AudioContextClass) {
+                    const context = new AudioContextClass();
+                    const oscillator = context.createOscillator();
+                    const gain = context.createGain();
+                    oscillator.connect(gain);
+                    gain.connect(context.destination);
+                    oscillator.type = "sine";
+                    oscillator.frequency.value = 800;
+                    gain.gain.setValueAtTime(0, context.currentTime);
+                    gain.gain.linearRampToValueAtTime(1, context.currentTime + 0.05);
+                    gain.gain.linearRampToValueAtTime(0, context.currentTime + 0.2);
+                    oscillator.start(context.currentTime);
+                    oscillator.stop(context.currentTime + 0.2);
+                  }
+                }
+              } catch (e) {
+                // Ignore audio errors on iOS
+              }
+
+              if (scannerInstance) {
+                scannerInstance.clear().catch(console.error);
+              }
+              onScan(decodedText);
+            },
+            (errorMessage) => {
+              // Ignore continuous scan errors
+            }
+          );
+
+          if (isMounted) {
+            setTimeout(() => setIsInitializing(false), 800);
           }
-
-          if (scanner) {
-            scanner.clear();
-          }
-          onScan(decodedText);
-        },
-        (errorMessage) => {
-          // We can ignore continuous scanning errors
+        } catch (error) {
+          console.error("Error initializing scanner:", error);
+          toast.error("No se pudo acceder a la cámara.");
+          setIsInitializing(false);
+          onClose();
         }
-      );
-      
-      // Delaying the initialization state to hide the loading skeleton
-      setTimeout(() => setIsInitializing(false), 800);
-    } catch (error) {
-      console.error("Error initializing scanner:", error);
-      toast.error("No se pudo acceder a la cámara.");
-      setIsInitializing(false);
-      onClose();
-    }
+      })
+      .catch((err) => {
+        console.error("Error loading html5-qrcode:", err);
+        toast.error("No se pudo cargar la librería de la cámara.");
+        setIsInitializing(false);
+      });
 
     return () => {
-      if (scanner) {
-        scanner.clear().catch(console.error);
+      isMounted = false;
+      if (scannerInstance) {
+        scannerInstance.clear().catch(console.error);
       }
     };
   }, [open, onScan, onClose]);
