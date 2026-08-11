@@ -19,12 +19,55 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
   const [statusMessage, setStatusMessage] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const processImageFile = async (file: File) => {
+    setIsProcessingFile(true);
+    setStatusMessage("Iniciando análisis inteligente de la foto...");
+
+    try {
+      const result = await scanTagImage(file, (msg) => setStatusMessage(msg));
+      if (result) {
+        const methodLabel =
+          result.method === "ocr-text"
+            ? "Texto impreso en etiqueta (OCR)"
+            : "Código de barras";
+        toast.success(`Referencia/SKU detectada (${methodLabel}): ${result.sku}`);
+        onScan(result.sku);
+        onClose();
+      } else {
+        toast.error(
+          "No se detectó un código o referencia en la foto. Intenta con una imagen más clara o usa la cámara en vivo."
+        );
+      }
+    } catch (err) {
+      console.error("Error processing tag image:", err);
+      toast.error("Error al procesar la imagen de la etiqueta.");
+    } finally {
+      setIsProcessingFile(false);
+      setStatusMessage("");
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
   useEffect(() => {
     if (!open) return;
 
     setIsInitializing(true);
     let scannerInstance: any = null;
     let isMounted = true;
+
+    // Intercept file selection from html5-qrcode's internal UI if user clicks it
+    const readerContainer = document.getElementById("reader");
+    const handleInternalFileChange = (e: Event) => {
+      const target = e.target as HTMLInputElement;
+      if (target && target.type === "file" && target.files && target.files.length > 0) {
+        const file = target.files[0];
+        processImageFile(file);
+      }
+    };
+
+    readerContainer?.addEventListener("change", handleInternalFileChange, true);
 
     // Dynamically import html5-qrcode on client side only to prevent SSR crashes
     import("html5-qrcode")
@@ -109,51 +152,29 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
 
     return () => {
       isMounted = false;
+      readerContainer?.removeEventListener("change", handleInternalFileChange, true);
       if (scannerInstance) {
         scannerInstance.clear().catch(console.error);
       }
     };
   }, [open, onScan, onClose]);
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-
-    const file = files[0];
-    setIsProcessingFile(true);
-    setStatusMessage("Iniciando análisis inteligente...");
-
-    try {
-      const result = await scanTagImage(file, (msg) => setStatusMessage(msg));
-      if (result) {
-        const methodLabel =
-          result.method === "ocr-text"
-            ? "Texto impreso en etiqueta (OCR)"
-            : "Código de barras";
-        toast.success(`Referencia/SKU detectada (${methodLabel}): ${result.sku}`);
-        onScan(result.sku);
-        onClose();
-      } else {
-        toast.error(
-          "No se detectó un código o referencia en la foto. Intenta con una imagen más clara o usa la cámara en vivo."
-        );
-      }
-    } catch (err) {
-      console.error("Error processing tag image:", err);
-      toast.error("Error al procesar la imagen de la etiqueta.");
-    } finally {
-      setIsProcessingFile(false);
-      setStatusMessage("");
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
-    }
+    processImageFile(files[0]);
   };
 
   if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
+      <style>{`
+        #reader { border: none !important; }
+        #reader button { background-color: var(--primary); color: white; border-radius: 8px; padding: 6px 12px; font-size: 13px; }
+        #reader__status_span { display: none !important; }
+        .html5-qrcode-element-error { display: none !important; }
+      `}</style>
       <div className="w-full max-w-md bg-card border border-border shadow-2xl rounded-2xl overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-border bg-muted/30">
