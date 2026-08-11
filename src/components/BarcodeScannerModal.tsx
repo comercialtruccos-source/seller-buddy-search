@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from "react";
-import { X } from "lucide-react";
+import React, { useEffect, useState, useRef } from "react";
+import { X, Upload, Camera, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
+import { scanTagImage } from "@/lib/tagScanner";
 
 interface BarcodeScannerModalProps {
   open: boolean;
@@ -14,6 +15,9 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
   onScan,
 }) => {
   const [isInitializing, setIsInitializing] = useState(true);
+  const [isProcessingFile, setIsProcessingFile] = useState(false);
+  const [statusMessage, setStatusMessage] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -32,8 +36,11 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
             "reader",
             {
               fps: 10,
-              qrbox: { width: 250, height: 150 },
+              qrbox: { width: 260, height: 160 },
               aspectRatio: 1.0,
+              experimentalFeatures: {
+                useBarCodeDetectorIfSupported: true,
+              },
               formatsToSupport: [
                 Html5QrcodeSupportedFormats.EAN_13,
                 Html5QrcodeSupportedFormats.EAN_8,
@@ -108,6 +115,41 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
     };
   }, [open, onScan, onClose]);
 
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const file = files[0];
+    setIsProcessingFile(true);
+    setStatusMessage("Iniciando análisis inteligente...");
+
+    try {
+      const result = await scanTagImage(file, (msg) => setStatusMessage(msg));
+      if (result) {
+        const methodLabel =
+          result.method === "ocr-text"
+            ? "Texto impreso en etiqueta (OCR)"
+            : "Código de barras";
+        toast.success(`Referencia/SKU detectada (${methodLabel}): ${result.sku}`);
+        onScan(result.sku);
+        onClose();
+      } else {
+        toast.error(
+          "No se detectó un código o referencia en la foto. Intenta con una imagen más clara o usa la cámara en vivo."
+        );
+      }
+    } catch (err) {
+      console.error("Error processing tag image:", err);
+      toast.error("Error al procesar la imagen de la etiqueta.");
+    } finally {
+      setIsProcessingFile(false);
+      setStatusMessage("");
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
   if (!open) return null;
 
   return (
@@ -115,8 +157,9 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
       <div className="w-full max-w-md bg-card border border-border shadow-2xl rounded-2xl overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-border bg-muted/30">
-          <h2 className="text-lg font-bold text-foreground">
-            Escanear Código
+          <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
+            <Camera className="h-5 w-5 text-primary" />
+            Escanear Código o Etiqueta
           </h2>
           <button
             onClick={onClose}
@@ -129,14 +172,47 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
         {/* Scanner Body */}
         <div className="p-4 flex flex-col items-center">
           <p className="text-sm text-muted-foreground mb-4 text-center">
-            Apunta la cámara al código de barras o código QR de la prenda para buscar su referencia.
+            Apunta la cámara al código de barras o sube una foto de la etiqueta para leer la referencia por código o texto.
           </p>
 
-          <div className="w-full relative bg-black/5 rounded-xl overflow-hidden min-h-[300px] flex items-center justify-center">
-            {isInitializing && (
-              <div className="absolute inset-0 flex items-center justify-center flex-col gap-3 text-muted-foreground z-10 bg-card/80 backdrop-blur-sm">
-                <div className="w-8 h-8 border-4 border-accent/30 border-t-accent rounded-full animate-spin"></div>
-                <p className="text-sm font-medium">Iniciando cámara...</p>
+          {/* Action Button: Subir foto con escáner inteligente / OCR */}
+          <div className="w-full mb-3 flex flex-col gap-2">
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileChange}
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isProcessingFile}
+              className="w-full py-2.5 px-4 bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl font-medium shadow-md transition-all flex items-center justify-center gap-2 text-sm"
+            >
+              {isProcessingFile ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>{statusMessage || "Analizando foto..."}</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4 text-amber-300 animate-pulse" />
+                  <Upload className="h-4 w-4" />
+                  <span>Subir / Tomar Foto de Etiqueta (Escanear + OCR)</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          <div className="w-full relative bg-black/5 rounded-xl overflow-hidden min-h-[280px] flex items-center justify-center">
+            {(isInitializing || isProcessingFile) && (
+              <div className="absolute inset-0 flex items-center justify-center flex-col gap-3 text-muted-foreground z-10 bg-card/90 backdrop-blur-sm p-4 text-center">
+                <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
+                <p className="text-sm font-medium">
+                  {isProcessingFile
+                    ? statusMessage || "Procesando imagen con IA/OCR..."
+                    : "Iniciando cámara..."}
+                </p>
               </div>
             )}
             {/* The element where html5-qrcode mounts its UI */}
