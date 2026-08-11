@@ -345,6 +345,21 @@ function normalizeCode(str: string): string {
   return str.toLowerCase().replace(/[^a-z0-9]/gi, "").trim();
 }
 
+/**
+ * Extracts the base SKU / Reference from raw scanned barcodes or variant SKUs.
+ * E.g., "T12032107S580" -> "T12032107", "B2910735606599" -> "B29107356"
+ */
+export function extractBaseSku(rawCode: string): string {
+  if (!rawCode) return "";
+  const cleaned = rawCode.trim();
+  // Extract 9-character reference (1 letter + 8 digits, e.g., T12032107)
+  const match = cleaned.match(/^([a-zA-Z]\d{8})/);
+  if (match) {
+    return match[1].toUpperCase();
+  }
+  return cleaned;
+}
+
 export function searchReferences(
   groups: ReferenceGroup[],
   query: string,
@@ -358,21 +373,32 @@ export function searchReferences(
 
   // Code-based query (remove spaces, hyphens, dots, etc.)
   const queryCode = normalizeCode(cleanQuery);
+  const extractedSku = extractBaseSku(cleanQuery);
+  const normExtractedSku = normalizeCode(extractedSku);
 
   return groups.filter((group) => {
     const normRef = normalizeText(group.referencia);
     const normRefCode = normalizeCode(group.referencia);
     const normDesc = normalizeText(group.descripcion);
 
-    // 1. Direct code search (Reference code or SKU exact/prefix match)
-    if (queryCode.length >= 3 && normRefCode.includes(queryCode)) {
-      return true;
-    }
-
+    // 1. Direct code search (Reference code or SKU exact/prefix/extracted match)
     if (queryCode.length >= 3) {
+      if (
+        normRefCode.includes(queryCode) ||
+        queryCode.includes(normRefCode) ||
+        normRefCode.includes(normExtractedSku) ||
+        (normExtractedSku.length >= 3 && normExtractedSku.includes(normRefCode))
+      ) {
+        return true;
+      }
+
       const matchesSku = group.variantes.some((v) => {
         const normSku = normalizeCode(v.sku);
-        return normSku.includes(queryCode);
+        return (
+          normSku.includes(queryCode) ||
+          queryCode.includes(normSku) ||
+          normSku.includes(normExtractedSku)
+        );
       });
       if (matchesSku) return true;
     }

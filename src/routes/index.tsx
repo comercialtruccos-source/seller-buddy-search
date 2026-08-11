@@ -34,6 +34,7 @@ import { BarcodeScannerModal } from "@/components/BarcodeScannerModal";
 
 
 import {
+  extractBaseSku,
   formatCurrency,
   formatDateTime,
   formatUsd,
@@ -689,9 +690,10 @@ function Index() {
         open={isScannerOpen}
         onClose={() => setIsScannerOpen(false)}
         onScan={(decodedText) => {
-          setQuery(decodedText);
+          const sku = extractBaseSku(decodedText);
+          setQuery(sku);
           setIsScannerOpen(false);
-          toast.success(`Código escaneado: ${decodedText}`);
+          toast.success(`Código escaneado: ${decodedText}${sku !== decodedText ? ` (SKU: ${sku})` : ''}`);
         }}
       />
     </div>
