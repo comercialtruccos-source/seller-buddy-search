@@ -1,7 +1,19 @@
 import React, { useEffect, useState, useRef } from "react";
-import { X, Upload, Camera, Loader2, Sparkles } from "lucide-react";
+import {
+  X,
+  Upload,
+  Camera,
+  Loader2,
+  Sparkles,
+  Check,
+  Search,
+  Image as ImageIcon,
+  AlertCircle,
+  RefreshCw,
+} from "lucide-react";
 import { toast } from "sonner";
 import { scanTagImage } from "@/lib/tagScanner";
+import { extractBaseSku } from "@/lib/inventory";
 
 interface BarcodeScannerModalProps {
   open: boolean;
@@ -14,232 +26,372 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
   onClose,
   onScan,
 }) => {
-  const [isInitializing, setIsInitializing] = useState(true);
+  const [activeTab, setActiveTab] = useState<"photo" | "camera">("photo");
   const [isProcessingFile, setIsProcessingFile] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [detectedSku, setDetectedSku] = useState("");
+  const [detectionMethod, setDetectionMethod] = useState<string | null>(null);
+  const [isCameraActive, setIsCameraActive] = useState(false);
 
-  const processImageFile = async (file: File) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const html5QrcodeRef = useRef<any>(null);
+
+  // Reset state when modal opens/closes
+  useEffect(() => {
+    if (!open) {
+      stopLiveCamera();
+      setPreviewUrl(null);
+      setDetectedSku("");
+      setDetectionMethod(null);
+      setIsProcessingFile(false);
+    }
+  }, [open]);
+
+  // Clean up camera on unmount or tab switch
+  useEffect(() => {
+    if (activeTab === "camera" && open) {
+      startLiveCamera();
+    } else {
+      stopLiveCamera();
+    }
+    return () => {
+      stopLiveCamera();
+    };
+  }, [activeTab, open]);
+
+  const startLiveCamera = async () => {
+    try {
+      setIsCameraActive(true);
+      const { Html5Qrcode } = await import("html5-qrcode");
+      const elementId = "custom-camera-stream";
+      
+      if (!document.getElementById(elementId)) return;
+
+      if (html5QrcodeRef.current) {
+        try {
+          await html5QrcodeRef.current.stop();
+        } catch (e) {}
+      }
+
+      const html5Qrcode = new Html5Qrcode(elementId);
+      html5QrcodeRef.current = html5Qrcode;
+
+      await html5Qrcode.start(
+        { facingMode: "environment" },
+        {
+          fps: 15,
+          qrbox: { width: 250, height: 150 },
+          aspectRatio: 1.0,
+        },
+        (decodedText) => {
+          // Beep audio on success
+          try {
+            if (typeof window !== "undefined") {
+              const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+              if (AudioCtx) {
+                const ctx = new AudioCtx();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.type = "sine";
+                osc.frequency.value = 800;
+                gain.gain.setValueAtTime(0, ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(1, ctx.currentTime + 0.05);
+                gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.2);
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 0.2);
+              }
+            }
+          } catch (e) {}
+
+          const sku = extractBaseSku(decodedText);
+          toast.success(`Código detectado por cámara: ${sku}`);
+          stopLiveCamera();
+          onScan(sku);
+          onClose();
+        },
+        (errorMessage) => {
+          // Ignore live frame scan errors
+        }
+      );
+    } catch (err) {
+      console.error("Error starting live camera stream:", err);
+      setIsCameraActive(false);
+      toast.error("No se pudo iniciar la cámara en vivo. Usa la opción de Foto de Etiqueta.");
+    }
+  };
+
+  const stopLiveCamera = () => {
+    if (html5QrcodeRef.current) {
+      try {
+        if (html5QrcodeRef.current.isScanning) {
+          html5QrcodeRef.current.stop().then(() => {
+            html5QrcodeRef.current?.clear();
+            html5QrcodeRef.current = null;
+          }).catch(() => {
+            html5QrcodeRef.current = null;
+          });
+        } else {
+          html5QrcodeRef.current.clear();
+          html5QrcodeRef.current = null;
+        }
+      } catch (e) {
+        html5QrcodeRef.current = null;
+      }
+    }
+    setIsCameraActive(false);
+  };
+
+  const handleProcessImageFile = async (file: File) => {
+    if (!file) return;
+
+    // Show image preview
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    setDetectedSku("");
+    setDetectionMethod(null);
     setIsProcessingFile(true);
-    setStatusMessage("Iniciando análisis inteligente de la foto...");
+    setStatusMessage("Analizando foto con IA y OCR...");
 
     try {
       const result = await scanTagImage(file, (msg) => setStatusMessage(msg));
       if (result) {
-        const methodLabel =
+        setDetectedSku(result.sku);
+        const label =
           result.method === "ocr-text"
             ? "Texto impreso en etiqueta (OCR)"
             : "Código de barras";
-        toast.success(`Referencia/SKU detectada (${methodLabel}): ${result.sku}`);
-        onScan(result.sku);
-        onClose();
+        setDetectionMethod(label);
+        toast.success(`¡SKU Detectado!: ${result.sku}`);
       } else {
-        toast.error(
-          "No se detectó un código o referencia en la foto. Intenta con una imagen más clara o usa la cámara en vivo."
+        toast.info(
+          "No detectamos el SKU automáticamente. Puedes escribir la referencia abajo para realizar la búsqueda."
         );
       }
     } catch (err) {
-      console.error("Error processing tag image:", err);
-      toast.error("Error al procesar la imagen de la etiqueta.");
+      console.error("Error scanning tag image:", err);
+      toast.error("Error al analizar la imagen.");
     } finally {
       setIsProcessingFile(false);
       setStatusMessage("");
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
     }
   };
 
-  useEffect(() => {
-    if (!open) return;
-
-    setIsInitializing(true);
-    let scannerInstance: any = null;
-    let isMounted = true;
-
-    // Intercept file selection from html5-qrcode's internal UI if user clicks it
-    const readerContainer = document.getElementById("reader");
-    const handleInternalFileChange = (e: Event) => {
-      const target = e.target as HTMLInputElement;
-      if (target && target.type === "file" && target.files && target.files.length > 0) {
-        const file = target.files[0];
-        processImageFile(file);
-      }
-    };
-
-    readerContainer?.addEventListener("change", handleInternalFileChange, true);
-
-    // Dynamically import html5-qrcode on client side only to prevent SSR crashes
-    import("html5-qrcode")
-      .then(({ Html5QrcodeScanner, Html5QrcodeSupportedFormats }) => {
-        if (!isMounted) return;
-
-        try {
-          const scanner = new Html5QrcodeScanner(
-            "reader",
-            {
-              fps: 10,
-              qrbox: { width: 260, height: 160 },
-              aspectRatio: 1.0,
-              experimentalFeatures: {
-                useBarCodeDetectorIfSupported: true,
-              },
-              formatsToSupport: [
-                Html5QrcodeSupportedFormats.EAN_13,
-                Html5QrcodeSupportedFormats.EAN_8,
-                Html5QrcodeSupportedFormats.CODE_128,
-                Html5QrcodeSupportedFormats.CODE_39,
-                Html5QrcodeSupportedFormats.UPC_A,
-                Html5QrcodeSupportedFormats.UPC_E,
-                Html5QrcodeSupportedFormats.QR_CODE,
-              ],
-            },
-            /* verbose= */ false
-          );
-          scannerInstance = scanner;
-
-          scanner.render(
-            (decodedText) => {
-              // Play a simple beep sound on success if supported by browser
-              try {
-                if (typeof window !== "undefined") {
-                  const AudioContextClass =
-                    window.AudioContext || (window as any).webkitAudioContext;
-                  if (AudioContextClass) {
-                    const context = new AudioContextClass();
-                    const oscillator = context.createOscillator();
-                    const gain = context.createGain();
-                    oscillator.connect(gain);
-                    gain.connect(context.destination);
-                    oscillator.type = "sine";
-                    oscillator.frequency.value = 800;
-                    gain.gain.setValueAtTime(0, context.currentTime);
-                    gain.gain.linearRampToValueAtTime(1, context.currentTime + 0.05);
-                    gain.gain.linearRampToValueAtTime(0, context.currentTime + 0.2);
-                    oscillator.start(context.currentTime);
-                    oscillator.stop(context.currentTime + 0.2);
-                  }
-                }
-              } catch (e) {
-                // Ignore audio errors on iOS
-              }
-
-              if (scannerInstance) {
-                scannerInstance.clear().catch(console.error);
-              }
-              onScan(decodedText);
-            },
-            (errorMessage) => {
-              // Ignore continuous scan errors
-            }
-          );
-
-          if (isMounted) {
-            setTimeout(() => setIsInitializing(false), 800);
-          }
-        } catch (error) {
-          console.error("Error initializing scanner:", error);
-          toast.error("No se pudo acceder a la cámara.");
-          setIsInitializing(false);
-          onClose();
-        }
-      })
-      .catch((err) => {
-        console.error("Error loading html5-qrcode:", err);
-        toast.error("No se pudo cargar la librería de la cámara.");
-        setIsInitializing(false);
-      });
-
-    return () => {
-      isMounted = false;
-      readerContainer?.removeEventListener("change", handleInternalFileChange, true);
-      if (scannerInstance) {
-        scannerInstance.clear().catch(console.error);
-      }
-    };
-  }, [open, onScan, onClose]);
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-    processImageFile(files[0]);
+  const handleConfirmSearch = () => {
+    if (!detectedSku.trim()) {
+      toast.error("Por favor ingresa o confirma el SKU a buscar.");
+      return;
+    }
+    const cleanSku = extractBaseSku(detectedSku.trim());
+    onScan(cleanSku);
+    onClose();
   };
 
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
-      <style>{`
-        #reader { border: none !important; }
-        #reader button { background-color: var(--primary); color: white; border-radius: 8px; padding: 6px 12px; font-size: 13px; }
-        #reader__status_span { display: none !important; }
-        .html5-qrcode-element-error { display: none !important; }
-      `}</style>
-      <div className="w-full max-w-md bg-card border border-border shadow-2xl rounded-2xl overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+      <div className="w-full max-w-md bg-card border border-border shadow-2xl rounded-2xl overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-border bg-muted/30">
-          <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
-            <Camera className="h-5 w-5 text-primary" />
-            Escanear Código o Etiqueta
+          <h2 className="text-base font-bold text-foreground flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-amber-500 animate-pulse" />
+            Lector de SKU y Etiquetas
           </h2>
           <button
             onClick={onClose}
-            className="p-2 bg-muted/50 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            className="p-1.5 bg-muted/60 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        {/* Scanner Body */}
-        <div className="p-4 flex flex-col items-center">
-          <p className="text-sm text-muted-foreground mb-4 text-center">
-            Apunta la cámara al código de barras o sube una foto de la etiqueta para leer la referencia por código o texto.
-          </p>
+        {/* Custom Tab Selector */}
+        <div className="flex border-b border-border bg-muted/20 p-1.5 gap-1.5">
+          <button
+            onClick={() => setActiveTab("photo")}
+            className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all ${
+              activeTab === "photo"
+                ? "bg-background text-primary shadow-sm border border-border/50"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
+            }`}
+          >
+            <ImageIcon className="h-4 w-4 text-primary" />
+            <span>Foto / Escáner SKU</span>
+          </button>
+          <button
+            onClick={() => setActiveTab("camera")}
+            className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all ${
+              activeTab === "camera"
+                ? "bg-background text-primary shadow-sm border border-border/50"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
+            }`}
+          >
+            <Camera className="h-4 w-4 text-primary" />
+            <span>Cámara en Vivo</span>
+          </button>
+        </div>
 
-          {/* Action Button: Subir foto con escáner inteligente / OCR */}
-          <div className="w-full mb-3 flex flex-col gap-2">
+        {/* Tab 1 Body: Foto de Etiqueta & SKU Parser */}
+        {activeTab === "photo" && (
+          <div className="p-4 flex flex-col gap-4 overflow-y-auto">
+            <p className="text-xs text-muted-foreground text-center">
+              Toma una foto de la etiqueta o sube una imagen de la prenda para detectar automáticamente el SKU (Referencia).
+            </p>
+
+            {/* Hidden File Inputs */}
+            <input
+              type="file"
+              ref={cameraInputRef}
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => {
+                if (e.target.files?.[0]) {
+                  handleProcessImageFile(e.target.files[0]);
+                }
+              }}
+            />
             <input
               type="file"
               ref={fileInputRef}
               accept="image/*"
               className="hidden"
-              onChange={handleFileChange}
+              onChange={(e) => {
+                if (e.target.files?.[0]) {
+                  handleProcessImageFile(e.target.files[0]);
+                }
+              }}
             />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isProcessingFile}
-              className="w-full py-2.5 px-4 bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl font-medium shadow-md transition-all flex items-center justify-center gap-2 text-sm"
-            >
-              {isProcessingFile ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>{statusMessage || "Analizando foto..."}</span>
-                </>
-              ) : (
-                <>
-                  <Sparkles className="h-4 w-4 text-amber-300 animate-pulse" />
-                  <Upload className="h-4 w-4" />
-                  <span>Subir / Tomar Foto de Etiqueta (Escanear + OCR)</span>
-                </>
-              )}
-            </button>
-          </div>
 
-          <div className="w-full relative bg-black/5 rounded-xl overflow-hidden min-h-[280px] flex items-center justify-center">
-            {(isInitializing || isProcessingFile) && (
-              <div className="absolute inset-0 flex items-center justify-center flex-col gap-3 text-muted-foreground z-10 bg-card/90 backdrop-blur-sm p-4 text-center">
-                <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
-                <p className="text-sm font-medium">
-                  {isProcessingFile
-                    ? statusMessage || "Procesando imagen con IA/OCR..."
-                    : "Iniciando cámara..."}
-                </p>
+            {/* Action Buttons */}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => cameraInputRef.current?.click()}
+                disabled={isProcessingFile}
+                className="py-3 px-3 bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl font-medium shadow-md transition-all flex flex-col items-center justify-center gap-1.5 text-xs text-center"
+              >
+                <Camera className="h-5 w-5" />
+                <span>Tomar Foto con Cámara</span>
+              </button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isProcessingFile}
+                className="py-3 px-3 bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-border/60 rounded-xl font-medium shadow-sm transition-all flex flex-col items-center justify-center gap-1.5 text-xs text-center"
+              >
+                <Upload className="h-5 w-5 text-primary" />
+                <span>Subir de Galería</span>
+              </button>
+            </div>
+
+            {/* Image Preview & Scanner Status */}
+            <div className="w-full relative bg-muted/30 border border-dashed border-border/80 rounded-2xl min-h-[180px] max-h-[260px] flex items-center justify-center overflow-hidden">
+              {isProcessingFile ? (
+                <div className="flex flex-col items-center justify-center p-6 gap-3 text-center">
+                  <Loader2 className="h-8 w-8 text-primary animate-spin" />
+                  <p className="text-xs font-semibold text-foreground">{statusMessage}</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Analizando código de barras y texto impreso...
+                  </p>
+                </div>
+              ) : previewUrl ? (
+                <div className="relative w-full h-full flex items-center justify-center bg-black/40">
+                  <img
+                    src={previewUrl}
+                    alt="Etiqueta"
+                    className="max-h-[240px] w-auto object-contain rounded-lg"
+                  />
+                  <button
+                    onClick={() => {
+                      setPreviewUrl(null);
+                      setDetectedSku("");
+                    }}
+                    className="absolute top-2 right-2 p-1.5 bg-black/60 text-white rounded-full hover:bg-black/80 transition-colors"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : (
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex flex-col items-center justify-center p-6 gap-2 text-center cursor-pointer hover:bg-muted/50 transition-colors w-full h-full"
+                >
+                  <ImageIcon className="h-8 w-8 text-muted-foreground/50" />
+                  <span className="text-xs text-muted-foreground font-medium">
+                    Haz clic para seleccionar o tomar la foto de la etiqueta
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* SKU Results & Confirmation Box */}
+            <div className="bg-muted/40 border border-border/70 rounded-xl p-3 flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                  <span>SKU / Referencia a Buscar:</span>
+                </label>
+                {detectionMethod && (
+                  <span className="text-[10px] bg-primary/10 text-primary font-medium px-2 py-0.5 rounded-full">
+                    {detectionMethod}
+                  </span>
+                )}
               </div>
-            )}
-            {/* The element where html5-qrcode mounts its UI */}
-            <div id="reader" className="w-full"></div>
+
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={detectedSku}
+                  onChange={(e) => setDetectedSku(e.target.value.toUpperCase())}
+                  placeholder="Ej: T12032107"
+                  className="flex-1 px-3 py-2 bg-background border border-input rounded-xl text-sm font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary uppercase tracking-wider"
+                />
+                <button
+                  onClick={handleConfirmSearch}
+                  disabled={!detectedSku.trim()}
+                  className="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all"
+                >
+                  <Search className="h-4 w-4" />
+                  <span>Buscar</span>
+                </button>
+              </div>
+
+              {!detectedSku && !isProcessingFile && previewUrl && (
+                <p className="text-[11px] text-amber-600 dark:text-amber-400 flex items-center gap-1 mt-1">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                  Escribe la referencia arriba si no se detectó automáticamente.
+                </p>
+              )}
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* Tab 2 Body: Live Camera Stream */}
+        {activeTab === "camera" && (
+          <div className="p-4 flex flex-col items-center gap-3">
+            <p className="text-xs text-muted-foreground text-center">
+              Apunta la cámara al código de barras de la prenda para lectura instantánea.
+            </p>
+
+            <div className="w-full relative bg-black/90 rounded-2xl overflow-hidden min-h-[280px] max-h-[320px] flex items-center justify-center shadow-inner border border-border">
+              {/* Custom Frame Target Overlay */}
+              <div className="absolute inset-0 z-10 pointer-events-none flex items-center justify-center">
+                <div className="w-[240px] h-[150px] border-2 border-primary/80 rounded-2xl relative shadow-[0_0_0_9999px_rgba(0,0,0,0.4)]">
+                  <div className="absolute -top-1 -left-1 w-4 h-4 border-t-4 border-l-4 border-primary rounded-tl"></div>
+                  <div className="absolute -top-1 -right-1 w-4 h-4 border-t-4 border-r-4 border-primary rounded-tr"></div>
+                  <div className="absolute -bottom-1 -left-1 w-4 h-4 border-b-4 border-l-4 border-primary rounded-bl"></div>
+                  <div className="absolute -bottom-1 -right-1 w-4 h-4 border-b-4 border-r-4 border-primary rounded-br"></div>
+                  <div className="w-full h-0.5 bg-red-500/80 shadow-[0_0_8px_rgba(239,68,68,1)] animate-pulse absolute top-1/2 -translate-y-1/2"></div>
+                </div>
+              </div>
+
+              {/* Headless html5-qrcode element */}
+              <div id="custom-camera-stream" className="w-full h-full"></div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
