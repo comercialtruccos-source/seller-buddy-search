@@ -19,7 +19,6 @@ import {
   Trash2,
   Filter,
   Layers,
-  ScanBarcode,
   Search,
 } from "lucide-react";
 import { toast, Toaster } from "sonner";
@@ -86,7 +85,6 @@ function Cargar() {
 
   const [voiceSearchEnabled, setVoiceSearchEnabled] = useState<boolean>(true);
   const [voiceOrderEnabled, setVoiceOrderEnabled] = useState<boolean>(true);
-  const [barcodeScannerEnabled, setBarcodeScannerEnabled] = useState<boolean>(true);
 
   // Bodegas state management
   const [disabledBodegas, setDisabledBodegas] = useState<Set<string>>(() => {
@@ -111,7 +109,6 @@ function Cargar() {
   useEffect(() => {
     setVoiceSearchEnabled(readVoiceFlag("voice_search_enabled"));
     setVoiceOrderEnabled(readVoiceFlag("voice_order_assistant_enabled"));
-    setBarcodeScannerEnabled(readVoiceFlag("barcode_scanner_enabled"));
 
     fetchBodegasFromDb()
       .then((dbBodegas) => {
@@ -143,11 +140,6 @@ function Cargar() {
   const handleToggleVoiceOrder = (checked: boolean) => {
     setVoiceOrderEnabled(checked);
     persistVoiceFlag("voice_order_assistant_enabled", checked, "Asistente de Pedidos por Voz");
-  };
-
-  const handleToggleBarcodeScanner = (checked: boolean) => {
-    setBarcodeScannerEnabled(checked);
-    persistVoiceFlag("barcode_scanner_enabled", checked, "Escáner de Códigos");
   };
 
   const [isUpdatingPrices, setIsUpdatingPrices] = useState(false);
@@ -772,14 +764,14 @@ function Cargar() {
             </div>
           </div>
 
-          {/* Configuración de Asistentes y Escáner */}
+          {/* Configuración de Asistentes de Voz */}
           <div className="bg-muted/40 border border-border rounded-xl p-4 shadow-xs space-y-4">
             <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
               <Bot className="h-4 w-4 text-accent" />
-              Módulos de Voz y Escáner
+              Módulos de Voz
             </h3>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="flex items-center justify-between p-3 rounded-lg bg-background border border-border">
                 <div className="flex items-center gap-2 min-w-0 pr-2">
                   <Mic className="h-4 w-4 text-accent shrink-0" />
@@ -794,14 +786,6 @@ function Cargar() {
                   <span className="text-xs font-semibold text-foreground truncate">Asistente Pedidos</span>
                 </div>
                 <Switch checked={voiceOrderEnabled} onCheckedChange={handleToggleVoiceOrder} />
-              </div>
-
-              <div className="flex items-center justify-between p-3 rounded-lg bg-background border border-border">
-                <div className="flex items-center gap-2 min-w-0 pr-2">
-                  <ScanBarcode className="h-4 w-4 text-accent shrink-0" />
-                  <span className="text-xs font-semibold text-foreground truncate">Escáner Códigos</span>
-                </div>
-                <Switch checked={barcodeScannerEnabled} onCheckedChange={handleToggleBarcodeScanner} />
               </div>
             </div>
           </div>
