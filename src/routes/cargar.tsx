@@ -19,7 +19,6 @@ import {
   Trash2,
   Filter,
   Layers,
-  ScanBarcode,
   Search,
 } from "lucide-react";
 import { toast, Toaster } from "sonner";

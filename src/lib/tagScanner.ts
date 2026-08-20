@@ -157,7 +157,7 @@ export async function scanTagImage(
           try {
             const res = await html5Qrcode.scanFileV2(tempFile, true);
             if (res && res.decodedText) {
-              html5Qrcode.clear().catch(() => {});
+              try { html5Qrcode.clear(); } catch {}
               if (document.body.contains(tempDiv)) {
                 document.body.removeChild(tempDiv);
               }
@@ -171,7 +171,7 @@ export async function scanTagImage(
       }
     }
 
-    html5Qrcode.clear().catch(() => {});
+    try { html5Qrcode.clear(); } catch {}
     if (document.body.contains(tempDiv)) {
       document.body.removeChild(tempDiv);
     }
