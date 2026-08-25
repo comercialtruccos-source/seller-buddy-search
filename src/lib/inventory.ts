@@ -239,7 +239,14 @@ export function parseInventoryCsv(text: string, trm?: number): InventoryRow[] {
     if (!referencia) continue;
 
     const rawTalla = (cols[iTalla] ?? "").trim();
-    const talla = /^\d+$/.test(rawTalla) ? rawTalla.padStart(2, "0") : rawTalla;
+    let talla = /^\d+$/.test(rawTalla) ? rawTalla.padStart(2, "0") : rawTalla;
+    if (!talla && cols[iTallaLote]) {
+      const parts = (cols[iTallaLote] ?? "").trim().split(/[-_\s/]+/);
+      const ext = parts[0]?.trim();
+      if (ext) {
+        talla = /^\d+$/.test(ext) ? ext.padStart(2, "0") : ext;
+      }
+    }
 
     const rawCodColor = (cols[iCodColor] ?? "").trim();
     const codColor = /^\d+$/.test(rawCodColor) ? rawCodColor.padStart(2, "0") : rawCodColor;

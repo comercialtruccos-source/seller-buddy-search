@@ -1,5 +1,65 @@
 import type { InventoryRow } from "./inventory";
 
+// ─── Size Extraction & Normalization ───────────────────────────────
+export function extractNormalizedSize(row: {
+  talla?: string;
+  tallaLote?: string;
+  sku?: string;
+}): string {
+  let raw = (row.talla || "").trim().toUpperCase();
+
+  // If talla is empty or single dash/generic placeholder, try tallaLote
+  if (!raw || raw === "-" || raw === "--" || raw === "0" || raw === "00") {
+    if (row.tallaLote) {
+      const parts = row.tallaLote.trim().split(/[-_\s/]+/);
+      const ext = parts[0]?.trim().toUpperCase();
+      if (ext && ext !== "0" && ext !== "00") {
+        raw = ext;
+      }
+    }
+  }
+
+  // If still empty, try extracting from SKU (often ends with size like ...-S, ...-04, ...-32)
+  if (!raw && row.sku) {
+    const skuParts = row.sku.trim().split(/[-_]+/);
+    if (skuParts.length >= 2) {
+      const last = skuParts[skuParts.length - 1].trim().toUpperCase();
+      if (last.length <= 4) {
+        raw = last;
+      }
+    }
+  }
+
+  if (!raw) return "U";
+
+  // Normalize "UNICA", "ÚNICA", "TU", "UNI" to "U"
+  if (raw === "UNICA" || raw === "ÚNICA" || raw === "TU" || raw === "UNI" || raw === "STD") {
+    return "U";
+  }
+
+  // Normalize numeric sizes like "2" -> "02", "4" -> "04", "6" -> "06", "8" -> "08"
+  if (/^\d+$/.test(raw)) {
+    const num = parseInt(raw, 10);
+    // If it's a small number <= 20, pad to 2 digits (e.g. 02, 04, 06, 08, 10, 12, 14, 16)
+    if (num <= 20) {
+      return String(num).padStart(2, "0");
+    }
+    // If it's 28, 30, 32, 34, 36, 38, etc.
+    return String(num);
+  }
+
+  // Normalize letter sizes
+  if (raw === "EXTRA SMALL" || raw === "X-SMALL") return "XS";
+  if (raw === "SMALL") return "S";
+  if (raw === "MEDIUM" || raw === "MED") return "M";
+  if (raw === "LARGE") return "L";
+  if (raw === "EXTRA LARGE" || raw === "X-LARGE") return "XL";
+  if (raw === "XXL" || raw === "2X" || raw === "2XL") return "2XL";
+  if (raw === "XXXL" || raw === "3X" || raw === "3XL") return "3XL";
+
+  return raw;
+}
+
 // ─── Filter State ───────────────────────────────────────────────────
 export interface AnalyticsFilterState {
   searchQuery: string;
@@ -121,12 +181,48 @@ export interface AnalyticsResult {
 }
 
 // ─── Standardized size order ───────────────────────────────────────
+export const STANDARD_LETTER_SIZES = ["XXS", "XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL", "U"];
+export const STANDARD_NUMERIC_SIZES = ["02", "04", "06", "08", "10", "12", "14", "16", "18", "20"];
+export const STANDARD_PANT_SIZES = ["28", "30", "32", "34", "36", "38", "40", "42"];
+
 const SIZE_ORDER: Record<string, number> = {
-  XXS: 1, XS: 2, S: 3, M: 4, L: 5, XL: 6, "2XL": 7, XXL: 7,
-  "3XL": 8, XXXL: 8, "4XL": 9, "5XL": 10, U: 50, UNICA: 50,
+  XXS: 1,
+  XS: 2,
+  S: 3,
+  M: 4,
+  L: 5,
+  XL: 6,
+  "2XL": 7,
+  XXL: 7,
+  "3XL": 8,
+  XXXL: 8,
+  "4XL": 9,
+  "5XL": 10,
+  "02": 11,
+  "04": 12,
+  "06": 13,
+  "08": 14,
+  "10": 15,
+  "12": 16,
+  "14": 17,
+  "16": 18,
+  "18": 19,
+  "20": 20,
+  "24": 24,
+  "26": 26,
+  "28": 28,
+  "30": 30,
+  "32": 32,
+  "34": 34,
+  "36": 36,
+  "38": 38,
+  "40": 40,
+  "42": 42,
+  U: 99,
+  UNICA: 99,
 };
 
-function sizeSort(a: string, b: string): number {
+export function sizeSort(a: string, b: string): number {
   const aUp = a.toUpperCase();
   const bUp = b.toUpperCase();
   const aOrd = SIZE_ORDER[aUp];
@@ -146,23 +242,26 @@ export function applyFilters(
   filters: AnalyticsFilterState
 ): InventoryRow[] {
   return rows.filter((r) => {
+    const s = extractNormalizedSize(r);
     if (filters.searchQuery) {
       const q = filters.searchQuery.toLowerCase();
       const matches =
         r.referencia.toLowerCase().includes(q) ||
         r.descripcion.toLowerCase().includes(q) ||
         r.sku.toLowerCase().includes(q) ||
-        r.color.toLowerCase().includes(q);
+        r.color.toLowerCase().includes(q) ||
+        s.toLowerCase().includes(q);
       if (!matches) return false;
     }
     if (
       filters.selectedBodegas.length > 0 &&
-      !filters.selectedBodegas.includes(r.bodega || "Principal")
+      !filters.selectedBodegas.includes(r.bodega || "PRINCIPAL 1004")
     ) {
       return false;
     }
     if (
       filters.selectedTallas.length > 0 &&
+      !filters.selectedTallas.includes(s) &&
       !filters.selectedTallas.includes(r.talla)
     ) {
       return false;
@@ -221,8 +320,9 @@ export function computeInventoryAnalytics(
   let maxPvp = 0;
 
   for (const item of allRows) {
-    allBodegas.add(item.bodega || "Principal");
-    allTallas.add(item.talla);
+    const s = extractNormalizedSize(item);
+    allBodegas.add(item.bodega || "PRINCIPAL 1004");
+    allTallas.add(s);
     allColors.add(item.color);
     if (item.pvp > maxPvp) maxPvp = item.pvp;
   }
@@ -233,6 +333,7 @@ export function computeInventoryAnalytics(
     const pvm = item.pvm || 0;
     const pvp = item.pvp || 0;
     const usd = item.precioUsd || 0;
+    const s = extractNormalizedSize(item);
 
     totalUnits += saldo;
     totalCostValue += saldo * pvm;
@@ -249,7 +350,7 @@ export function computeInventoryAnalytics(
     else healthCounts.overstock++;
 
     // Bodega
-    const b = item.bodega || "Principal";
+    const b = item.bodega || "PRINCIPAL 1004";
     if (!bodegaMap.has(b))
       bodegaMap.set(b, { units: 0, costValue: 0, retailValue: 0 });
     const bEntry = bodegaMap.get(b)!;
@@ -258,7 +359,6 @@ export function computeInventoryAnalytics(
     bEntry.retailValue += saldo * pvp;
 
     // Size
-    const s = item.talla || "U";
     sizeMap.set(s, (sizeMap.get(s) || 0) + saldo);
 
     // Color
@@ -352,12 +452,8 @@ export function computeInventoryAnalytics(
     .map(([size, units]) => ({ size, units }))
     .sort((a, b) => sizeSort(a.size, b.size));
 
-  // Collect all unique sizes for heatmap columns
-  const allSizesSet = new Set<string>();
-  heatmapMap.forEach((row) => {
-    Object.keys(row.sizes).forEach((s) => allSizesSet.add(s));
-  });
-  const allSizes = Array.from(allSizesSet).sort(sizeSort);
+  // Collect ALL sizes across the entire catalog
+  const allSizes = Array.from(allTallas).sort(sizeSort);
 
   // Color distribution sorted by units desc
   const colorDistribution = Array.from(colorMap.entries())
@@ -369,10 +465,9 @@ export function computeInventoryAnalytics(
     .map(([name, d]) => ({ name, ...d }))
     .sort((a, b) => b.units - a.units);
 
-  // Heatmap rows sorted by total stock desc, limited to top 50
+  // Heatmap rows sorted by total stock desc
   const sizeHeatmap = Array.from(heatmapMap.values())
-    .sort((a, b) => b.totalStock - a.totalStock)
-    .slice(0, 50);
+    .sort((a, b) => b.totalStock - a.totalStock);
 
   return {
     kpis: {
