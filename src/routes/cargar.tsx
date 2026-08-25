@@ -20,6 +20,7 @@ import {
   Filter,
   Layers,
   Search,
+  BarChart3,
 } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import { Switch } from "@/components/ui/switch";
@@ -584,6 +585,14 @@ function Cargar() {
               Actualiza las referencias en Supabase y gestiona las bodegas activas
             </p>
           </div>
+          <div className="flex-1" />
+          <Link
+            to="/analiticas"
+            className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-accent/20 px-3.5 py-2 text-sm font-bold text-primary-foreground hover:bg-accent/30 transition-all"
+          >
+            <BarChart3 className="h-4 w-4" />
+            Analíticas
+          </Link>
         </div>
       </header>
 

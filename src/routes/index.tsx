@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import {
   Search,
@@ -22,6 +22,7 @@ import {
   Eye,
   ExternalLink,
   Bot,
+  BarChart3,
 } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import { useQuery } from "@tanstack/react-query";
@@ -377,24 +378,33 @@ function Index() {
             </p>
           </div>
           <div className="flex-1" />
-          {deferredPrompt && (
-            <button
-              onClick={handleInstallClick}
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-accent px-4 py-2 text-sm font-bold text-accent-foreground shadow-sm hover:bg-accent/90 transition-all"
+          <div className="flex items-center gap-2">
+            <Link
+              to="/analiticas"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-accent/20 px-3.5 py-2 text-sm font-bold text-primary-foreground hover:bg-accent/30 transition-all"
             >
-              <Download className="h-4 w-4" />
-              Instalar App
-            </button>
-          )}
+              <BarChart3 className="h-4 w-4" />
+              Analíticas
+            </Link>
+            {deferredPrompt && (
+              <button
+                onClick={handleInstallClick}
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-accent px-4 py-2 text-sm font-bold text-accent-foreground shadow-sm hover:bg-accent/90 transition-all"
+              >
+                <Download className="h-4 w-4" />
+                Instalar App
+              </button>
+            )}
+          </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-4xl px-4 py-8">
         {/* Navigation Tabs */}
-        <div className="mb-6 flex gap-2 border-b border-border pb-px">
+        <div className="mb-6 flex gap-2 border-b border-border pb-px overflow-x-auto">
           <button
             onClick={() => setActiveTab("catalogo")}
-            className={`pb-2.5 px-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${
+            className={`pb-2.5 px-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
               activeTab === "catalogo"
                 ? "border-accent text-accent"
                 : "border-transparent text-muted-foreground hover:text-foreground"
@@ -405,7 +415,7 @@ function Index() {
           </button>
           <button
             onClick={() => setActiveTab("historial")}
-            className={`pb-2.5 px-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${
+            className={`pb-2.5 px-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
               activeTab === "historial"
                 ? "border-accent text-accent"
                 : "border-transparent text-muted-foreground hover:text-foreground"
@@ -416,7 +426,7 @@ function Index() {
           </button>
           <button
             onClick={() => setActiveTab("analytics")}
-            className={`pb-2.5 px-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${
+            className={`pb-2.5 px-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
               activeTab === "analytics"
                 ? "border-accent text-accent"
                 : "border-transparent text-muted-foreground hover:text-foreground"
@@ -425,6 +435,13 @@ function Index() {
             <TrendingUp className="h-4 w-4" />
             Top Ventas
           </button>
+          <Link
+            to="/analiticas"
+            className="pb-2.5 px-3 text-sm font-bold border-b-2 border-transparent text-muted-foreground hover:text-accent hover:border-accent/40 transition-all flex items-center gap-2 whitespace-nowrap"
+          >
+            <BarChart3 className="h-4 w-4" />
+            Analíticas de Inventario
+          </Link>
         </div>
 
         {activeTab === "analytics" && <AnalyticsView allGroups={groups} />}
