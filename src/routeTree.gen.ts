@@ -9,10 +9,16 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as MetricasRouteImport } from './routes/metricas'
 import { Route as CargarRouteImport } from './routes/cargar'
 import { Route as AnaliticasRouteImport } from './routes/analiticas'
 import { Route as IndexRouteImport } from './routes/index'
 
+const MetricasRoute = MetricasRouteImport.update({
+  id: '/metricas',
+  path: '/metricas',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CargarRoute = CargarRouteImport.update({
   id: '/cargar',
   path: '/cargar',
@@ -33,34 +39,45 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/analiticas': typeof AnaliticasRoute
   '/cargar': typeof CargarRoute
+  '/metricas': typeof MetricasRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/analiticas': typeof AnaliticasRoute
   '/cargar': typeof CargarRoute
+  '/metricas': typeof MetricasRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/analiticas': typeof AnaliticasRoute
   '/cargar': typeof CargarRoute
+  '/metricas': typeof MetricasRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/analiticas' | '/cargar'
+  fullPaths: '/' | '/analiticas' | '/cargar' | '/metricas'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/analiticas' | '/cargar'
-  id: '__root__' | '/' | '/analiticas' | '/cargar'
+  to: '/' | '/analiticas' | '/cargar' | '/metricas'
+  id: '__root__' | '/' | '/analiticas' | '/cargar' | '/metricas'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AnaliticasRoute: typeof AnaliticasRoute
   CargarRoute: typeof CargarRoute
+  MetricasRoute: typeof MetricasRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/metricas': {
+      id: '/metricas'
+      path: '/metricas'
+      fullPath: '/metricas'
+      preLoaderRoute: typeof MetricasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/cargar': {
       id: '/cargar'
       path: '/cargar'
@@ -89,6 +106,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AnaliticasRoute: AnaliticasRoute,
   CargarRoute: CargarRoute,
+  MetricasRoute: MetricasRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
