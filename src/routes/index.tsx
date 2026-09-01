@@ -17,17 +17,14 @@ import {
   Download,
   X,
   History,
-  TrendingUp,
   Save,
   Eye,
   ExternalLink,
   Bot,
-  BarChart3,
 } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { AnalyticsView } from "@/components/AnalyticsView";
 import { VoiceSearchButton } from "@/components/VoiceSearchButton";
 import { VoiceOrderAssistantModal } from "@/components/VoiceOrderAssistantModal";
 
@@ -115,7 +112,7 @@ function Index() {
   }, []);
 
 
-  const [activeTab, setActiveTab] = useState<"catalogo" | "historial" | "analytics">("catalogo");
+  const [activeTab, setActiveTab] = useState<"catalogo" | "historial">("catalogo");
   useHydrateOrder();
   const order = useOrder();
   const orderCount = order.reduce((s, i) => s + i.cantidad, 0);
@@ -379,13 +376,6 @@ function Index() {
           </div>
           <div className="flex-1" />
           <div className="flex items-center gap-2">
-            <Link
-              to="/analiticas"
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-accent/20 px-3.5 py-2 text-sm font-bold text-primary-foreground hover:bg-accent/30 transition-all"
-            >
-              <BarChart3 className="h-4 w-4" />
-              Analíticas
-            </Link>
             {deferredPrompt && (
               <button
                 onClick={handleInstallClick}
@@ -424,27 +414,9 @@ function Index() {
             <History className="h-4 w-4" />
             Historial de Pedidos
           </button>
-          <button
-            onClick={() => setActiveTab("analytics")}
-            className={`pb-2.5 px-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
-              activeTab === "analytics"
-                ? "border-accent text-accent"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <TrendingUp className="h-4 w-4" />
-            Top Ventas
-          </button>
-          <Link
-            to="/analiticas"
-            className="pb-2.5 px-3 text-sm font-bold border-b-2 border-transparent text-muted-foreground hover:text-accent hover:border-accent/40 transition-all flex items-center gap-2 whitespace-nowrap"
-          >
-            <BarChart3 className="h-4 w-4" />
-            Analíticas de Inventario
-          </Link>
         </div>
 
-        {activeTab === "analytics" && <AnalyticsView allGroups={groups} />}
+
 
         {activeTab === "catalogo" && (
           <div className="space-y-6">

@@ -9,18 +9,14 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
-import { Route as AnaliticasRouteImport } from './routes/analiticas'
+import { Route as MetricasRouteImport } from './routes/metricas'
 import { Route as CargarRouteImport } from './routes/cargar'
+import { Route as AnaliticasRouteImport } from './routes/analiticas'
+import { Route as IndexRouteImport } from './routes/index'
 
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AnaliticasRoute = AnaliticasRouteImport.update({
-  id: '/analiticas',
-  path: '/analiticas',
+const MetricasRoute = MetricasRouteImport.update({
+  id: '/metricas',
+  path: '/metricas',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CargarRoute = CargarRouteImport.update({
@@ -28,51 +24,58 @@ const CargarRoute = CargarRouteImport.update({
   path: '/cargar',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AnaliticasRoute = AnaliticasRouteImport.update({
+  id: '/analiticas',
+  path: '/analiticas',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/analiticas': typeof AnaliticasRoute
   '/cargar': typeof CargarRoute
+  '/metricas': typeof MetricasRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/analiticas': typeof AnaliticasRoute
   '/cargar': typeof CargarRoute
+  '/metricas': typeof MetricasRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/analiticas': typeof AnaliticasRoute
   '/cargar': typeof CargarRoute
+  '/metricas': typeof MetricasRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/analiticas' | '/cargar'
+  fullPaths: '/' | '/analiticas' | '/cargar' | '/metricas'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/analiticas' | '/cargar'
-  id: '__root__' | '/' | '/analiticas' | '/cargar'
+  to: '/' | '/analiticas' | '/cargar' | '/metricas'
+  id: '__root__' | '/' | '/analiticas' | '/cargar' | '/metricas'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AnaliticasRoute: typeof AnaliticasRoute
   CargarRoute: typeof CargarRoute
+  MetricasRoute: typeof MetricasRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/analiticas': {
-      id: '/analiticas'
-      path: '/analiticas'
-      fullPath: '/analiticas'
-      preLoaderRoute: typeof AnaliticasRouteImport
+    '/metricas': {
+      id: '/metricas'
+      path: '/metricas'
+      fullPath: '/metricas'
+      preLoaderRoute: typeof MetricasRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/cargar': {
@@ -82,6 +85,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CargarRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/analiticas': {
+      id: '/analiticas'
+      path: '/analiticas'
+      fullPath: '/analiticas'
+      preLoaderRoute: typeof AnaliticasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -89,6 +106,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AnaliticasRoute: AnaliticasRoute,
   CargarRoute: CargarRoute,
+  MetricasRoute: MetricasRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
