@@ -17,17 +17,14 @@ import {
   Download,
   X,
   History,
-  TrendingUp,
   Save,
   Eye,
   ExternalLink,
   Bot,
-  BarChart3,
 } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { AnalyticsView } from "@/components/AnalyticsView";
 import { VoiceSearchButton } from "@/components/VoiceSearchButton";
 import { VoiceOrderAssistantModal } from "@/components/VoiceOrderAssistantModal";
 
@@ -115,7 +112,7 @@ function Index() {
   }, []);
 
 
-  const [activeTab, setActiveTab] = useState<"catalogo" | "historial" | "analytics">("catalogo");
+  const [activeTab, setActiveTab] = useState<"catalogo" | "historial">("catalogo");
   useHydrateOrder();
   const order = useOrder();
   const orderCount = order.reduce((s, i) => s + i.cantidad, 0);
