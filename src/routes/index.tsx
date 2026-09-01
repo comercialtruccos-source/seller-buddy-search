@@ -417,27 +417,9 @@ function Index() {
             <History className="h-4 w-4" />
             Historial de Pedidos
           </button>
-          <button
-            onClick={() => setActiveTab("analytics")}
-            className={`pb-2.5 px-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
-              activeTab === "analytics"
-                ? "border-accent text-accent"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <TrendingUp className="h-4 w-4" />
-            Top Ventas
-          </button>
-          <Link
-            to="/analiticas"
-            className="pb-2.5 px-3 text-sm font-bold border-b-2 border-transparent text-muted-foreground hover:text-accent hover:border-accent/40 transition-all flex items-center gap-2 whitespace-nowrap"
-          >
-            <BarChart3 className="h-4 w-4" />
-            Analíticas de Inventario
-          </Link>
         </div>
 
-        {activeTab === "analytics" && <AnalyticsView allGroups={groups} />}
+
 
         {activeTab === "catalogo" && (
           <div className="space-y-6">
