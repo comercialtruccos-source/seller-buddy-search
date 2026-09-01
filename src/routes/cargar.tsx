@@ -21,6 +21,7 @@ import {
   Layers,
   Search,
   BarChart3,
+  TrendingUp,
 } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import { Switch } from "@/components/ui/switch";
