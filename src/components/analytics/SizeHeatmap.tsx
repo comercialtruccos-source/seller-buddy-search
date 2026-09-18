@@ -67,7 +67,7 @@ export default function SizeHeatmap({ data, allSizes }: SizeHeatmapProps) {
   const [search, setSearch] = useState("");
   const [sizeMode, setSizeMode] = useState<SizeViewMode>("catalog");
   const [selectedLinea, setSelectedLinea] = useState<string>("all");
-  const [onlyWithStock, setOnlyWithStock] = useState<boolean>(true);
+  const [onlyWithStock, setOnlyWithStock] = useState<boolean>(false);
   const [pageSize, setPageSize] = useState<number>(50);
 
   // Filter base rows by search and linea
@@ -93,8 +93,8 @@ export default function SizeHeatmap({ data, allSizes }: SizeHeatmapProps) {
     return rows;
   }, [data, search, selectedLinea]);
 
-  // Determine initial candidate size columns based on sizeMode
-  const candidateDisplayedSizes = useMemo(() => {
+  // Determine size columns based on sizeMode
+  const displayedSizes = useMemo(() => {
     switch (sizeMode) {
       case "letter": {
         return STANDARD_LETTER_SIZES;
@@ -109,12 +109,13 @@ export default function SizeHeatmap({ data, allSizes }: SizeHeatmapProps) {
         return STANDARD_UNICA_SIZES;
       }
       case "active-only": {
-        // Collect sizes that actually have > 0 units in baseRows
         const activeSizes = new Set<string>();
         baseRows.forEach((r) => {
-          Object.entries(r.sizes).forEach(([s, qty]) => {
-            if (qty > 0) activeSizes.add(s);
-          });
+          if (r.totalStock > 0) {
+            Object.entries(r.sizes).forEach(([s, qty]) => {
+              if (qty > 0) activeSizes.add(s);
+            });
+          }
         });
         const arr = Array.from(activeSizes).sort(sizeSort);
         return arr.length > 0 ? arr : allSizes;
@@ -127,35 +128,18 @@ export default function SizeHeatmap({ data, allSizes }: SizeHeatmapProps) {
     }
   }, [sizeMode, allSizes, baseRows]);
 
-  // Filter rows: when onlyWithStock or active-only/unica is active, keep ONLY rows that have stock > 0 in displayed sizes
+  // Filter rows: apply stock or sizeMode filters safely
   const filteredRows = useMemo(() => {
-    if (!onlyWithStock && sizeMode !== "active-only" && sizeMode !== "unica") {
-      return baseRows;
+    let rows = baseRows;
+
+    if (onlyWithStock || sizeMode === "active-only") {
+      rows = rows.filter((r) => r.totalStock > 0);
+    } else if (sizeMode === "unica") {
+      rows = rows.filter((r) => "U" in r.sizes || (r.sizes["U"] || 0) > 0);
     }
 
-    return baseRows.filter((r) => {
-      if (!onlyWithStock && sizeMode === "unica") {
-        return "U" in r.sizes || candidateDisplayedSizes.some((s) => s in r.sizes);
-      }
-      // Must have at least one candidate displayed size with stock > 0
-      return candidateDisplayedSizes.some((s) => (r.sizes[s] || 0) > 0);
-    });
-  }, [baseRows, candidateDisplayedSizes, onlyWithStock, sizeMode]);
-
-  // Refine displayed size columns for active-only mode to remove completely empty size columns
-  const displayedSizes = useMemo(() => {
-    if (sizeMode !== "active-only") {
-      return candidateDisplayedSizes;
-    }
-    const activeSizes = new Set<string>();
-    filteredRows.forEach((r) => {
-      Object.entries(r.sizes).forEach(([s, qty]) => {
-        if (qty > 0) activeSizes.add(s);
-      });
-    });
-    const arr = Array.from(activeSizes).sort(sizeSort);
-    return arr.length > 0 ? arr : candidateDisplayedSizes;
-  }, [sizeMode, candidateDisplayedSizes, filteredRows]);
+    return rows;
+  }, [baseRows, onlyWithStock, sizeMode]);
 
   // Total items with inventory count for current line/search
   const itemsWithStockCount = useMemo(
@@ -348,6 +332,7 @@ export default function SizeHeatmap({ data, allSizes }: SizeHeatmapProps) {
                       row.pvp > 0 && hasFabCost
                         ? ((row.pvp - row.costoFabricacion!) / row.pvp) * 100
                         : 0;
+                    const badge = stockBadge(row.totalStock);
                     return (
                       <tr
                         key={`${row.referencia}-${row.color}-${idx}`}
