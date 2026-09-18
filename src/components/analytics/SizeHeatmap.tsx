@@ -93,8 +93,8 @@ export default function SizeHeatmap({ data, allSizes }: SizeHeatmapProps) {
     return rows;
   }, [data, search, selectedLinea]);
 
-  // Determine size columns based on sizeMode
-  const displayedSizes = useMemo(() => {
+  // Determine candidate size columns based on sizeMode
+  const candidateDisplayedSizes = useMemo(() => {
     switch (sizeMode) {
       case "letter": {
         return STANDARD_LETTER_SIZES;
@@ -108,25 +108,14 @@ export default function SizeHeatmap({ data, allSizes }: SizeHeatmapProps) {
       case "unica": {
         return STANDARD_UNICA_SIZES;
       }
-      case "active-only": {
-        const activeSizes = new Set<string>();
-        baseRows.forEach((r) => {
-          if (r.totalStock > 0) {
-            Object.entries(r.sizes).forEach(([s, qty]) => {
-              if (qty > 0) activeSizes.add(s);
-            });
-          }
-        });
-        const arr = Array.from(activeSizes).sort(sizeSort);
-        return arr.length > 0 ? arr : allSizes;
-      }
+      case "active-only":
       case "catalog":
       default: {
         const merged = new Set([...allSizes, "XS", "S", "M", "L", "XL", "U"]);
         return Array.from(merged).sort(sizeSort);
       }
     }
-  }, [sizeMode, allSizes, baseRows]);
+  }, [sizeMode, allSizes]);
 
   // Filter rows: apply stock or sizeMode filters safely
   const filteredRows = useMemo(() => {
@@ -140,6 +129,23 @@ export default function SizeHeatmap({ data, allSizes }: SizeHeatmapProps) {
 
     return rows;
   }, [baseRows, onlyWithStock, sizeMode]);
+
+  // Refine displayed size columns to show ONLY sizes that have inventory (>0) in current filtered rows
+  const displayedSizes = useMemo(() => {
+    const activeSizesInRows = new Set<string>();
+    filteredRows.forEach((r) => {
+      Object.entries(r.sizes).forEach(([s, qty]) => {
+        if (qty > 0) activeSizesInRows.add(s);
+      });
+    });
+
+    if (activeSizesInRows.size > 0) {
+      const activeArr = candidateDisplayedSizes.filter((s) => activeSizesInRows.has(s));
+      return activeArr.length > 0 ? activeArr : candidateDisplayedSizes;
+    }
+
+    return candidateDisplayedSizes;
+  }, [candidateDisplayedSizes, filteredRows]);
 
   // Total items with inventory count for current line/search
   const itemsWithStockCount = useMemo(
