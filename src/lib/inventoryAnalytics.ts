@@ -184,6 +184,7 @@ export interface AnalyticsResult {
 export const STANDARD_LETTER_SIZES = ["XXS", "XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL", "U"];
 export const STANDARD_NUMERIC_SIZES = ["02", "04", "06", "08", "10", "12", "14", "16", "18", "20"];
 export const STANDARD_PANT_SIZES = ["28", "30", "32", "34", "36", "38", "40", "42"];
+export const STANDARD_UNICA_SIZES = ["U"];
 
 const SIZE_ORDER: Record<string, number> = {
   XXS: 1,

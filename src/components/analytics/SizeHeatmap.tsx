@@ -17,6 +17,7 @@ import {
   STANDARD_LETTER_SIZES,
   STANDARD_NUMERIC_SIZES,
   STANDARD_PANT_SIZES,
+  STANDARD_UNICA_SIZES,
   sizeSort,
 } from "@/lib/inventoryAnalytics";
 
@@ -25,7 +26,13 @@ interface SizeHeatmapProps {
   allSizes: string[];
 }
 
-type SizeViewMode = "catalog" | "letter" | "numeric" | "pant" | "active-only";
+type SizeViewMode =
+  | "catalog"
+  | "letter"
+  | "numeric"
+  | "pant"
+  | "unica"
+  | "active-only";
 
 function cellColor(stock: number | undefined): string {
   if (stock === undefined || stock === 0)
@@ -89,6 +96,9 @@ export default function SizeHeatmap({ data, allSizes }: SizeHeatmapProps) {
       case "pant": {
         return STANDARD_PANT_SIZES;
       }
+      case "unica": {
+        return STANDARD_UNICA_SIZES;
+      }
       case "active-only": {
         // Collect sizes that actually have > 0 units in baseRows
         const activeSizes = new Set<string>();
@@ -108,13 +118,16 @@ export default function SizeHeatmap({ data, allSizes }: SizeHeatmapProps) {
     }
   }, [sizeMode, allSizes, baseRows]);
 
-  // Filter rows: when onlyWithStock or active-only is active, keep ONLY rows that have stock > 0 in displayed sizes
+  // Filter rows: when onlyWithStock or active-only/unica is active, keep ONLY rows that have stock > 0 in displayed sizes
   const filteredRows = useMemo(() => {
-    if (!onlyWithStock && sizeMode !== "active-only") {
+    if (!onlyWithStock && sizeMode !== "active-only" && sizeMode !== "unica") {
       return baseRows;
     }
 
     return baseRows.filter((r) => {
+      if (!onlyWithStock && sizeMode === "unica") {
+        return "U" in r.sizes || candidateDisplayedSizes.some((s) => s in r.sizes);
+      }
       // Must have at least one candidate displayed size with stock > 0
       return candidateDisplayedSizes.some((s) => (r.sizes[s] || 0) > 0);
     });
@@ -216,6 +229,7 @@ export default function SizeHeatmap({ data, allSizes }: SizeHeatmapProps) {
               { key: "letter", label: "Letras (XS-3XL)" },
               { key: "numeric", label: "Numéricas (02-16)" },
               { key: "pant", label: "Pantalón (28-38)" },
+              { key: "unica", label: "Talla Única (U)" },
               { key: "active-only", label: "Solo con Stock" },
             ].map((m) => (
               <button
