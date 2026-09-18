@@ -54,20 +54,9 @@ export default function SizeHeatmap({ data, allSizes }: SizeHeatmapProps) {
   const [onlyWithStock, setOnlyWithStock] = useState<boolean>(true);
   const [pageSize, setPageSize] = useState<number>(50);
 
-  // Total items with inventory count
-  const itemsWithStockCount = useMemo(
-    () => data.filter((r) => r.totalStock > 0).length,
-    [data]
-  );
-
-  // Filter rows by search, linea, and stock presence
-  const filteredRows = useMemo(() => {
+  // Filter base rows by search and linea
+  const baseRows = useMemo(() => {
     let rows = data;
-
-    // Filter out zero-stock items when onlyWithStock is true OR sizeMode is "active-only"
-    if (onlyWithStock || sizeMode === "active-only") {
-      rows = rows.filter((r) => r.totalStock > 0);
-    }
 
     if (search.trim()) {
       const q = search.toLowerCase().trim();
@@ -86,10 +75,10 @@ export default function SizeHeatmap({ data, allSizes }: SizeHeatmapProps) {
     }
 
     return rows;
-  }, [data, search, selectedLinea, onlyWithStock, sizeMode]);
+  }, [data, search, selectedLinea]);
 
-  // Determine which column sizes to show based on sizeMode
-  const displayedSizes = useMemo(() => {
+  // Determine initial candidate size columns based on sizeMode
+  const candidateDisplayedSizes = useMemo(() => {
     switch (sizeMode) {
       case "letter": {
         return STANDARD_LETTER_SIZES;
@@ -101,9 +90,9 @@ export default function SizeHeatmap({ data, allSizes }: SizeHeatmapProps) {
         return STANDARD_PANT_SIZES;
       }
       case "active-only": {
-        // Collect sizes that actually have > 0 units in current filtered rows
+        // Collect sizes that actually have > 0 units in baseRows
         const activeSizes = new Set<string>();
-        filteredRows.forEach((r) => {
+        baseRows.forEach((r) => {
           Object.entries(r.sizes).forEach(([s, qty]) => {
             if (qty > 0) activeSizes.add(s);
           });
@@ -113,12 +102,47 @@ export default function SizeHeatmap({ data, allSizes }: SizeHeatmapProps) {
       }
       case "catalog":
       default: {
-        // Show all detected sizes in catalog + ensure standard letter sizes are available
         const merged = new Set([...allSizes, "XS", "S", "M", "L", "XL", "U"]);
         return Array.from(merged).sort(sizeSort);
       }
     }
-  }, [sizeMode, allSizes, filteredRows]);
+  }, [sizeMode, allSizes, baseRows]);
+
+  // Filter rows: when onlyWithStock or active-only is active, keep ONLY rows that have stock > 0 in displayed sizes
+  const filteredRows = useMemo(() => {
+    if (!onlyWithStock && sizeMode !== "active-only") {
+      return baseRows;
+    }
+
+    return baseRows.filter((r) => {
+      // Must have at least one candidate displayed size with stock > 0
+      return candidateDisplayedSizes.some((s) => (r.sizes[s] || 0) > 0);
+    });
+  }, [baseRows, candidateDisplayedSizes, onlyWithStock, sizeMode]);
+
+  // Refine displayed size columns for active-only mode to remove completely empty size columns
+  const displayedSizes = useMemo(() => {
+    if (sizeMode !== "active-only") {
+      return candidateDisplayedSizes;
+    }
+    const activeSizes = new Set<string>();
+    filteredRows.forEach((r) => {
+      Object.entries(r.sizes).forEach(([s, qty]) => {
+        if (qty > 0) activeSizes.add(s);
+      });
+    });
+    const arr = Array.from(activeSizes).sort(sizeSort);
+    return arr.length > 0 ? arr : candidateDisplayedSizes;
+  }, [sizeMode, candidateDisplayedSizes, filteredRows]);
+
+  // Total items with inventory count for current line/search
+  const itemsWithStockCount = useMemo(
+    () =>
+      baseRows.filter((r) =>
+        Object.values(r.sizes).some((qty) => qty > 0)
+      ).length,
+    [baseRows]
+  );
 
   const visibleRows = filteredRows.slice(0, pageSize);
 
