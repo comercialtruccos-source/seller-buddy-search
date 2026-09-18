@@ -343,12 +343,10 @@ export default function SizeHeatmap({ data, allSizes }: SizeHeatmapProps) {
                   </tr>
                 ) : (
                   visibleRows.map((row, idx) => {
-                    const badge = stockBadge(row.totalStock);
-                    const effectiveCost = row.costoFabricacion !== undefined ? row.costoFabricacion : (row.pvm > 0 ? row.pvm : 0);
                     const hasFabCost = row.costoFabricacion !== undefined;
                     const marginPct =
-                      row.pvp > 0 && effectiveCost > 0
-                        ? ((row.pvp - effectiveCost) / row.pvp) * 100
+                      row.pvp > 0 && hasFabCost
+                        ? ((row.pvp - row.costoFabricacion!) / row.pvp) * 100
                         : 0;
                     return (
                       <tr
@@ -386,11 +384,7 @@ export default function SizeHeatmap({ data, allSizes }: SizeHeatmapProps) {
                           {row.totalStock.toLocaleString("es-CO")}
                         </td>
                         <td className="text-right px-3 py-2 font-mono font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-50/20 dark:bg-emerald-950/10">
-                          {hasFabCost
-                            ? formatCop(row.costoFabricacion!)
-                            : row.pvm > 0
-                            ? formatCop(row.pvm)
-                            : "-"}
+                          {hasFabCost ? formatCop(row.costoFabricacion!) : "-"}
                         </td>
                         <td className="text-right px-3 py-2 font-mono font-medium text-violet-700 dark:text-violet-400 bg-violet-50/20 dark:bg-violet-950/10">
                           {formatCop(row.pvp)}
