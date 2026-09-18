@@ -142,6 +142,17 @@ export interface ColorEntry {
   units: number;
 }
 
+// ─── Custom Manufacturing Costs Mapping ──────────────────────────────
+export const CUSTOM_MANUFACTURING_COSTS: Record<string, number> = {
+  // References with explicit manufacturing costs specified by the user
+};
+
+export function getManufacturingCost(referencia: string): number | undefined {
+  if (!referencia) return undefined;
+  const normRef = referencia.trim().toUpperCase();
+  return CUSTOM_MANUFACTURING_COSTS[normRef];
+}
+
 export interface ReferenceAnalytics {
   referencia: string;
   descripcion: string;
@@ -153,6 +164,7 @@ export interface ReferenceAnalytics {
   bodegas: Set<string>;
   pvm: number;
   pvp: number;
+  costoFabricacion?: number;
   isBrokenSizeRun: boolean;
 }
 
@@ -164,6 +176,7 @@ export interface SizeHeatmapRow {
   totalStock: number;
   pvm: number;
   pvp: number;
+  costoFabricacion?: number;
 }
 
 export interface AnalyticsResult {
@@ -370,6 +383,7 @@ export function computeInventoryAnalytics(
 
     // Reference grouping
     const refKey = item.referencia;
+    const fabCost = getManufacturingCost(item.referencia);
     if (!refMap.has(refKey)) {
       refMap.set(refKey, {
         referencia: item.referencia,
@@ -382,6 +396,7 @@ export function computeInventoryAnalytics(
         bodegas: new Set(),
         pvm,
         pvp,
+        costoFabricacion: fabCost,
         isBrokenSizeRun: false,
       });
     }
@@ -404,6 +419,7 @@ export function computeInventoryAnalytics(
         totalStock: 0,
         pvm: item.pvm || 0,
         pvp: item.pvp || 0,
+        costoFabricacion: fabCost,
       });
     }
     const hEntry = heatmapMap.get(heatKey)!;

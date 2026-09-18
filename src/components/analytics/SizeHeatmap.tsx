@@ -317,8 +317,8 @@ export default function SizeHeatmap({ data, allSizes }: SizeHeatmapProps) {
                   <th className="text-center px-3 py-2.5 font-bold min-w-[64px] bg-muted/40">
                     Total
                   </th>
-                  <th className="text-right px-3 py-2.5 font-bold min-w-[90px] text-emerald-700 dark:text-emerald-400 bg-emerald-50/50 dark:bg-emerald-950/20">
-                    Fabricación (PVM)
+                  <th className="text-right px-3 py-2.5 font-bold min-w-[95px] text-emerald-700 dark:text-emerald-400 bg-emerald-50/50 dark:bg-emerald-950/20">
+                    Costo Fabricación
                   </th>
                   <th className="text-right px-3 py-2.5 font-bold min-w-[90px] text-violet-700 dark:text-violet-400 bg-violet-50/50 dark:bg-violet-950/20">
                     PVP (Detal)
@@ -344,8 +344,12 @@ export default function SizeHeatmap({ data, allSizes }: SizeHeatmapProps) {
                 ) : (
                   visibleRows.map((row, idx) => {
                     const badge = stockBadge(row.totalStock);
+                    const effectiveCost = row.costoFabricacion !== undefined ? row.costoFabricacion : (row.pvm > 0 ? row.pvm : 0);
+                    const hasFabCost = row.costoFabricacion !== undefined;
                     const marginPct =
-                      row.pvp > 0 ? ((row.pvp - row.pvm) / row.pvp) * 100 : 0;
+                      row.pvp > 0 && effectiveCost > 0
+                        ? ((row.pvp - effectiveCost) / row.pvp) * 100
+                        : 0;
                     return (
                       <tr
                         key={`${row.referencia}-${row.color}-${idx}`}
@@ -357,9 +361,9 @@ export default function SizeHeatmap({ data, allSizes }: SizeHeatmapProps) {
                           </div>
                           <div className="text-[11px] text-muted-foreground truncate max-w-[210px] flex items-center justify-between gap-1">
                             <span>{row.color || "Único"}</span>
-                            {row.pvm > 0 && (
-                              <span className="text-[10px] font-mono text-emerald-700 dark:text-emerald-400">
-                                Fab: {formatCop(row.pvm)}
+                            {hasFabCost && (
+                              <span className="text-[10px] font-mono text-emerald-700 dark:text-emerald-400 font-bold">
+                                Fab: {formatCop(row.costoFabricacion!)}
                               </span>
                             )}
                           </div>
@@ -382,23 +386,31 @@ export default function SizeHeatmap({ data, allSizes }: SizeHeatmapProps) {
                           {row.totalStock.toLocaleString("es-CO")}
                         </td>
                         <td className="text-right px-3 py-2 font-mono font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-50/20 dark:bg-emerald-950/10">
-                          {formatCop(row.pvm)}
+                          {hasFabCost
+                            ? formatCop(row.costoFabricacion!)
+                            : row.pvm > 0
+                            ? formatCop(row.pvm)
+                            : "-"}
                         </td>
                         <td className="text-right px-3 py-2 font-mono font-medium text-violet-700 dark:text-violet-400 bg-violet-50/20 dark:bg-violet-950/10">
                           {formatCop(row.pvp)}
                         </td>
                         <td className="text-center px-2 py-2">
-                          <span
-                            className={`inline-block text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                              marginPct >= 50
-                                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-                                : marginPct >= 35
-                                ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
-                                : "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300"
-                            }`}
-                          >
-                            {marginPct > 0 ? `${marginPct.toFixed(0)}%` : "-"}
-                          </span>
+                          {marginPct > 0 ? (
+                            <span
+                              className={`inline-block text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                                marginPct >= 50
+                                  ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                                  : marginPct >= 35
+                                  ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                                  : "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300"
+                              }`}
+                            >
+                              {marginPct.toFixed(0)}%
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
                         </td>
                         <td className="text-center px-3 py-2">
                           <Badge
