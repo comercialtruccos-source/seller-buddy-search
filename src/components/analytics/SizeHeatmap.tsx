@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import {
   Search,
   SlidersHorizontal,
-  ChevronDown,
   Layers,
+  PackageCheck,
+  PackageX,
   Sparkles,
 } from "lucide-react";
 import type { SizeHeatmapRow } from "@/lib/inventoryAnalytics";
@@ -50,11 +51,24 @@ export default function SizeHeatmap({ data, allSizes }: SizeHeatmapProps) {
   const [search, setSearch] = useState("");
   const [sizeMode, setSizeMode] = useState<SizeViewMode>("catalog");
   const [selectedLinea, setSelectedLinea] = useState<string>("all");
+  const [onlyWithStock, setOnlyWithStock] = useState<boolean>(true);
   const [pageSize, setPageSize] = useState<number>(50);
 
-  // Filter rows by search and linea
+  // Total items with inventory count
+  const itemsWithStockCount = useMemo(
+    () => data.filter((r) => r.totalStock > 0).length,
+    [data]
+  );
+
+  // Filter rows by search, linea, and stock presence
   const filteredRows = useMemo(() => {
     let rows = data;
+
+    // Filter out zero-stock items when onlyWithStock is true OR sizeMode is "active-only"
+    if (onlyWithStock || sizeMode === "active-only") {
+      rows = rows.filter((r) => r.totalStock > 0);
+    }
+
     if (search.trim()) {
       const q = search.toLowerCase().trim();
       rows = rows.filter(
@@ -64,13 +78,15 @@ export default function SizeHeatmap({ data, allSizes }: SizeHeatmapProps) {
           r.color.toLowerCase().includes(q)
       );
     }
+
     if (selectedLinea !== "all") {
       rows = rows.filter((r) =>
         r.referencia.toUpperCase().startsWith(selectedLinea)
       );
     }
+
     return rows;
-  }, [data, search, selectedLinea]);
+  }, [data, search, selectedLinea, onlyWithStock, sizeMode]);
 
   // Determine which column sizes to show based on sizeMode
   const displayedSizes = useMemo(() => {
@@ -111,10 +127,18 @@ export default function SizeHeatmap({ data, allSizes }: SizeHeatmapProps) {
       <CardHeader className="pb-3 border-b border-border/60">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div>
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <Layers className="h-4 w-4 text-primary" />
-              Matriz de Tallas por Referencia
-            </CardTitle>
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <Layers className="h-4 w-4 text-primary" />
+                Matriz de Tallas por Referencia
+              </CardTitle>
+              <Badge
+                variant="secondary"
+                className="text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-medium"
+              >
+                {itemsWithStockCount} prendas con stock
+              </Badge>
+            </div>
             <p className="text-[11px] text-muted-foreground mt-0.5">
               Visualiza existencias y faltantes por talla en cada prenda para detectar tallas rotas
             </p>
@@ -157,7 +181,7 @@ export default function SizeHeatmap({ data, allSizes }: SizeHeatmapProps) {
           </div>
         </div>
 
-        {/* Size View Mode Tabs + Legend */}
+        {/* Size View Mode Tabs + Stock Filter Toggle + Legend */}
         <div className="flex flex-wrap items-center justify-between gap-2 pt-2 text-xs">
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-[11px] text-muted-foreground font-medium mr-1 flex items-center gap-1">
@@ -182,6 +206,30 @@ export default function SizeHeatmap({ data, allSizes }: SizeHeatmapProps) {
                 {m.label}
               </button>
             ))}
+
+            {/* Toggle button to explicitly show only items with stock */}
+            <button
+              onClick={() => setOnlyWithStock(!onlyWithStock)}
+              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all ${
+                onlyWithStock || sizeMode === "active-only"
+                  ? "bg-emerald-600 text-white shadow-xs hover:bg-emerald-700"
+                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+              }`}
+              title={
+                onlyWithStock || sizeMode === "active-only"
+                  ? "Mostrando solo prendas con inventario disponible (>0)"
+                  : "Mostrando todas las prendas (incluye prendas agotadas)"
+              }
+            >
+              {onlyWithStock || sizeMode === "active-only" ? (
+                <PackageCheck className="h-3 w-3" />
+              ) : (
+                <PackageX className="h-3 w-3" />
+              )}
+              {onlyWithStock || sizeMode === "active-only"
+                ? "Solo con inventario"
+                : "Todas las prendas"}
+            </button>
           </div>
 
           {/* Color Legend */}
@@ -234,7 +282,7 @@ export default function SizeHeatmap({ data, allSizes }: SizeHeatmapProps) {
                       colSpan={displayedSizes.length + 3}
                       className="text-center py-12 text-muted-foreground text-xs"
                     >
-                      No se encontraron referencias para los filtros seleccionados
+                      No se encontraron referencias con inventario para los filtros seleccionados
                     </td>
                   </tr>
                 ) : (
@@ -292,7 +340,7 @@ export default function SizeHeatmap({ data, allSizes }: SizeHeatmapProps) {
         {filteredRows.length > pageSize && (
           <div className="p-3 border-t border-border flex items-center justify-between text-xs text-muted-foreground">
             <span>
-              Mostrando {visibleRows.length} de {filteredRows.length} referencias
+              Mostrando {visibleRows.length} de {filteredRows.length} referencias con inventario
             </span>
             <Button
               variant="outline"
@@ -308,3 +356,4 @@ export default function SizeHeatmap({ data, allSizes }: SizeHeatmapProps) {
     </Card>
   );
 }
+
