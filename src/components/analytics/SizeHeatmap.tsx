@@ -54,6 +54,15 @@ function stockBadge(total: number): { text: string; cls: string } {
   return { text: "Sobrestock", cls: "bg-indigo-600 text-white hover:bg-indigo-700" };
 }
 
+function formatCop(val: number): string {
+  if (!val || val === 0) return "-";
+  return new Intl.NumberFormat("es-CO", {
+    style: "currency",
+    currency: "COP",
+    maximumFractionDigits: 0,
+  }).format(val);
+}
+
 export default function SizeHeatmap({ data, allSizes }: SizeHeatmapProps) {
   const [search, setSearch] = useState("");
   const [sizeMode, setSizeMode] = useState<SizeViewMode>("catalog");
@@ -177,7 +186,7 @@ export default function SizeHeatmap({ data, allSizes }: SizeHeatmapProps) {
               </Badge>
             </div>
             <p className="text-[11px] text-muted-foreground mt-0.5">
-              Visualiza existencias y faltantes por talla en cada prenda para detectar tallas rotas
+              Visualiza existencias por talla, precios de fabricación (PVM), PVP detal y márgenes por prenda
             </p>
           </div>
 
@@ -290,12 +299,12 @@ export default function SizeHeatmap({ data, allSizes }: SizeHeatmapProps) {
 
       <CardContent className="p-0">
         <ScrollArea className="w-full">
-          <div className="min-w-[700px]">
+          <div className="min-w-[850px]">
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b bg-muted/30">
-                  <th className="text-left px-4 py-2.5 font-bold sticky left-0 bg-background/95 backdrop-blur-sm z-20 min-w-[200px] border-r">
-                    Referencia / Color
+                  <th className="text-left px-4 py-2.5 font-bold sticky left-0 bg-background/95 backdrop-blur-sm z-20 min-w-[220px] border-r">
+                    Referencia / Color / Precio
                   </th>
                   {displayedSizes.map((size) => (
                     <th
@@ -308,6 +317,15 @@ export default function SizeHeatmap({ data, allSizes }: SizeHeatmapProps) {
                   <th className="text-center px-3 py-2.5 font-bold min-w-[64px] bg-muted/40">
                     Total
                   </th>
+                  <th className="text-right px-3 py-2.5 font-bold min-w-[90px] text-emerald-700 dark:text-emerald-400 bg-emerald-50/50 dark:bg-emerald-950/20">
+                    Fabricación (PVM)
+                  </th>
+                  <th className="text-right px-3 py-2.5 font-bold min-w-[90px] text-violet-700 dark:text-violet-400 bg-violet-50/50 dark:bg-violet-950/20">
+                    PVP (Detal)
+                  </th>
+                  <th className="text-center px-2 py-2.5 font-bold min-w-[60px]">
+                    Margen
+                  </th>
                   <th className="text-center px-3 py-2.5 font-bold min-w-[68px]">
                     Estado
                   </th>
@@ -317,7 +335,7 @@ export default function SizeHeatmap({ data, allSizes }: SizeHeatmapProps) {
                 {visibleRows.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={displayedSizes.length + 3}
+                      colSpan={displayedSizes.length + 6}
                       className="text-center py-12 text-muted-foreground text-xs"
                     >
                       No se encontraron referencias con inventario para los filtros seleccionados
@@ -326,6 +344,8 @@ export default function SizeHeatmap({ data, allSizes }: SizeHeatmapProps) {
                 ) : (
                   visibleRows.map((row, idx) => {
                     const badge = stockBadge(row.totalStock);
+                    const marginPct =
+                      row.pvp > 0 ? ((row.pvp - row.pvm) / row.pvp) * 100 : 0;
                     return (
                       <tr
                         key={`${row.referencia}-${row.color}-${idx}`}
@@ -335,8 +355,13 @@ export default function SizeHeatmap({ data, allSizes }: SizeHeatmapProps) {
                           <div className="font-semibold text-foreground">
                             {row.referencia}
                           </div>
-                          <div className="text-[11px] text-muted-foreground truncate max-w-[190px]">
-                            {row.color || "Único"}
+                          <div className="text-[11px] text-muted-foreground truncate max-w-[210px] flex items-center justify-between gap-1">
+                            <span>{row.color || "Único"}</span>
+                            {row.pvm > 0 && (
+                              <span className="text-[10px] font-mono text-emerald-700 dark:text-emerald-400">
+                                Fab: {formatCop(row.pvm)}
+                              </span>
+                            )}
                           </div>
                         </td>
                         {displayedSizes.map((size) => {
@@ -355,6 +380,25 @@ export default function SizeHeatmap({ data, allSizes }: SizeHeatmapProps) {
                         })}
                         <td className="text-center px-3 py-2 font-bold tabular-nums bg-muted/10">
                           {row.totalStock.toLocaleString("es-CO")}
+                        </td>
+                        <td className="text-right px-3 py-2 font-mono font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-50/20 dark:bg-emerald-950/10">
+                          {formatCop(row.pvm)}
+                        </td>
+                        <td className="text-right px-3 py-2 font-mono font-medium text-violet-700 dark:text-violet-400 bg-violet-50/20 dark:bg-violet-950/10">
+                          {formatCop(row.pvp)}
+                        </td>
+                        <td className="text-center px-2 py-2">
+                          <span
+                            className={`inline-block text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                              marginPct >= 50
+                                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                                : marginPct >= 35
+                                ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                                : "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300"
+                            }`}
+                          >
+                            {marginPct > 0 ? `${marginPct.toFixed(0)}%` : "-"}
+                          </span>
                         </td>
                         <td className="text-center px-3 py-2">
                           <Badge

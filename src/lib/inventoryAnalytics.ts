@@ -162,6 +162,8 @@ export interface SizeHeatmapRow {
   color: string;
   sizes: Record<string, number>;
   totalStock: number;
+  pvm: number;
+  pvp: number;
 }
 
 export interface AnalyticsResult {
@@ -400,6 +402,8 @@ export function computeInventoryAnalytics(
         color: item.color,
         sizes: {},
         totalStock: 0,
+        pvm: item.pvm || 0,
+        pvp: item.pvp || 0,
       });
     }
     const hEntry = heatmapMap.get(heatKey)!;

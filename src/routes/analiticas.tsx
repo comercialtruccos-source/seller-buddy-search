@@ -351,7 +351,7 @@ function AnaliticasPage() {
                               {formatCurrency(ref.totalCostValue)}
                             </p>
                             <p className="text-[10px] text-muted-foreground">
-                              {ref.totalStock} uds · PVP: {formatCurrency(ref.pvp)}
+                              {ref.totalStock} uds · Fab (PVM): {formatCurrency(ref.pvm)} · PVP: {formatCurrency(ref.pvp)}
                             </p>
                           </div>
                         </div>
@@ -404,7 +404,7 @@ function AnaliticasPage() {
                               {ref.totalStock} {ref.totalStock === 1 ? "unidad" : "unidades"}
                             </Badge>
                             <p className="text-[10px] text-muted-foreground mt-0.5">
-                              PVP: {formatCurrency(ref.pvp)}
+                              Fab (PVM): {formatCurrency(ref.pvm)} · PVP: {formatCurrency(ref.pvp)}
                             </p>
                           </div>
                         </div>
