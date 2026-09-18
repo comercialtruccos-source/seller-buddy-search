@@ -288,12 +288,11 @@ function Index() {
 
   const hasActiveFilters = selectedTallas.size > 0 || selectedColores.size > 0 || selectedLineas.size > 0 || selectedBodegas.size > 0;
 
-  // Base list: search results if there's a query, otherwise all groups when filters are active
+  // Base list: search results if there's a query, otherwise all groups
   const baseList = useMemo(() => {
     if (query.trim() !== "") return results;
-    if (hasActiveFilters) return groups;
-    return [];
-  }, [query, results, groups, hasActiveFilters]);
+    return groups;
+  }, [query, results, groups]);
 
   const filteredResults = useMemo(() => {
     if (!hasActiveFilters) return baseList;
@@ -348,6 +347,16 @@ function Index() {
     }
     return out;
   }, [baseList, selectedTallas, selectedColores, selectedLineas, selectedBodegas, hasActiveFilters]);
+
+  const [visibleCount, setVisibleCount] = useState<number>(30);
+
+  useEffect(() => {
+    setVisibleCount(30);
+  }, [query, selectedTallas, selectedColores, selectedLineas, selectedBodegas]);
+
+  const visibleResults = useMemo(() => {
+    return filteredResults.slice(0, visibleCount);
+  }, [filteredResults, visibleCount]);
 
   const toggle = (set: Set<string>, value: string) => {
     const next = new Set(set);
@@ -525,38 +534,19 @@ function Index() {
 
               {hydrated &&
                 rows.length > 0 &&
-                query.trim() === "" &&
-                !hasActiveFilters && (
-                  <EmptyState
-                    icon={<Search className="h-8 w-8" />}
-                    title="Busca o filtra por talla y color"
-                    description={`${groups.length} referencias disponibles. Escribe una referencia o usa los filtros arriba.`}
-                  />
-                )}
-
-              {hydrated &&
-                rows.length > 0 &&
-                query.trim() !== "" &&
-                results.length === 0 && (
-                  <EmptyState
-                    icon={<PackageSearch className="h-8 w-8" />}
-                    title="Sin resultados"
-                    description={`No se encontró ninguna referencia que coincida con «${query}».`}
-                  />
-                )}
-
-              {hydrated &&
-                query.trim() !== "" &&
-                results.length > 0 &&
                 filteredResults.length === 0 && (
                   <EmptyState
                     icon={<PackageSearch className="h-8 w-8" />}
-                    title="Ninguna variante coincide con los filtros"
-                    description="Prueba a quitar alguna talla o color seleccionado."
+                    title="No se encontraron referencias"
+                    description={
+                      query.trim()
+                        ? `No hay ninguna referencia que coincida con «${query}».`
+                        : "No hay referencias que coincidan con los filtros seleccionados."
+                    }
                   />
                 )}
 
-              {filteredResults.map((group) => (
+              {visibleResults.map((group) => (
                 <ReferenceCard
                   key={group.referencia}
                   group={group}
@@ -565,6 +555,17 @@ function Index() {
                   onPreviewProduct={setPreviewProduct}
                 />
               ))}
+
+              {filteredResults.length > visibleCount && (
+                <div className="pt-4 pb-2 text-center">
+                  <button
+                    onClick={() => setVisibleCount((prev) => prev + 30)}
+                    className="rounded-xl bg-muted px-6 py-3 text-xs font-bold text-foreground hover:bg-muted/80 transition-colors shadow-xs"
+                  >
+                    Cargar 30 referencias más (mostrando {visibleResults.length} de {filteredResults.length})
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}
