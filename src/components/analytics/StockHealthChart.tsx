@@ -1,16 +1,19 @@
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
-import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
-import type { HealthBreakdown } from "@/lib/inventoryAnalytics";
+import { PieChart, Pie, Cell } from "recharts";
+import type { HealthBreakdown, HealthTier } from "@/lib/inventoryAnalytics";
 
 interface StockHealthChartProps {
   health: HealthBreakdown;
+  selectedTiers?: HealthTier[];
+  onSelectTier?: (tier: HealthTier) => void;
 }
 
 const HEALTH_COLORS = {
@@ -34,7 +37,11 @@ const chartConfig: ChartConfig = {
   overstock: { label: "Sobrestock (30+)", color: HEALTH_COLORS.overstock },
 };
 
-export default function StockHealthChart({ health }: StockHealthChartProps) {
+export default function StockHealthChart({
+  health,
+  selectedTiers = [],
+  onSelectTier,
+}: StockHealthChartProps) {
   const total = health.oos + health.low + health.healthy + health.overstock;
 
   const data = [
@@ -51,8 +58,18 @@ export default function StockHealthChart({ health }: StockHealthChartProps) {
 
   return (
     <Card className="border-0 shadow-sm">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-semibold">Salud del Stock</CardTitle>
+      <CardHeader className="pb-2 flex flex-row items-center justify-between">
+        <div>
+          <CardTitle className="text-sm font-semibold">Salud del Stock</CardTitle>
+          <p className="text-[10px] text-muted-foreground mt-0.5">
+            Haz clic en un segmento para filtrar todo el dashboard
+          </p>
+        </div>
+        {selectedTiers.length > 0 && (
+          <Badge variant="secondary" className="text-[9px]">
+            {selectedTiers.length} filtro
+          </Badge>
+        )}
       </CardHeader>
       <CardContent className="pb-4">
         <ChartContainer config={chartConfig} className="mx-auto h-[200px]">
@@ -66,7 +83,7 @@ export default function StockHealthChart({ health }: StockHealthChartProps) {
                       total > 0
                         ? ((Number(value) / total) * 100).toFixed(1)
                         : "0";
-                    return `${label}: ${value} SKUs (${pct}%)`;
+                    return `${label}: ${value} SKUs (${pct}%) (Clic para filtrar)`;
                   }}
                 />
               }
@@ -82,10 +99,24 @@ export default function StockHealthChart({ health }: StockHealthChartProps) {
               nameKey="name"
               strokeWidth={2}
               stroke="var(--background)"
+              className="cursor-pointer"
+              onClick={(entry) => {
+                if (entry && entry.name && onSelectTier) {
+                  onSelectTier(entry.name as HealthTier);
+                }
+              }}
             >
-              {data.map((entry) => (
-                <Cell key={entry.name} fill={entry.fill} />
-              ))}
+              {data.map((entry) => {
+                const isSelected = selectedTiers.includes(entry.name as HealthTier);
+                return (
+                  <Cell
+                    key={entry.name}
+                    fill={entry.fill}
+                    stroke={isSelected ? "#000" : "var(--background)"}
+                    strokeWidth={isSelected ? 3 : 2}
+                  />
+                );
+              })}
             </Pie>
           </PieChart>
         </ChartContainer>
@@ -96,25 +127,33 @@ export default function StockHealthChart({ health }: StockHealthChartProps) {
           <p className="text-[10px] text-muted-foreground">Óptimo</p>
         </div>
 
-        {/* Legend */}
-        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 mt-2">
+        {/* Interactive Legend */}
+        <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-2">
           {Object.entries(HEALTH_COLORS).map(([key, color]) => {
             const val = health[key as keyof HealthBreakdown];
             if (key === "orphan") return null;
             const pct = total > 0 ? ((val / total) * 100).toFixed(1) : "0";
+            const isSelected = selectedTiers.includes(key as HealthTier);
             return (
-              <div key={key} className="flex items-center gap-1.5 text-xs">
+              <button
+                key={key}
+                onClick={() => onSelectTier && onSelectTier(key as HealthTier)}
+                className={`flex items-center gap-1.5 text-xs p-1 rounded transition-all ${
+                  isSelected
+                    ? "bg-primary/10 font-bold text-foreground ring-1 ring-primary"
+                    : "hover:bg-muted text-muted-foreground"
+                }`}
+                title={`Filtrar métricas por ${HEALTH_LABELS[key]}`}
+              >
                 <div
                   className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                   style={{ backgroundColor: color }}
                 />
-                <span className="text-muted-foreground truncate">
-                  {HEALTH_LABELS[key]}
-                </span>
+                <span className="truncate">{HEALTH_LABELS[key]}</span>
                 <span className="ml-auto font-medium tabular-nums">
-                  {val} <span className="text-muted-foreground/60">({pct}%)</span>
+                  {val} <span className="opacity-60">({pct}%)</span>
                 </span>
-              </div>
+              </button>
             );
           })}
         </div>
@@ -122,3 +161,4 @@ export default function StockHealthChart({ health }: StockHealthChartProps) {
     </Card>
   );
 }
+

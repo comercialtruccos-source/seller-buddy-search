@@ -25,6 +25,7 @@ import {
   applyFilters,
   EMPTY_FILTERS,
   type AnalyticsFilterState,
+  type HealthTier,
 } from "@/lib/inventoryAnalytics";
 
 import KpiCards from "@/components/analytics/KpiCards";
@@ -148,6 +149,47 @@ function AnaliticasPage() {
     return computeInventoryAnalytics(activeRows, filteredRows);
   }, [activeRows, filteredRows]);
 
+  // Handlers for interactive chart element clicks to filter all dashboard metrics
+  const handleSelectTalla = useCallback((size: string) => {
+    setFilters((prev) => {
+      const exists = prev.selectedTallas.includes(size);
+      const nextTallas = exists
+        ? prev.selectedTallas.filter((s) => s !== size)
+        : [...prev.selectedTallas, size];
+      return { ...prev, selectedTallas: nextTallas, preset: null };
+    });
+  }, []);
+
+  const handleSelectSizeGroup = useCallback((sizes: string[]) => {
+    setFilters((prev) => {
+      const allSelected = sizes.every((s) => prev.selectedTallas.includes(s));
+      const nextTallas = allSelected
+        ? prev.selectedTallas.filter((s) => !sizes.includes(s))
+        : Array.from(new Set([...prev.selectedTallas, ...sizes]));
+      return { ...prev, selectedTallas: nextTallas, preset: null };
+    });
+  }, []);
+
+  const handleSelectHealthTier = useCallback((tier: HealthTier) => {
+    setFilters((prev) => {
+      const exists = prev.healthTiers.includes(tier);
+      const nextTiers = exists
+        ? prev.healthTiers.filter((t) => t !== tier)
+        : [...prev.healthTiers, tier];
+      return { ...prev, healthTiers: nextTiers, preset: null };
+    });
+  }, []);
+
+  const handleSelectBodega = useCallback((bodegaName: string) => {
+    setFilters((prev) => {
+      const exists = prev.selectedBodegas.includes(bodegaName);
+      const nextBodegas = exists
+        ? prev.selectedBodegas.filter((b) => b !== bodegaName)
+        : [...prev.selectedBodegas, bodegaName];
+      return { ...prev, selectedBodegas: nextBodegas, preset: null };
+    });
+  }, []);
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Toaster position="top-center" richColors />
@@ -251,9 +293,22 @@ function AnaliticasPage() {
 
             {/* Charts Grid (Donut, Warehouses, Size Curve) */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <StockHealthChart health={analytics.healthBreakdown} />
-              <WarehouseChart data={analytics.bodegaDistribution} />
-              <SizeCurveChart data={analytics.sizeCurve} />
+              <StockHealthChart
+                health={analytics.healthBreakdown}
+                selectedTiers={filters.healthTiers}
+                onSelectTier={handleSelectHealthTier}
+              />
+              <WarehouseChart
+                data={analytics.bodegaDistribution}
+                selectedBodegas={filters.selectedBodegas}
+                onSelectBodega={handleSelectBodega}
+              />
+              <SizeCurveChart
+                data={analytics.sizeCurve}
+                selectedTallas={filters.selectedTallas}
+                onSelectTalla={handleSelectTalla}
+                onSelectGroup={handleSelectSizeGroup}
+              />
             </div>
 
             {/* Strategic Action Tiers: Top Overstock vs Top Understock */}
