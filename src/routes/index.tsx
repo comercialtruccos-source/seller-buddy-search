@@ -28,7 +28,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { VoiceSearchButton } from "@/components/VoiceSearchButton";
 import { VoiceOrderAssistantModal } from "@/components/VoiceOrderAssistantModal";
-import { generateAIDAStructure, getModelSize } from "@/lib/aida";
+import { generateAIDAStructure, parseAidaFromShopifyHtml, getModelSize } from "@/lib/aida";
 
 
 import {
@@ -1033,20 +1033,24 @@ function ReferenceCard({
   }) => void;
   onPreviewProduct?: (product: ReferenceGroup) => void;
 }) {
-  // Query Shopify search suggestion API to fetch product image in live mode
+  // Query Shopify search suggestion API to fetch product image and official description in live mode
   const { data: shopifyProduct, isLoading } = useQuery({
     queryKey: ["shopifyProduct", group.referencia],
     queryFn: () => getShopifyProductImage({ data: group.referencia }),
     staleTime: 1000 * 60 * 60, // Cache for 1 hour
-    enabled: !group.imageUrl, // Only fetch if we don't have a custom image URL in inventory data
+    enabled: !!group.referencia, // Query Shopify for official product copy and details
   });
 
   const [localBodega, setLocalBodega] = useState<string | null>(null);
   const [showAida, setShowAida] = useState(true);
 
   const aidaData = useMemo(() => {
-    return group.aidaDescription || generateAIDAStructure(group.descripcion, group.referencia);
-  }, [group.aidaDescription, group.descripcion, group.referencia]);
+    if (shopifyProduct?.bodyHtml) {
+      const parsed = parseAidaFromShopifyHtml(shopifyProduct.bodyHtml, group.descripcion, group.referencia);
+      if (parsed) return parsed;
+    }
+    return generateAIDAStructure(group.descripcion, group.referencia);
+  }, [shopifyProduct?.bodyHtml, group.descripcion, group.referencia]);
 
   const copyAidaText = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -1294,6 +1298,11 @@ function ReferenceCard({
                   <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 font-bold">
                     {aidaData.archetype}
                   </span>
+                  {aidaData.isFromShopify && (
+                    <span className="text-[10px] uppercase font-semibold px-2 py-0.5 rounded bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/20">
+                      Oficial Shopify
+                    </span>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -1350,13 +1359,13 @@ function ReferenceCard({
                       <strong className="text-foreground">Ref:</strong> {group.referencia}
                     </span>
                     <span className="inline-flex items-center gap-1 bg-background/80 px-2 py-0.5 rounded border border-border">
-                      <strong className="text-foreground">Composición:</strong> Denim Confort / Algodón Premium
+                      <strong className="text-foreground">Composición:</strong> {aidaData.composicion}
                     </span>
                     <span className="inline-flex items-center gap-1 bg-background/80 px-2 py-0.5 rounded border border-border">
                       <strong className="text-foreground">Colección:</strong> Tendencias Trucco's
                     </span>
                     <span className="inline-flex items-center gap-1 bg-background/80 px-2 py-0.5 rounded border border-border">
-                      <strong className="text-foreground">Talla Modelo:</strong> Talla {getModelSize(group.referencia)}
+                      <strong className="text-foreground">Talla Modelo:</strong> Talla {aidaData.tallaModelo}
                     </span>
                   </div>
                 </div>
@@ -1787,8 +1796,12 @@ function ImageModal({
 }) {
   const [showAida, setShowAida] = useState(true);
   const aidaData = useMemo(() => {
+    if (image.descriptionHtml) {
+      const parsed = parseAidaFromShopifyHtml(image.descriptionHtml, image.description, image.refCode);
+      if (parsed) return parsed;
+    }
     return generateAIDAStructure(image.description, image.refCode);
-  }, [image.description, image.refCode]);
+  }, [image.descriptionHtml, image.description, image.refCode]);
 
   const copyAida = (e: React.MouseEvent) => {
     e.stopPropagation();
