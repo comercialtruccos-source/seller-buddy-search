@@ -48,6 +48,7 @@ export const getShopifyProductImage = createServerFn({ method: "GET" })
         ? {
             imageUrl: match.image,
             shopifyUrl: `https://truccos.com.co${match.url}`,
+            bodyHtml: match.body || undefined,
           }
         : null;
     } catch (error) {

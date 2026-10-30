@@ -1,3 +1,5 @@
+import { AIDAStructure, generateAIDAStructure } from "./aida";
+
 export interface InventoryRow {
   referencia: string;
   descripcion: string;
@@ -28,6 +30,7 @@ export interface ReferenceGroup {
   saldosPorBodega: Record<string, number>;
   variantes: VariantGroup[];
   imageUrl?: string;
+  aidaDescription?: AIDAStructure;
 }
 
 export const STORAGE_DATA_KEY = "inventario_data";
@@ -324,6 +327,7 @@ export function groupByReferencia(rows: InventoryRow[]): ReferenceGroup[] {
         existing.imageUrl = row.imageUrl;
       }
     } else {
+      const aidaDescription = generateAIDAStructure(row.descripcion, row.referencia);
       map.set(row.referencia, {
         referencia: row.referencia,
         descripcion: row.descripcion,
@@ -334,6 +338,7 @@ export function groupByReferencia(rows: InventoryRow[]): ReferenceGroup[] {
         saldosPorBodega: { [bodegaName]: row.saldo },
         variantes: [{ ...row, saldosPorBodega: { [bodegaName]: row.saldo } }],
         imageUrl: row.imageUrl,
+        aidaDescription,
       });
     }
   }
