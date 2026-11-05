@@ -11,6 +11,8 @@ export interface OrderItem {
   color: string;
   codColor: string;
   pvm: number;
+  pvp?: number;
+  precioUsd?: number;
   saldo: number;
   cantidad: number;
 }
@@ -79,7 +81,13 @@ export function addOrderItem(
       return { success: false, isLimit: true, currentQty };
     }
     const nextQty = Math.min(item.saldo, currentQty + qty);
-    const next = { ...items[idx], cantidad: nextQty };
+    const next = {
+      ...items[idx],
+      pvm: item.pvm || items[idx].pvm,
+      pvp: item.pvp ?? items[idx].pvp,
+      precioUsd: item.precioUsd ?? items[idx].precioUsd,
+      cantidad: nextQty,
+    };
     items = [...items.slice(0, idx), next, ...items.slice(idx + 1)];
     emit();
     return { success: true, isLimit: nextQty === item.saldo, currentQty: nextQty };

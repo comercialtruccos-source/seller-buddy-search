@@ -22,12 +22,16 @@ import {
   ExternalLink,
   Bot,
   Sparkles,
+  Calculator,
+  FileSpreadsheet,
+  FileText,
 } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { VoiceSearchButton } from "@/components/VoiceSearchButton";
 import { VoiceOrderAssistantModal } from "@/components/VoiceOrderAssistantModal";
+import { CotizadorModal } from "@/components/CotizadorModal";
 import { generateAIDAStructure, parseAidaFromShopifyHtml, getModelSize } from "@/lib/aida";
 
 
@@ -82,6 +86,7 @@ function Index() {
   const [query, setQuery] = useState("");
   const [hydrated, setHydrated] = useState(false);
   const [orderOpen, setOrderOpen] = useState(false);
+  const [cotizadorOpen, setCotizadorOpen] = useState(false);
   const [voiceAssistantOpen, setVoiceAssistantOpen] = useState(false);
   const [voiceCustomerName, setVoiceCustomerName] = useState("");
   const readFlag = (key: string) => {
@@ -426,6 +431,19 @@ function Index() {
             <History className="h-4 w-4" />
             Historial de Pedidos
           </button>
+          <button
+            onClick={() => setCotizadorOpen(true)}
+            className="pb-2.5 px-3 text-sm font-bold border-b-2 border-transparent text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 transition-all flex items-center gap-2 whitespace-nowrap ml-auto"
+            title="Generar cotización en COP o USD (PDF / Excel)"
+          >
+            <Calculator className="h-4 w-4" />
+            <span>Cotizador</span>
+            {orderCount > 0 && (
+              <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-extrabold text-emerald-700 dark:text-emerald-300">
+                {orderCount} uds.
+              </span>
+            )}
+          </button>
         </div>
 
 
@@ -556,6 +574,7 @@ function Index() {
                   allGroups={groups}
                   onPreviewImage={setPreviewImage}
                   onPreviewProduct={setPreviewProduct}
+                  onOpenCotizador={() => setCotizadorOpen(true)}
                 />
               ))}
 
@@ -592,6 +611,22 @@ function Index() {
         )}
 
         <button
+          onClick={() => setCotizadorOpen(true)}
+          className="flex items-center gap-2.5 rounded-full bg-emerald-600 px-5 py-3.5 text-sm font-bold text-white shadow-2xl transition-all duration-300 hover:scale-105 active:scale-95 hover:bg-emerald-700 hover:shadow-emerald-600/30"
+          aria-label="Abrir Cotizador"
+        >
+          <div className="relative">
+            <Calculator className="h-5 w-5" />
+            {orderCount > 0 && (
+              <span className="absolute -top-3.5 -right-3.5 flex h-5 w-5 items-center justify-center rounded-full bg-white text-emerald-800 text-[10px] font-extrabold shadow">
+                {orderCount}
+              </span>
+            )}
+          </div>
+          <span>Cotizador ({orderCount})</span>
+        </button>
+
+        <button
           onClick={() => setOrderOpen(true)}
           className="flex items-center gap-2.5 rounded-full bg-accent px-5 py-3.5 text-sm font-bold text-accent-foreground shadow-2xl transition-all duration-300 hover:scale-105 active:scale-95 hover:shadow-accent/25"
           aria-label="Ver pedido actual"
@@ -613,6 +648,15 @@ function Index() {
           order={order}
           onClose={() => setOrderOpen(false)}
           onOrderSaved={reloadInventory}
+          onOpenCotizador={() => setCotizadorOpen(true)}
+        />
+      )}
+
+      {cotizadorOpen && (
+        <CotizadorModal
+          open={cotizadorOpen}
+          onClose={() => setCotizadorOpen(false)}
+          inventory={rows}
         />
       )}
 
@@ -659,6 +703,7 @@ function Index() {
           allGroups={groups}
           onPreviewImage={setPreviewImage}
           onPreviewProduct={setPreviewProduct}
+          onOpenCotizador={() => setCotizadorOpen(true)}
           onClose={() => setPreviewProduct(null)}
         />
       )}
@@ -671,10 +716,12 @@ function OrderModal({
   order,
   onClose,
   onOrderSaved,
+  onOpenCotizador,
 }: {
   order: ReturnType<typeof useOrder>;
   onClose: () => void;
   onOrderSaved?: () => void;
+  onOpenCotizador?: () => void;
 }) {
   const [customerName, setCustomerName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -885,6 +932,17 @@ function OrderModal({
               </button>
             </div>
             <button
+              onClick={() => {
+                onClose();
+                onOpenCotizador?.();
+              }}
+              disabled={order.length === 0 || isSaving}
+              className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-emerald-700 transition-all disabled:opacity-40"
+            >
+              <Calculator className="h-4 w-4" />
+              Generar Cotización en COP o USD (PDF / Excel)
+            </button>
+            <button
               onClick={handleSaveToDb}
               disabled={order.length === 0 || isSaving}
               className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3 text-sm font-bold text-accent-foreground shadow-sm transition-transform hover:scale-[1.01] active:scale-95 disabled:opacity-40 disabled:hover:scale-100"
@@ -1020,6 +1078,7 @@ function ReferenceCard({
   allGroups,
   onPreviewImage,
   onPreviewProduct,
+  onOpenCotizador,
 }: {
   group: ReferenceGroup;
   allGroups?: ReferenceGroup[];
@@ -1032,6 +1091,7 @@ function ReferenceCard({
     descriptionHtml?: string;
   }) => void;
   onPreviewProduct?: (product: ReferenceGroup) => void;
+  onOpenCotizador?: () => void;
 }) {
   // Query Shopify search suggestion API to fetch product image and official description in live mode
   const { data: shopifyProduct, isLoading } = useQuery({
@@ -1051,6 +1111,37 @@ function ReferenceCard({
     }
     return generateAIDAStructure(group.descripcion, group.referencia);
   }, [shopifyProduct?.bodyHtml, group.descripcion, group.referencia]);
+
+  const addAllSizesToQuotation = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    let addedCount = 0;
+    for (const v of group.variantes) {
+      if (v.saldo > 0) {
+        addOrderItem(
+          {
+            sku: v.sku,
+            referencia: group.referencia,
+            descripcion: group.descripcion,
+            talla: v.talla,
+            color: v.color || "Sin color",
+            codColor: v.codColor,
+            pvm: group.pvm || v.pvm || 0,
+            pvp: group.pvp || v.pvp || 0,
+            precioUsd: group.precioUsd || v.precioUsd || 0,
+            saldo: v.saldo,
+          },
+          1
+        );
+        addedCount++;
+      }
+    }
+    if (addedCount > 0) {
+      toast.success(`Añadida(s) ${addedCount} variante(s) de ${group.referencia} a la cotización`);
+      onOpenCotizador?.();
+    } else {
+      toast.error(`No hay unidades disponibles para cotizar en ${group.referencia}`);
+    }
+  };
 
   const copyAidaText = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -1280,9 +1371,20 @@ function ReferenceCard({
               <h2 className="text-xl sm:text-2xl font-black text-foreground tracking-tight uppercase">
                 {group.descripcion}
               </h2>
-              <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 w-fit">
-                Fórmula A.I.D.A. Activa
-              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={addAllSizesToQuotation}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 px-2.5 py-1 text-xs font-bold text-emerald-700 dark:text-emerald-300 transition-colors shadow-sm"
+                  title="Agregar variantes disponibles y abrir Cotizador"
+                >
+                  <Calculator className="h-3 w-3" />
+                  <span>Cotizar Prenda</span>
+                </button>
+                <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 w-fit">
+                  Fórmula A.I.D.A. Activa
+                </span>
+              </div>
             </div>
 
             {/* AIDA Commercial Description - Visible by default */}
@@ -1455,7 +1557,9 @@ function ReferenceCard({
                               talla: v.talla,
                               color,
                               codColor: v.codColor,
-                              pvm: group.pvm || v.pvm,
+                              pvm: group.pvm || v.pvm || 0,
+                              pvp: group.pvp || v.pvp || 0,
+                              precioUsd: group.precioUsd || v.precioUsd || 0,
                               saldo: v.saldo,
                             });
                             if (result.success) {
@@ -1929,12 +2033,14 @@ function ProductModal({
   allGroups,
   onPreviewImage,
   onPreviewProduct,
+  onOpenCotizador,
   onClose,
 }: {
   product: ReferenceGroup;
   allGroups?: ReferenceGroup[];
   onPreviewImage?: (img: any) => void;
   onPreviewProduct?: (product: ReferenceGroup) => void;
+  onOpenCotizador?: () => void;
   onClose: () => void;
 }) {
   return (
@@ -1961,6 +2067,7 @@ function ProductModal({
               allGroups={allGroups} 
               onPreviewImage={onPreviewImage} 
               onPreviewProduct={onPreviewProduct} 
+              onOpenCotizador={onOpenCotizador}
             />
           </div>
           

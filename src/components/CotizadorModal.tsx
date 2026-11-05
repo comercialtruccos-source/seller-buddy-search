@@ -1,0 +1,500 @@
+import React, { useState, useMemo } from "react";
+import {
+  X,
+  FileSpreadsheet,
+  FileText,
+  Printer,
+  Trash2,
+  Plus,
+  Minus,
+  DollarSign,
+  Calculator,
+  User,
+  Building,
+  Sparkles,
+  Info,
+  CheckCircle2,
+  Boxes,
+} from "lucide-react";
+import { toast } from "sonner";
+import {
+  type QuotationCurrency,
+  type CopPriceType,
+  buildQuotationData,
+  downloadQuotationExcel,
+  downloadQuotationPdf,
+  openQuotationPrintView,
+} from "@/lib/quotation";
+import {
+  useOrder,
+  setOrderQty,
+  removeOrderItem,
+  clearOrder,
+  type OrderItem,
+} from "@/lib/order";
+import { formatCurrency, formatUsd, type InventoryRow } from "@/lib/inventory";
+
+interface CotizadorModalProps {
+  open: boolean;
+  onClose: () => void;
+  inventory?: InventoryRow[];
+}
+
+export function CotizadorModal({
+  open,
+  onClose,
+  inventory = [],
+}: CotizadorModalProps) {
+  const order = useOrder();
+
+  // Currency & calculation state
+  const [currency, setCurrency] = useState<QuotationCurrency>("COP");
+  const [copPriceType, setCopPriceType] = useState<CopPriceType>("PVM");
+
+  // Metadata state
+  const [customerName, setCustomerName] = useState("");
+  const [advisorName, setAdvisorName] = useState("");
+  const [notes, setNotes] = useState(
+    "Cotización válida por 15 días calendario. Sujeta a disponibilidad de inventario físico."
+  );
+
+  // Fast lookup dictionary for inventory rows
+  const inventoryLookup = useMemo(() => {
+    const map: Record<string, InventoryRow> = {};
+    for (const row of inventory) {
+      if (row.sku) {
+        map[row.sku] = row;
+      }
+    }
+    return map;
+  }, [inventory]);
+
+  // Real-time calculation of quotation data
+  const quotation = useMemo(() => {
+    return buildQuotationData(
+      order,
+      {
+        currency,
+        copPriceType,
+        customerName,
+        advisorName,
+        notes,
+      },
+      inventoryLookup
+    );
+  }, [order, currency, copPriceType, customerName, advisorName, notes, inventoryLookup]);
+
+  if (!open) return null;
+
+  const handleDownloadPdf = () => {
+    if (quotation.items.length === 0) {
+      toast.error("Debes seleccionar al menos una prenda para generar la cotización.");
+      return;
+    }
+    try {
+      downloadQuotationPdf(quotation);
+      toast.success("Archivo PDF de la cotización generado y descargado exitosamente.", {
+        duration: 3500,
+      });
+    } catch (err: any) {
+      console.error("Error generating PDF:", err);
+      toast.error("No se pudo generar el PDF. Intenta con la versión Excel o Imprimir.");
+    }
+  };
+
+  const handleDownloadExcel = () => {
+    if (quotation.items.length === 0) {
+      toast.error("Debes seleccionar al menos una prenda para generar la cotización.");
+      return;
+    }
+    try {
+      downloadQuotationExcel(quotation);
+      toast.success("Archivo Excel (.xlsx) de la cotización descargado con éxito.", {
+        duration: 3500,
+      });
+    } catch (err: any) {
+      console.error("Error generating Excel:", err);
+      toast.error("Error al exportar a Excel.");
+    }
+  };
+
+  const handlePrint = () => {
+    if (quotation.items.length === 0) {
+      toast.error("Debes seleccionar al menos una prenda para generar la cotización.");
+      return;
+    }
+    openQuotationPrintView(quotation);
+  };
+
+  return (
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 backdrop-blur-sm sm:items-center sm:p-4 animate-in fade-in duration-200"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="flex h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-t-2xl bg-card border border-border shadow-2xl sm:rounded-2xl sm:max-h-[88vh]"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-border bg-gradient-to-r from-slate-900 via-slate-800 to-emerald-950 px-6 py-4 text-white">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/20 border border-emerald-400/30 text-emerald-400">
+              <Calculator className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-black tracking-tight">Cotizador Comercial</h2>
+                <span className="rounded-full bg-emerald-500/20 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-bold text-emerald-300">
+                  Trucco's Denim
+                </span>
+              </div>
+              <p className="text-xs text-slate-300">
+                Selecciona prendas y cotiza en Pesos Colombianos (COP) o Dólares (USD)
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-lg p-2 text-slate-300 transition-colors hover:bg-white/10 hover:text-white"
+            aria-label="Cerrar Cotizador"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Content Body */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+          {/* STEP 1: Currency Selection Prompt */}
+          <div className="rounded-2xl border-2 border-emerald-500/30 bg-emerald-500/5 p-4 sm:p-5">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <DollarSign className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                <h3 className="text-xs sm:text-sm font-black uppercase tracking-wider text-foreground">
+                  1. ¿En qué moneda deseas la cotización?
+                </h3>
+              </div>
+              <span className="text-[11px] font-medium text-muted-foreground">
+                Los precios se multiplican automáticamente por las unidades
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Option: Pesos Colombianos (COP) */}
+              <div
+                onClick={() => setCurrency("COP")}
+                className={`cursor-pointer rounded-xl border-2 p-3.5 transition-all flex flex-col justify-between ${
+                  currency === "COP"
+                    ? "border-emerald-600 bg-card shadow-md ring-2 ring-emerald-500/20"
+                    : "border-border bg-card/60 hover:border-emerald-500/40 hover:bg-card"
+                }`}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">🇨🇴</span>
+                    <div>
+                      <h4 className="text-sm font-bold text-foreground">Pesos Colombianos (COP)</h4>
+                      <p className="text-[11px] text-muted-foreground">
+                        Precios oficiales en moneda local colombiana
+                      </p>
+                    </div>
+                  </div>
+                  {currency === "COP" && (
+                    <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
+                  )}
+                </div>
+
+                {currency === "COP" && (
+                  <div className="mt-3 pt-2.5 border-t border-border flex items-center gap-2">
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase">
+                      Tipo de Precio:
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCopPriceType("PVM");
+                      }}
+                      className={`px-2.5 py-1 rounded text-[11px] font-bold transition-colors ${
+                        copPriceType === "PVM"
+                          ? "bg-emerald-600 text-white"
+                          : "bg-muted text-muted-foreground hover:bg-muted/80"
+                      }`}
+                    >
+                      Mayorista (PVM)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCopPriceType("PVP");
+                      }}
+                      className={`px-2.5 py-1 rounded text-[11px] font-bold transition-colors ${
+                        copPriceType === "PVP"
+                          ? "bg-emerald-600 text-white"
+                          : "bg-muted text-muted-foreground hover:bg-muted/80"
+                      }`}
+                    >
+                      Detal (PVP)
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Option: Dólares Americanos (USD) */}
+              <div
+                onClick={() => setCurrency("USD")}
+                className={`cursor-pointer rounded-xl border-2 p-3.5 transition-all flex flex-col justify-between ${
+                  currency === "USD"
+                    ? "border-emerald-600 bg-card shadow-md ring-2 ring-emerald-500/20"
+                    : "border-border bg-card/60 hover:border-emerald-500/40 hover:bg-card"
+                }`}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">🇺🇸</span>
+                    <div>
+                      <h4 className="text-sm font-bold text-foreground">Dólares Americanos (USD)</h4>
+                      <p className="text-[11px] text-muted-foreground">
+                        Precio USD internacional configurado en la plataforma
+                      </p>
+                    </div>
+                  </div>
+                  {currency === "USD" && (
+                    <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
+                  )}
+                </div>
+
+                {currency === "USD" && (
+                  <div className="mt-3 pt-2.5 border-t border-border flex items-center justify-between">
+                    <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                      ✓ Precios en dólares asignados a cada prenda
+                    </span>
+                    <span className="text-[10px] font-mono font-bold bg-muted px-1.5 py-0.5 rounded">
+                      USD ($)
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* STEP 2: Optional Client & Advisor Information */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-2xl border border-border bg-card p-4">
+            <div>
+              <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                <Building className="h-3.5 w-3.5 text-muted-foreground" />
+                Nombre del Cliente o Empresa
+              </label>
+              <input
+                type="text"
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                placeholder="Ej. Boutique Bella Moda / María Pérez"
+                className="w-full rounded-xl border border-border bg-background px-3.5 py-2 text-sm font-semibold outline-none focus:border-accent"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                <User className="h-3.5 w-3.5 text-muted-foreground" />
+                Nombre del Asesor Comercial
+              </label>
+              <input
+                type="text"
+                value={advisorName}
+                onChange={(e) => setAdvisorName(e.target.value)}
+                placeholder="Ej. Asesor de Ventas Trucco's"
+                className="w-full rounded-xl border border-border bg-background px-3.5 py-2 text-sm font-semibold outline-none focus:border-accent"
+              />
+            </div>
+          </div>
+
+          {/* STEP 3: Garments List & Calculation Table */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Boxes className="h-4 w-4 text-primary" />
+                <h3 className="text-xs sm:text-sm font-black uppercase tracking-wider text-foreground">
+                  Prendas Seleccionadas para la Cotización ({quotation.items.length})
+                </h3>
+              </div>
+              {quotation.items.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirm("¿Deseas vaciar todas las prendas de la cotización?")) {
+                      clearOrder();
+                    }
+                  }}
+                  className="text-xs text-destructive hover:underline font-semibold flex items-center gap-1"
+                >
+                  <Trash2 className="h-3 w-3" />
+                  Vaciar lista
+                </button>
+              )}
+            </div>
+
+            {quotation.items.length === 0 ? (
+              <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-muted/20 py-12 px-4 text-center">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground mb-3">
+                  <Boxes className="h-6 w-6" />
+                </div>
+                <h4 className="text-sm font-bold text-foreground">No has seleccionado prendas aún</h4>
+                <p className="mt-1 max-w-md text-xs text-muted-foreground">
+                  Para cotizar, regresa al catálogo y agrega las prendas haciendo clic en las tallas disponibles de cada referencia.
+                </p>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="mt-4 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-colors"
+                >
+                  Ir al catálogo a seleccionar prendas
+                </button>
+              </div>
+            ) : (
+              <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b border-border bg-muted/50 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+                        <th className="py-2.5 px-3">Prenda</th>
+                        <th className="py-2.5 px-3">Color / Talla</th>
+                        <th className="py-2.5 px-3 text-center">Cant.</th>
+                        <th className="py-2.5 px-3 text-right">
+                          Precio Unit. ({currency})
+                        </th>
+                        <th className="py-2.5 px-3 text-right">
+                          Total ({currency})
+                        </th>
+                        <th className="py-2.5 px-3 text-center w-10"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {quotation.items.map((it) => (
+                        <tr key={it.sku} className="hover:bg-muted/30 transition-colors">
+                          <td className="py-2.5 px-3">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-xs font-bold text-foreground bg-primary/10 text-primary px-1.5 py-0.5 rounded">
+                                {it.referencia}
+                              </span>
+                              <span className="font-medium text-foreground truncate max-w-[200px]" title={it.descripcion}>
+                                {it.descripcion}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="py-2.5 px-3 text-muted-foreground">
+                            <span className="capitalize">{it.color}</span> · Talla {it.talla}
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => setOrderQty(it.sku, it.cantidad - 1)}
+                                className="h-6 w-6 rounded border border-border bg-background flex items-center justify-center hover:bg-muted text-muted-foreground"
+                              >
+                                <Minus className="h-3 w-3" />
+                              </button>
+                              <span className="w-7 text-center font-bold text-foreground text-xs">
+                                {it.cantidad}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setOrderQty(it.sku, it.cantidad + 1)}
+                                className="h-6 w-6 rounded border border-border bg-background flex items-center justify-center hover:bg-muted text-muted-foreground"
+                              >
+                                <Plus className="h-3 w-3" />
+                              </button>
+                            </div>
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-medium text-foreground">
+                            {it.formattedUnitPrice}
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-bold text-foreground">
+                            {it.formattedTotalPrice}
+                          </td>
+                          <td className="py-2.5 px-3 text-center">
+                            <button
+                              type="button"
+                              onClick={() => removeOrderItem(it.sku)}
+                              className="text-muted-foreground hover:text-destructive p-1 rounded transition-colors"
+                              title="Quitar prenda"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Subtotal & Summary footer of the table */}
+                <div className="bg-muted/40 p-4 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-3">
+                  <div className="text-xs text-muted-foreground">
+                    <span>
+                      Total: <strong>{quotation.totalUnits}</strong> unidades de{" "}
+                      <strong>{quotation.totalReferences}</strong> referencias
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-4 text-right">
+                    <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                      Total Cotización ({currency}):
+                    </span>
+                    <span className="text-xl font-black text-emerald-600 dark:text-emerald-400">
+                      {quotation.formattedTotal}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Footer Actions */}
+        <div className="border-t border-border bg-muted/20 px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-full sm:w-auto px-4 py-2.5 text-xs font-bold text-muted-foreground hover:text-foreground border border-border rounded-xl bg-card transition-colors"
+          >
+            Seguir seleccionando
+          </button>
+
+          <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+            <button
+              type="button"
+              onClick={handlePrint}
+              disabled={quotation.items.length === 0}
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 rounded-xl border border-border bg-card px-3.5 py-2.5 text-xs font-bold text-foreground hover:bg-muted transition-colors disabled:opacity-40"
+              title="Vista previa e impresión"
+            >
+              <Printer className="h-3.5 w-3.5 text-muted-foreground" />
+              <span>Imprimir</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDownloadExcel}
+              disabled={quotation.items.length === 0}
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-600/30 bg-emerald-600/10 px-4 py-2.5 text-xs font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-600/20 transition-all shadow-sm disabled:opacity-40"
+            >
+              <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
+              <span>Descargar Excel (.xlsx)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDownloadPdf}
+              disabled={quotation.items.length === 0}
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-emerald-700 active:scale-95 transition-all disabled:opacity-40"
+            >
+              <FileText className="h-4 w-4" />
+              <span>Descargar PDF (.pdf)</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

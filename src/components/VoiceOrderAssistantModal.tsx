@@ -116,7 +116,9 @@ export const VoiceOrderAssistantModal: React.FC<VoiceOrderAssistantModalProps> =
               talla: item.talla,
               color: item.color,
               codColor: item.codColor,
-              pvm: item.pvm,
+              pvm: item.pvm || 0,
+              pvp: item.pvp || 0,
+              precioUsd: item.precioUsd || 0,
               saldo: item.saldo,
             },
             qty
