@@ -220,6 +220,7 @@ export function downloadQuotationExcel(quotation: QuotationData): void {
 function sanitizePdf(str: string): string {
   if (!str) return "";
   return str
+    .replace(/[\r\n]+/g, " ")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/\\/g, "\\\\")
@@ -346,7 +347,7 @@ export function generateQuotationPdfBlob(quotation: QuotationData): Blob {
 
     // 4. Data Rows
     const rowsThisPage = isFirstPage ? rowsPerPageFirst : rowsPerPageNext;
-    const pageItemEnd = Math.min(totalItems, itemIndex + rowsPerPageThisPage);
+    const pageItemEnd = Math.min(totalItems, itemIndex + rowsThisPage);
     const rowHeight = 16;
 
     for (let i = itemIndex; i < pageItemEnd; i++) {
@@ -505,8 +506,9 @@ export function generateQuotationPdfBlob(quotation: QuotationData): Blob {
  */
 export function downloadQuotationPdf(quotation: QuotationData): void {
   const blob = generateQuotationPdfBlob(quotation);
-  const cleanName = quotation.customerName.replace(/[^A-Za-z0-9]/g, "_").toUpperCase();
-  const filename = `COTIZACION_${cleanName}_${quotation.currency}_${quotation.quotationNumber}.pdf`;
+  const cleanName = (quotation.customerName || "CLIENTE").replace(/[^A-Za-z0-9]/g, "_").toUpperCase();
+  const cleanNumber = (quotation.quotationNumber || "COTIZACION").replace(/[^A-Za-z0-9]/g, "_");
+  const filename = `COTIZACION_${cleanName}_${quotation.currency}_${cleanNumber}.pdf`;
 
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -515,7 +517,13 @@ export function downloadQuotationPdf(quotation: QuotationData): void {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  setTimeout(() => {
+    try {
+      URL.revokeObjectURL(url);
+    } catch {
+      // ignore
+    }
+  }, 60000);
 }
 
 /**

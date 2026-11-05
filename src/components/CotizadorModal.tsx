@@ -98,7 +98,7 @@ export function CotizadorModal({
       });
     } catch (err: any) {
       console.error("Error generating PDF:", err);
-      toast.error("No se pudo generar el PDF. Intenta con la versión Excel o Imprimir.");
+      toast.error(`No se pudo generar el PDF: ${err?.message || "error desconocido"}. Intenta con Imprimir o Excel.`);
     }
   };
 
