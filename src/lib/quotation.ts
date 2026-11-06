@@ -254,6 +254,31 @@ function escapePdf(str: string): string {
     .replace(/\)/g, "\\)");
 }
 
+/**
+ * Wraps text into lines with at most maxCharsPerLine, preserving whole words.
+ */
+function wrapTextToLines(text: string, maxCharsPerLine: number = 74): string[] {
+  if (!text) return [];
+  const rawParagraphs = text.split(/\r?\n/).map((p) => p.trim()).filter(Boolean);
+  const result: string[] = [];
+  for (const para of rawParagraphs) {
+    const cleaned = cleanText(para);
+    if (!cleaned) continue;
+    const words = cleaned.split(" ").filter(Boolean);
+    let currentLine = "";
+    for (const w of words) {
+      if ((currentLine + " " + w).trim().length <= maxCharsPerLine) {
+        currentLine = (currentLine + " " + w).trim();
+      } else {
+        if (currentLine) result.push(currentLine);
+        currentLine = w;
+      }
+    }
+    if (currentLine) result.push(currentLine);
+  }
+  return result;
+}
+
 function stringToUint8Array(str: string): Uint8Array {
   return new TextEncoder().encode(str);
 }
@@ -289,8 +314,8 @@ export function generateQuotationPdfBlob(quotation: QuotationData): Blob {
     : "COP - DETAL PVP";
 
   // Pagination planning
-  const rowsPerPageFirst = 18;
-  const rowsPerPageNext = 26;
+  const rowsPerPageFirst = 16;
+  const rowsPerPageNext = 24;
 
   const totalItems = quotation.items.length;
   let totalPages = 1;
@@ -527,26 +552,58 @@ export function generateQuotationPdfBlob(quotation: QuotationData): Blob {
     // 6. Summary Totals Cards (Last page only - STRICT SEPARATION, ZERO OVERLAPPING)
     if (isLastPage) {
       currentY -= 16;
-      const sumH = 64;
-      const leftW = 308;
-      const rightX = 356;
-      const rightW = 220;
+      const sumH = 86;
+      const rightW = 195;
+      const leftW = usableWidth - rightW - 12; // 540 - 195 - 12 = 333 pt (spacious and clear)
+      const rightX = marginLeft + leftW + 12; // 381 pt
 
       s += "q\n";
-      // Left Card: Observaciones & Términos
+      // Left Card: Observaciones & Términos (Expanded block, wraps text without cutting words)
       s += "0.98 0.98 0.99 rg\n";
-      s += "0.86 0.86 0.89 RG 0.6 w\n";
+      s += "0.84 0.85 0.88 RG 0.6 w\n";
       s += `${marginLeft} ${currentY - sumH} ${leftW} ${sumH} re b\n`;
 
-      s += "0.25 0.25 0.30 rg\n";
-      s += `BT /F2 7 Tf ${marginLeft + 10} ${currentY - 14} Td (OBSERVACIONES Y CONDICIONES COMERCIALES) Tj ET\n`;
+      s += "0.20 0.25 0.35 rg\n";
+      s += `BT /F2 7.2 Tf ${marginLeft + 10} ${currentY - 14} Td (OBSERVACIONES Y CONDICIONES COMERCIALES) Tj ET\n`;
 
-      s += "0.45 0.45 0.50 rg\n";
-      const notesClean = escapePdf(quotation.notes);
-      const notesDisplay = notesClean.length > 55 ? notesClean.substring(0, 53) + ".." : notesClean;
-      s += `BT /F1 6.8 Tf ${marginLeft + 10} ${currentY - 26} Td (* ${notesDisplay}) Tj ET\n`;
-      s += `BT /F1 6.8 Tf ${marginLeft + 10} ${currentY - 37} Td (* Precios y unidades sujetos a rotacion fisica de inventario.) Tj ET\n`;
-      s += `BT /F1 6.8 Tf ${marginLeft + 10} ${currentY - 48} Td (* Calculo comercial: Unidades multiplicadas por el valor en ${quotation.currency}.) Tj ET\n`;
+      s += "0.42 0.44 0.48 rg\n";
+      const noteLines = wrapTextToLines(quotation.notes, 74);
+      let lineY = currentY - 26;
+      const stepY = 11;
+      let linesDrawn = 0;
+      const maxLines = 5;
+
+      // Render user notes / comments without truncating
+      if (noteLines.length > 0) {
+        for (let i = 0; i < noteLines.length && linesDrawn < 3; i++) {
+          const prefix = i === 0 ? "* " : "  ";
+          const safeLine = escapePdf(noteLines[i]);
+          s += `BT /F1 6.8 Tf ${marginLeft + 10} ${lineY} Td (${prefix}${safeLine}) Tj ET\n`;
+          lineY -= stepY;
+          linesDrawn++;
+        }
+      }
+
+      // If note was brief, add explicit calendar validity line
+      if (linesDrawn <= 1) {
+        s += `BT /F1 6.8 Tf ${marginLeft + 10} ${lineY} Td (* Cotizacion valida por 15 dias calendario a partir de su emision.) Tj ET\n`;
+        lineY -= stepY;
+        linesDrawn++;
+      }
+
+      // Standard inventory condition
+      if (linesDrawn < maxLines) {
+        s += `BT /F1 6.8 Tf ${marginLeft + 10} ${lineY} Td (* Precios y unidades sujetos a rotacion fisica de inventario.) Tj ET\n`;
+        lineY -= stepY;
+        linesDrawn++;
+      }
+
+      // Calculation rule
+      if (linesDrawn < maxLines) {
+        s += `BT /F1 6.8 Tf ${marginLeft + 10} ${lineY} Td (* Calculo comercial: Unidades multiplicadas por el valor en ${quotation.currency}.) Tj ET\n`;
+        lineY -= stepY;
+        linesDrawn++;
+      }
 
       // Right Card: Luxury Noir Card (#0B0B0B) with Slate Gray Accent
       s += "0.05 0.05 0.06 rg\n"; // Deep Noir #0D0D10
@@ -558,32 +615,32 @@ export function generateQuotationPdfBlob(quotation: QuotationData): Blob {
 
       // Row 1: Unidades
       s += "0.75 0.75 0.80 rg\n";
-      s += `BT /F1 7.5 Tf ${rightX + 12} ${currentY - 17} Td (UNIDADES SELECCIONADAS:) Tj ET\n`;
+      s += `BT /F1 7.5 Tf ${rightX + 12} ${currentY - 18} Td (UNIDADES SELECCIONADAS:) Tj ET\n`;
       s += "1 1 1 rg\n";
       const unitsStr = `${quotation.totalUnits} uds.`;
       const unitsX = rightX + rightW - 12 - unitsStr.length * 4.8;
-      s += `BT /F2 8.5 Tf ${unitsX} ${currentY - 17} Td (${unitsStr}) Tj ET\n`;
+      s += `BT /F2 8.5 Tf ${unitsX} ${currentY - 18} Td (${unitsStr}) Tj ET\n`;
 
       // Row 2: Referencias
       s += "0.75 0.75 0.80 rg\n";
-      s += `BT /F1 7.5 Tf ${rightX + 12} ${currentY - 29} Td (TOTAL MODELOS / REFS:) Tj ET\n`;
+      s += `BT /F1 7.5 Tf ${rightX + 12} ${currentY - 32} Td (TOTAL MODELOS / REFS:) Tj ET\n`;
       s += "1 1 1 rg\n";
       const refsStr = `${quotation.totalReferences} modelos`;
       const refsX = rightX + rightW - 12 - refsStr.length * 4.8;
-      s += `BT /F2 8.5 Tf ${refsX} ${currentY - 29} Td (${refsStr}) Tj ET\n`;
+      s += `BT /F2 8.5 Tf ${refsX} ${currentY - 32} Td (${refsStr}) Tj ET\n`;
 
       // Hairline divider in card
       s += "0.20 0.20 0.25 RG 0.5 w\n";
-      s += `${rightX + 12} ${currentY - 35} m ${rightX + rightW - 12} ${currentY - 35} l S\n`;
+      s += `${rightX + 12} ${currentY - 44} m ${rightX + rightW - 12} ${currentY - 44} l S\n`;
 
       // Row 3: Grand Total
       s += "0.90 0.90 0.95 rg\n";
-      s += `BT /F2 8.5 Tf ${rightX + 12} ${currentY - 50} Td (TOTAL COTIZACION:) Tj ET\n`;
+      s += `BT /F2 8.5 Tf ${rightX + 12} ${currentY - 63} Td (TOTAL COTIZACION:) Tj ET\n`;
 
       s += "1 1 1 rg\n"; // Crisp pure white amount
       const totGrandStr = escapePdf(quotation.formattedTotal);
-      const totGrandX = rightX + rightW - 12 - totGrandStr.length * 7.2;
-      s += `BT /F2 13 Tf ${totGrandX} ${currentY - 51} Td (${totGrandStr}) Tj ET\n`;
+      const totGrandX = rightX + rightW - 12 - totGrandStr.length * 7.5;
+      s += `BT /F2 13.5 Tf ${totGrandX} ${currentY - 64} Td (${totGrandStr}) Tj ET\n`;
       s += "Q\n";
     }
 
@@ -871,29 +928,30 @@ export function openQuotationPrintView(quotation: QuotationData): void {
       .summary-wrap {
         margin-top: 20px;
         display: grid;
-        grid-template-columns: 1.4fr 1fr;
+        grid-template-columns: 1.65fr 1fr;
         gap: 16px;
         align-items: stretch;
       }
       .obs-card {
         border: 1px solid #e5e7eb;
         border-radius: 6px;
-        padding: 12px 16px;
+        padding: 14px 18px;
         background: #f8f9fa;
       }
       .obs-card h4 {
         margin: 0 0 8px 0;
-        font-size: 10.5px;
+        font-size: 11px;
         font-weight: 700;
         text-transform: uppercase;
         color: #374151;
         letter-spacing: 0.5px;
       }
       .obs-card p {
-        margin: 3px 0;
-        font-size: 10px;
-        color: #6b7280;
-        line-height: 1.4;
+        margin: 4px 0;
+        font-size: 10.5px;
+        color: #4b5563;
+        line-height: 1.45;
+        white-space: pre-wrap;
       }
       .total-card {
         background: #0b0b0b;

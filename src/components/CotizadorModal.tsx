@@ -15,6 +15,7 @@ import {
   Info,
   CheckCircle2,
   Boxes,
+  MessageSquareText,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -309,7 +310,27 @@ export function CotizadorModal({
             </div>
           </div>
 
-          {/* STEP 3: Garments List & Calculation Table */}
+          {/* STEP 3: Observaciones y Comentarios de la Cotización */}
+          <div className="rounded-2xl border border-border bg-card p-4 space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                <MessageSquareText className="h-3.5 w-3.5 text-muted-foreground" />
+                Observaciones y Comentarios de la Cotización
+              </label>
+              <span className="text-[11px] text-muted-foreground hidden sm:inline">
+                Se incluirán en el PDF, Excel y vista de impresión
+              </span>
+            </div>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={2}
+              placeholder="Ej: Cotización válida por 15 días calendario. Sujeta a disponibilidad de inventario físico en bodega. Entrega en 3 días hábiles."
+              className="w-full rounded-xl border border-border bg-background px-3.5 py-2.5 text-xs font-medium text-foreground outline-none focus:border-accent resize-none placeholder:text-muted-foreground/60 transition-colors"
+            />
+          </div>
+
+          {/* STEP 4: Garments List & Calculation Table */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
