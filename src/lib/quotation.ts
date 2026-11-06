@@ -309,9 +309,9 @@ export function generateQuotationPdfBlob(quotation: QuotationData): Blob {
     const isLastPage = pageNum === totalPages;
     let s = "";
 
-    // 1. Top Brand Accent Line (Trucco's Red #D02E2E)
+    // 1. Top Brand Accent Line (Slate Gray #475569)
     s += "q\n";
-    s += "0.816 0.180 0.180 rg\n";
+    s += "0.30 0.35 0.42 rg\n";
     s += `${marginLeft} ${pageHeight - 34} ${usableWidth} 3.5 re f\n`;
     s += "Q\n";
 
@@ -332,10 +332,10 @@ export function generateQuotationPdfBlob(quotation: QuotationData): Blob {
     s += "0.04 0.04 0.04 rg\n"; // Deep Noir #0B0B0B
     s += `BT /F2 17 Tf ${textStartX} ${pageHeight - 56} Td (TRUCCO'S JEANS) Tj ET\n`;
 
-    s += "0.816 0.180 0.180 rg\n"; // Trucco's Red Subtitle
+    s += "0.35 0.40 0.48 rg\n"; // Slate Gray Subtitle
     s += `BT /F2 7.5 Tf ${textStartX} ${pageHeight - 69} Td (COMERCIAL TRUCCOS S.A.S.  |  NIT 900.228.614-1) Tj ET\n`;
 
-    s += "0.40 0.40 0.40 rg\n"; // Address and web
+    s += "0.45 0.45 0.50 rg\n"; // Address and web
     s += `BT /F1 7 Tf ${textStartX} ${pageHeight - 80} Td (Cra 56 # 46-49 Ed. Pompano Of. 901 Medellin  *  www.truccos.com.co) Tj ET\n`;
 
     // Right Header Badge Card (Folio & Date)
@@ -348,8 +348,8 @@ export function generateQuotationPdfBlob(quotation: QuotationData): Blob {
     s += "0.85 0.85 0.88 RG 0.6 w\n";
     s += `${badgeX} ${badgeY} ${badgeW} ${badgeH} re b\n`;
 
-    // Trucco's Red Accent Stripe on card
-    s += "0.816 0.180 0.180 rg\n";
+    // Slate Gray Accent Stripe on card
+    s += "0.30 0.35 0.42 rg\n";
     s += `${badgeX} ${badgeY + badgeH - 3} ${badgeW} 3 re f\n`;
 
     s += "0.04 0.04 0.04 rg\n";
@@ -402,12 +402,12 @@ export function generateQuotationPdfBlob(quotation: QuotationData): Blob {
       const displayAdvisor = advisorText.length > 34 ? advisorText.substring(0, 32) + ".." : advisorText;
       s += `BT /F2 8 Tf ${marginLeft + 46} ${currentY - 42} Td (${displayAdvisor}) Tj ET\n`;
 
-      // Right Card: Commercial Conditions (Trucco's Red luxury accent)
-      s += "1.0 0.98 0.98 rg\n"; // Warm light rose background
-      s += "0.95 0.75 0.75 RG 0.6 w\n"; // Soft red border
+      // Right Card: Commercial Conditions (Sophisticated Gray Accent)
+      s += "0.965 0.972 0.982 rg\n"; // Soft clean gray background
+      s += "0.80 0.83 0.88 RG 0.6 w\n"; // Sleek gray border
       s += `${rightX} ${currentY - cardH} ${rightW} ${cardH} re b\n`;
 
-      s += "0.816 0.180 0.180 rg\n"; // Trucco's Red Title
+      s += "0.20 0.25 0.35 rg\n"; // Dark Slate Gray Title
       s += `BT /F2 7.5 Tf ${rightX + 10} ${currentY - 14} Td (CONDICIONES COMERCIALES) Tj ET\n`;
 
       s += "0.40 0.40 0.45 rg\n";
@@ -417,14 +417,14 @@ export function generateQuotationPdfBlob(quotation: QuotationData): Blob {
 
       s += "0.40 0.40 0.45 rg\n";
       s += `BT /F1 7.5 Tf ${rightX + 10} ${currentY - 42} Td (Resumen:) Tj ET\n`;
-      s += "0.816 0.180 0.180 rg\n";
+      s += "0.20 0.25 0.35 rg\n";
       s += `BT /F2 8 Tf ${rightX + 50} ${currentY - 42} Td (${quotation.totalReferences} refs  *  ${quotation.totalUnits} unidades en total) Tj ET\n`;
       s += "Q\n";
 
       currentY -= cardH + 12;
     }
 
-    // 4. Products Table Headers (Deep Noir #0D0D10 with subtle red underline)
+    // 4. Products Table Headers (Deep Noir #0D0D10 with subtle slate gray underline)
     const colX = {
       num: 36, // w: 22 -> 58
       ref: 58, // w: 74 -> 132
@@ -441,8 +441,8 @@ export function generateQuotationPdfBlob(quotation: QuotationData): Blob {
     s += "0.05 0.05 0.06 rg\n"; // Deep Noir #0D0D10
     s += `${marginLeft} ${currentY - headerH} ${usableWidth} ${headerH} re f\n`;
 
-    // Red accent line under table header
-    s += "0.816 0.180 0.180 rg\n";
+    // Slate Gray accent line under table header
+    s += "0.35 0.40 0.48 rg\n";
     s += `${marginLeft} ${currentY - headerH} ${usableWidth} 1.5 re f\n`;
 
     s += "1 1 1 rg\n";
@@ -548,12 +548,12 @@ export function generateQuotationPdfBlob(quotation: QuotationData): Blob {
       s += `BT /F1 6.8 Tf ${marginLeft + 10} ${currentY - 37} Td (* Precios y unidades sujetos a rotacion fisica de inventario.) Tj ET\n`;
       s += `BT /F1 6.8 Tf ${marginLeft + 10} ${currentY - 48} Td (* Calculo comercial: Unidades multiplicadas por el valor en ${quotation.currency}.) Tj ET\n`;
 
-      // Right Card: Luxury Noir Card (#0B0B0B) with Trucco's Red Accent
+      // Right Card: Luxury Noir Card (#0B0B0B) with Slate Gray Accent
       s += "0.05 0.05 0.06 rg\n"; // Deep Noir #0D0D10
       s += `${rightX} ${currentY - sumH} ${rightW} ${sumH} re f\n`;
 
-      // Top Red Stripe on total card
-      s += "0.816 0.180 0.180 rg\n"; // Trucco's Red
+      // Top Slate Gray Stripe on total card
+      s += "0.45 0.50 0.58 rg\n"; // Slate Gray
       s += `${rightX} ${currentY - 3} ${rightW} 3 re f\n`;
 
       // Row 1: Unidades
@@ -754,7 +754,7 @@ export function openQuotationPrintView(quotation: QuotationData): void {
       }
       .brand-accent {
         height: 4px;
-        background: #d02e2e;
+        background: #475569;
         border-radius: 2px;
         margin-bottom: 16px;
       }
@@ -786,7 +786,7 @@ export function openQuotationPrintView(quotation: QuotationData): void {
         margin: 3px 0 2px 0;
         font-size: 11px;
         font-weight: 700;
-        color: #d02e2e;
+        color: #475569;
         letter-spacing: 0.5px;
       }
       .brand-title .address {
@@ -796,7 +796,7 @@ export function openQuotationPrintView(quotation: QuotationData): void {
       }
       .folio-card {
         border: 1px solid #e5e7eb;
-        border-top: 3px solid #d02e2e;
+        border-top: 3px solid #475569;
         border-radius: 6px;
         padding: 10px 14px;
         background: #f8f9fa;
@@ -831,8 +831,8 @@ export function openQuotationPrintView(quotation: QuotationData): void {
         background: #f8f9fa;
       }
       .info-box.highlight {
-        background: #fff5f5;
-        border-color: #fecaca;
+        background: #f8fafc;
+        border-color: #cbd5e1;
       }
       .info-box h3 {
         margin: 0 0 8px 0;
@@ -843,7 +843,7 @@ export function openQuotationPrintView(quotation: QuotationData): void {
         color: #0b0b0b;
       }
       .info-box.highlight h3 {
-        color: #d02e2e;
+        color: #334155;
       }
       .info-box p {
         margin: 3px 0;
@@ -866,7 +866,7 @@ export function openQuotationPrintView(quotation: QuotationData): void {
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.5px;
-        border-bottom: 2px solid #d02e2e;
+        border-bottom: 2px solid #475569;
       }
       .summary-wrap {
         margin-top: 20px;
@@ -897,7 +897,7 @@ export function openQuotationPrintView(quotation: QuotationData): void {
       }
       .total-card {
         background: #0b0b0b;
-        border-top: 3px solid #d02e2e;
+        border-top: 3px solid #64748b;
         color: #ffffff;
         padding: 14px 18px;
         border-radius: 6px;
@@ -954,7 +954,7 @@ export function openQuotationPrintView(quotation: QuotationData): void {
   </head>
   <body>
     <div class="no-print" style="margin-bottom: 20px; display: flex; gap: 10px;">
-      <button onclick="window.print()" style="background: #d02e2e; color: white; border: none; padding: 10px 22px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px;">
+      <button onclick="window.print()" style="background: #0f172a; color: white; border: none; padding: 10px 22px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px;">
         🖨️ Imprimir Cotización
       </button>
       <button onclick="window.close()" style="background: #f3f4f6; color: #1f2937; border: 1px solid #d1d5db; padding: 10px 16px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px;">

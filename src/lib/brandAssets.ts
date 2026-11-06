@@ -10,13 +10,14 @@ export const TRUCCOS_BRAND_INFO = {
   website: "www.truccos.com.co",
   phone: "(+57) 314 865 1454 · PBX: (604) 448 01 23",
   email: "info@truccosjeans.com",
-  // Brand colors from truccos.com.co
+  // Brand colors (Monochrome Luxury Palette: Deep Noir & Slate Gray)
   colors: {
     noir: "#0B0B0B",
-    red: "#D02E2E",
-    redDark: "#B91C1C",
-    redLight: "#FFF5F5",
-    redBorder: "#FECACA",
+    grayAccent: "#4B5563",
+    grayDark: "#374151",
+    grayMedium: "#6B7280",
+    grayLight: "#F3F4F6",
+    grayBorder: "#D1D5DB",
     border: "#E5E7EB",
     bgCard: "#F8F9FA",
     textMuted: "#6B7280",
