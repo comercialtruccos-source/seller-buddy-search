@@ -136,26 +136,26 @@ export function CotizadorModal({
         className="flex h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-t-2xl bg-card border border-border shadow-2xl sm:rounded-2xl sm:max-h-[88vh]"
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-border bg-gradient-to-r from-slate-900 via-slate-800 to-emerald-950 px-6 py-4 text-white">
+        <div className="flex items-center justify-between border-b border-border bg-gradient-to-r from-neutral-950 via-neutral-900 to-red-950 px-6 py-4 text-white">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/20 border border-emerald-400/30 text-emerald-400">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/20 border border-red-400/30 text-red-400">
               <Calculator className="h-5 w-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-lg font-black tracking-tight">Cotizador Comercial</h2>
-                <span className="rounded-full bg-emerald-500/20 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-bold text-emerald-300">
-                  Trucco's Denim
+                <span className="rounded-full bg-red-500/20 border border-red-500/30 px-2.5 py-0.5 text-[10px] font-bold text-red-300 tracking-wider">
+                  Trucco's Jeans
                 </span>
               </div>
-              <p className="text-xs text-slate-300">
+              <p className="text-xs text-neutral-300">
                 Selecciona prendas y cotiza en Pesos Colombianos (COP) o Dólares (USD)
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-2 text-slate-300 transition-colors hover:bg-white/10 hover:text-white"
+            className="rounded-lg p-2 text-neutral-300 transition-colors hover:bg-white/10 hover:text-white"
             aria-label="Cerrar Cotizador"
           >
             <X className="h-5 w-5" />
@@ -165,10 +165,10 @@ export function CotizadorModal({
         {/* Content Body */}
         <div className="flex-1 overflow-y-auto p-5 space-y-5">
           {/* STEP 1: Currency Selection Prompt */}
-          <div className="rounded-2xl border-2 border-emerald-500/30 bg-emerald-500/5 p-4 sm:p-5">
+          <div className="rounded-2xl border-2 border-red-500/30 bg-red-500/5 p-4 sm:p-5">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <DollarSign className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                <DollarSign className="h-4 w-4 text-red-600 dark:text-red-400" />
                 <h3 className="text-xs sm:text-sm font-black uppercase tracking-wider text-foreground">
                   1. ¿En qué moneda deseas la cotización?
                 </h3>
@@ -184,8 +184,8 @@ export function CotizadorModal({
                 onClick={() => setCurrency("COP")}
                 className={`cursor-pointer rounded-xl border-2 p-3.5 transition-all flex flex-col justify-between ${
                   currency === "COP"
-                    ? "border-emerald-600 bg-card shadow-md ring-2 ring-emerald-500/20"
-                    : "border-border bg-card/60 hover:border-emerald-500/40 hover:bg-card"
+                    ? "border-red-600 bg-card shadow-md ring-2 ring-red-500/20"
+                    : "border-border bg-card/60 hover:border-red-500/40 hover:bg-card"
                 }`}
               >
                 <div className="flex items-start justify-between">
@@ -199,7 +199,7 @@ export function CotizadorModal({
                     </div>
                   </div>
                   {currency === "COP" && (
-                    <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
+                    <CheckCircle2 className="h-5 w-5 text-red-600 shrink-0" />
                   )}
                 </div>
 
@@ -216,7 +216,7 @@ export function CotizadorModal({
                       }}
                       className={`px-2.5 py-1 rounded text-[11px] font-bold transition-colors ${
                         copPriceType === "PVM"
-                          ? "bg-emerald-600 text-white"
+                          ? "bg-red-600 text-white"
                           : "bg-muted text-muted-foreground hover:bg-muted/80"
                       }`}
                     >
@@ -230,7 +230,7 @@ export function CotizadorModal({
                       }}
                       className={`px-2.5 py-1 rounded text-[11px] font-bold transition-colors ${
                         copPriceType === "PVP"
-                          ? "bg-emerald-600 text-white"
+                          ? "bg-red-600 text-white"
                           : "bg-muted text-muted-foreground hover:bg-muted/80"
                       }`}
                     >
@@ -245,8 +245,8 @@ export function CotizadorModal({
                 onClick={() => setCurrency("USD")}
                 className={`cursor-pointer rounded-xl border-2 p-3.5 transition-all flex flex-col justify-between ${
                   currency === "USD"
-                    ? "border-emerald-600 bg-card shadow-md ring-2 ring-emerald-500/20"
-                    : "border-border bg-card/60 hover:border-emerald-500/40 hover:bg-card"
+                    ? "border-red-600 bg-card shadow-md ring-2 ring-red-500/20"
+                    : "border-border bg-card/60 hover:border-red-500/40 hover:bg-card"
                 }`}
               >
                 <div className="flex items-start justify-between">
@@ -260,13 +260,13 @@ export function CotizadorModal({
                     </div>
                   </div>
                   {currency === "USD" && (
-                    <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
+                    <CheckCircle2 className="h-5 w-5 text-red-600 shrink-0" />
                   )}
                 </div>
 
                 {currency === "USD" && (
                   <div className="mt-3 pt-2.5 border-t border-border flex items-center justify-between">
-                    <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                    <span className="text-[10px] font-semibold text-red-600 dark:text-red-400">
                       ✓ Precios en dólares asignados a cada prenda
                     </span>
                     <span className="text-[10px] font-mono font-bold bg-muted px-1.5 py-0.5 rounded">
@@ -432,7 +432,7 @@ export function CotizadorModal({
                 <div className="bg-muted/40 p-4 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-3">
                   <div className="text-xs text-muted-foreground">
                     <span>
-                      Total: <strong>{quotation.totalUnits}</strong> unidades de{" "}
+                      Total: <strong>{quotation.totalUnits}</strong> prendas de{" "}
                       <strong>{quotation.totalReferences}</strong> referencias
                     </span>
                   </div>
@@ -441,7 +441,7 @@ export function CotizadorModal({
                     <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
                       Total Cotización ({currency}):
                     </span>
-                    <span className="text-xl font-black text-emerald-600 dark:text-emerald-400">
+                    <span className="text-xl font-black text-red-600 dark:text-red-400">
                       {quotation.formattedTotal}
                     </span>
                   </div>
@@ -477,7 +477,7 @@ export function CotizadorModal({
               type="button"
               onClick={handleDownloadExcel}
               disabled={quotation.items.length === 0}
-              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-600/30 bg-emerald-600/10 px-4 py-2.5 text-xs font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-600/20 transition-all shadow-sm disabled:opacity-40"
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-card px-4 py-2.5 text-xs font-bold text-foreground hover:bg-muted transition-all shadow-sm disabled:opacity-40"
             >
               <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
               <span>Descargar Excel (.xlsx)</span>
@@ -487,7 +487,7 @@ export function CotizadorModal({
               type="button"
               onClick={handleDownloadPdf}
               disabled={quotation.items.length === 0}
-              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-emerald-700 active:scale-95 transition-all disabled:opacity-40"
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-red-700 active:scale-95 transition-all disabled:opacity-40"
             >
               <FileText className="h-4 w-4" />
               <span>Descargar PDF (.pdf)</span>
