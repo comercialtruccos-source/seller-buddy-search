@@ -32,7 +32,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { VoiceSearchButton } from "@/components/VoiceSearchButton";
 import { VoiceOrderAssistantModal } from "@/components/VoiceOrderAssistantModal";
 import { CotizadorModal } from "@/components/CotizadorModal";
-import { generateAIDAStructure, parseAidaFromShopifyHtml, getModelSize } from "@/lib/aida";
 
 
 import {
@@ -1102,15 +1101,6 @@ function ReferenceCard({
   });
 
   const [localBodega, setLocalBodega] = useState<string | null>(null);
-  const [showAida, setShowAida] = useState(true);
-
-  const aidaData = useMemo(() => {
-    if (shopifyProduct?.bodyHtml) {
-      const parsed = parseAidaFromShopifyHtml(shopifyProduct.bodyHtml, group.descripcion, group.referencia);
-      if (parsed) return parsed;
-    }
-    return generateAIDAStructure(group.descripcion, group.referencia);
-  }, [shopifyProduct?.bodyHtml, group.descripcion, group.referencia]);
 
   const addAllSizesToQuotation = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -1141,12 +1131,6 @@ function ReferenceCard({
     } else {
       toast.error(`No hay unidades disponibles para cotizar en ${group.referencia}`);
     }
-  };
-
-  const copyAidaText = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    navigator.clipboard.writeText(aidaData.fullText);
-    toast.success("Descripción AIDA copiada para compartir", { duration: 2500 });
   };
 
   const imageUrl = group.imageUrl || shopifyProduct?.imageUrl;
@@ -1309,7 +1293,7 @@ function ReferenceCard({
                   description: group.descripcion,
                   refCode: group.referencia,
                   shopifyUrl: shopifyUrl || undefined,
-                  descriptionHtml: shopifyProduct?.bodyHtml || aidaData.fullHTML,
+                  descriptionHtml: shopifyProduct?.bodyHtml || undefined,
                 });
               }
             }}
@@ -1375,103 +1359,13 @@ function ReferenceCard({
                 <button
                   type="button"
                   onClick={addAllSizesToQuotation}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 px-2.5 py-1 text-xs font-bold text-emerald-700 dark:text-emerald-300 transition-colors shadow-sm"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card hover:bg-muted px-2.5 py-1 text-xs font-bold text-foreground transition-colors shadow-sm"
                   title="Agregar variantes disponibles y abrir Cotizador"
                 >
-                  <Calculator className="h-3 w-3" />
+                  <Calculator className="h-3.5 w-3.5 text-muted-foreground" />
                   <span>Cotizar Prenda</span>
                 </button>
-                <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 w-fit">
-                  Fórmula A.I.D.A. Activa
-                </span>
               </div>
-            </div>
-
-            {/* AIDA Commercial Description - Visible by default */}
-            <div className="mt-3 rounded-2xl border border-emerald-500/25 bg-gradient-to-br from-emerald-500/5 via-card to-card p-4 text-xs shadow-sm space-y-3">
-              <div className="flex items-center justify-between pb-2 border-b border-emerald-500/15">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white text-[10px] font-bold shadow-sm">
-                    ✓
-                  </span>
-                  <span className="font-bold text-emerald-950 dark:text-emerald-200 uppercase tracking-wide text-xs">
-                    Descripción Comercial A.I.D.A.
-                  </span>
-                  <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 font-bold">
-                    {aidaData.archetype}
-                  </span>
-                  {aidaData.isFromShopify && (
-                    <span className="text-[10px] uppercase font-semibold px-2 py-0.5 rounded bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/20">
-                      Oficial Shopify
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={copyAidaText}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 px-2.5 py-1 text-xs font-bold text-emerald-700 dark:text-emerald-300 transition-colors shadow-sm"
-                    title="Copiar texto AIDA para WhatsApp o clientes"
-                  >
-                    <Copy className="h-3 w-3" />
-                    <span>Copiar A.I.D.A</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowAida(!showAida)}
-                    className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2 py-1 text-xs text-muted-foreground hover:bg-muted transition-colors"
-                    title={showAida ? "Contraer descripción" : "Expandir descripción"}
-                  >
-                    <span className="text-[11px]">{showAida ? "Contraer" : "Expandir"}</span>
-                    <ChevronDown className={`h-3 w-3 transition-transform ${showAida ? "rotate-180" : ""}`} />
-                  </button>
-                </div>
-              </div>
-
-              {showAida && (
-                <div className="space-y-2 text-xs leading-relaxed text-foreground animate-in fade-in duration-200">
-                  <p>
-                    <strong className="inline-block px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 font-bold text-[10px] uppercase mr-1.5 tracking-wide">
-                      A · Atención
-                    </strong>
-                    {aidaData.atencion}
-                  </p>
-                  <p>
-                    <strong className="inline-block px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-800 dark:text-blue-300 font-bold text-[10px] uppercase mr-1.5 tracking-wide">
-                      I · Interés
-                    </strong>
-                    {aidaData.interes}
-                  </p>
-                  <p>
-                    <strong className="inline-block px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-800 dark:text-purple-300 font-bold text-[10px] uppercase mr-1.5 tracking-wide">
-                      D · Deseo
-                    </strong>
-                    {aidaData.deseo}
-                  </p>
-                  <p>
-                    <strong className="inline-block px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-800 dark:text-amber-300 font-bold text-[10px] uppercase mr-1.5 tracking-wide">
-                      A · Acción
-                    </strong>
-                    {aidaData.accion}
-                  </p>
-
-                  <div className="pt-2 border-t border-emerald-500/15 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
-                    <span className="inline-flex items-center gap-1 bg-background/80 px-2 py-0.5 rounded border border-border">
-                      <strong className="text-foreground">Ref:</strong> {group.referencia}
-                    </span>
-                    <span className="inline-flex items-center gap-1 bg-background/80 px-2 py-0.5 rounded border border-border">
-                      <strong className="text-foreground">Composición:</strong> {aidaData.composicion}
-                    </span>
-                    <span className="inline-flex items-center gap-1 bg-background/80 px-2 py-0.5 rounded border border-border">
-                      <strong className="text-foreground">Colección:</strong> Tendencias Trucco's
-                    </span>
-                    <span className="inline-flex items-center gap-1 bg-background/80 px-2 py-0.5 rounded border border-border">
-                      <strong className="text-foreground">Talla Modelo:</strong> Talla {aidaData.tallaModelo}
-                    </span>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </div>
@@ -1898,21 +1792,6 @@ function ImageModal({
   image: { src: string; alt: string; description: string; refCode: string; shopifyUrl?: string; descriptionHtml?: string };
   onClose: () => void;
 }) {
-  const [showAida, setShowAida] = useState(true);
-  const aidaData = useMemo(() => {
-    if (image.descriptionHtml) {
-      const parsed = parseAidaFromShopifyHtml(image.descriptionHtml, image.description, image.refCode);
-      if (parsed) return parsed;
-    }
-    return generateAIDAStructure(image.description, image.refCode);
-  }, [image.descriptionHtml, image.description, image.refCode]);
-
-  const copyAida = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    navigator.clipboard.writeText(aidaData.fullText);
-    toast.success("Descripción A.I.D.A. copiada para WhatsApp", { duration: 2500 });
-  };
-
   return (
     <div
       onClick={onClose}
@@ -1935,15 +1814,15 @@ function ImageModal({
           <img
             src={image.src}
             alt={image.alt}
-            className="max-h-[60vh] w-full object-contain"
+            className="max-h-[65vh] w-full object-contain"
           />
         </div>
 
         {/* Info footer */}
-        <div className="bg-card border-t border-border p-5 overflow-y-auto max-h-[35vh]">
-          <div className="flex items-start justify-between gap-4">
+        <div className="bg-card border-t border-border p-4">
+          <div className="flex items-center justify-between gap-4">
             <div className="min-w-0">
-              <div className="flex items-center gap-2 mb-1.5">
+              <div className="flex items-center gap-2 mb-1">
                 <span className="rounded-md bg-primary px-2 py-0.5 font-mono text-xs font-bold text-primary-foreground tracking-wide">
                   {image.refCode}
                 </span>
@@ -1952,74 +1831,16 @@ function ImageModal({
                 {image.description}
               </h3>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={copyAida}
-                className="inline-flex items-center gap-1 rounded-xl border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                title="Copiar texto AIDA"
+            {image.shopifyUrl && (
+              <a
+                href={image.shopifyUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-accent px-3 py-1.5 text-xs font-bold text-accent-foreground shadow-sm transition-transform hover:scale-105 active:scale-95 shrink-0"
               >
-                <Copy className="h-3 w-3" />
-                <span>Copiar AIDA</span>
-              </button>
-              {image.shopifyUrl && (
-                <a
-                  href={image.shopifyUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-accent px-3 py-1.5 text-xs font-bold text-accent-foreground shadow-sm transition-transform hover:scale-105 active:scale-95"
-                >
-                  <span>Tienda</span>
-                  <ExternalLink className="h-3 w-3" />
-                </a>
-              )}
-            </div>
-          </div>
-
-          {/* AIDA Description Section */}
-          <div className="mt-3 pt-3 border-t border-border">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5 uppercase tracking-wide">
-                <Sparkles className="h-3.5 w-3.5 text-emerald-600" />
-                Fórmula Comercial A.I.D.A.
-              </span>
-              <button
-                type="button"
-                onClick={() => setShowAida(!showAida)}
-                className="text-[11px] font-medium text-muted-foreground hover:text-foreground flex items-center gap-1"
-              >
-                <span>{showAida ? "Contraer" : "Expandir"}</span>
-                <ChevronDown className={`h-3 w-3 transition-transform ${showAida ? "rotate-180" : ""}`} />
-              </button>
-            </div>
-
-            {showAida && (
-              <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3.5 text-xs space-y-2.5 animate-in fade-in duration-200">
-                <p>
-                  <strong className="inline-block px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 font-bold text-[10px] uppercase mr-1">
-                    A · Atención:
-                  </strong>
-                  {aidaData.atencion}
-                </p>
-                <p>
-                  <strong className="inline-block px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-800 dark:text-blue-300 font-bold text-[10px] uppercase mr-1">
-                    I · Interés:
-                  </strong>
-                  {aidaData.interes}
-                </p>
-                <p>
-                  <strong className="inline-block px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-800 dark:text-purple-300 font-bold text-[10px] uppercase mr-1">
-                    D · Deseo:
-                  </strong>
-                  {aidaData.deseo}
-                </p>
-                <p>
-                  <strong className="inline-block px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-800 dark:text-amber-300 font-bold text-[10px] uppercase mr-1">
-                    A · Acción:
-                  </strong>
-                  {aidaData.accion}
-                </p>
-              </div>
+                <span>Tienda</span>
+                <ExternalLink className="h-3 w-3" />
+              </a>
             )}
           </div>
         </div>
