@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   X,
   FileSpreadsheet,
@@ -39,12 +39,14 @@ interface CotizadorModalProps {
   open: boolean;
   onClose: () => void;
   inventory?: InventoryRow[];
+  initialCustomerName?: string;
 }
 
 export function CotizadorModal({
   open,
   onClose,
   inventory = [],
+  initialCustomerName = "",
 }: CotizadorModalProps) {
   const order = useOrder();
 
@@ -53,11 +55,17 @@ export function CotizadorModal({
   const [copPriceType, setCopPriceType] = useState<CopPriceType>("PVM");
 
   // Metadata state
-  const [customerName, setCustomerName] = useState("");
+  const [customerName, setCustomerName] = useState(initialCustomerName);
   const [advisorName, setAdvisorName] = useState("");
   const [notes, setNotes] = useState(
     "Cotización válida por 15 días calendario. Sujeta a disponibilidad de inventario físico."
   );
+
+  useEffect(() => {
+    if (initialCustomerName) {
+      setCustomerName(initialCustomerName);
+    }
+  }, [initialCustomerName, open]);
 
   // Fast lookup dictionary for inventory rows
   const inventoryLookup = useMemo(() => {
