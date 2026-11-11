@@ -416,11 +416,14 @@ export function CotizadorModal({
                   <table className="w-full text-left border-collapse text-xs">
                     <thead>
                       <tr className="border-b border-border bg-muted/50 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-                        <th className="py-2.5 px-3">Prenda</th>
+                        <th className="py-2.5 px-3">Ref / Prenda</th>
                         <th className="py-2.5 px-3">Color / Talla</th>
                         <th className="py-2.5 px-3 text-center">Cant.</th>
                         <th className="py-2.5 px-3 text-right">
-                          Precio Unit. ({currency})
+                          Precio Antes IVA
+                        </th>
+                        <th className="py-2.5 px-3 text-right">
+                          P. Unit. IVA Incluido
                         </th>
                         <th className="py-2.5 px-3 text-right">
                           Total ({currency})
@@ -436,7 +439,7 @@ export function CotizadorModal({
                               <span className="font-mono text-xs font-bold text-foreground bg-primary/10 text-primary px-1.5 py-0.5 rounded">
                                 {it.referencia}
                               </span>
-                              <span className="font-medium text-foreground truncate max-w-[200px]" title={it.descripcion}>
+                              <span className="font-medium text-foreground truncate max-w-[180px]" title={it.descripcion}>
                                 {it.descripcion}
                               </span>
                             </div>
@@ -472,15 +475,18 @@ export function CotizadorModal({
                                   {formatCurrency(it.basePvp || 0)}
                                 </span>
                                 <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                                  {it.formattedUnitPrice}
+                                  {it.formattedPrecioAntesIva}
                                 </span>
                               </div>
                             ) : (
-                              it.formattedUnitPrice
+                              it.formattedPrecioAntesIva
                             )}
                           </td>
+                          <td className="py-2.5 px-3 text-right font-semibold text-sky-700 dark:text-sky-300">
+                            {it.formattedPrecioUnitIvaInc}
+                          </td>
                           <td className="py-2.5 px-3 text-right font-bold text-foreground">
-                            {it.formattedTotalPrice}
+                            {it.formattedTotalPriceWithIva}
                           </td>
                           <td className="py-2.5 px-3 text-center">
                             <button
@@ -513,18 +519,20 @@ export function CotizadorModal({
                   </div>
 
                   <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2 sm:gap-4 text-right">
-                    {currency === "COP" && quotation.totalDiscount > 0 && (
-                      <div className="text-xs text-muted-foreground">
-                        <span>Subtotal Detal: </span>
-                        <span className="font-semibold text-foreground">{quotation.formattedSubtotalDetal}</span>
-                      </div>
-                    )}
+                    <div className="text-xs text-muted-foreground">
+                      <span>Subtotal Antes de IVA: </span>
+                      <span className="font-semibold text-foreground">{quotation.formattedSubtotalAntesIva}</span>
+                    </div>
+                    <div className="text-xs font-bold text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-950/40 px-2 py-1 rounded border border-sky-200 dark:border-sky-800">
+                      <span>Total IVA (19%): </span>
+                      <span>{quotation.formattedTotalIva}</span>
+                    </div>
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
                         Total Cotización ({currency}):
                       </span>
                       <span className="text-xl font-black text-slate-900 dark:text-slate-100">
-                        {quotation.formattedTotal}
+                        {quotation.formattedTotalWithIva}
                       </span>
                     </div>
                   </div>
