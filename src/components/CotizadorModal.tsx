@@ -420,7 +420,13 @@ export function CotizadorModal({
                         <th className="py-2.5 px-3">Color / Talla</th>
                         <th className="py-2.5 px-3 text-center">Cant.</th>
                         <th className="py-2.5 px-3 text-right">
-                          Precio Antes IVA
+                          P. Detal
+                        </th>
+                        <th className="py-2.5 px-3 text-right">
+                          Precio Sin IVA
+                        </th>
+                        <th className="py-2.5 px-3 text-right">
+                          Valor IVA (19%)
                         </th>
                         <th className="py-2.5 px-3 text-right">
                           P. Unit. IVA Incluido
@@ -439,7 +445,7 @@ export function CotizadorModal({
                               <span className="font-mono text-xs font-bold text-foreground bg-primary/10 text-primary px-1.5 py-0.5 rounded">
                                 {it.referencia}
                               </span>
-                              <span className="font-medium text-foreground truncate max-w-[180px]" title={it.descripcion}>
+                              <span className="font-medium text-foreground truncate max-w-[160px]" title={it.descripcion}>
                                 {it.descripcion}
                               </span>
                             </div>
@@ -468,25 +474,31 @@ export function CotizadorModal({
                               </button>
                             </div>
                           </td>
+                          <td className="py-2.5 px-3 text-right font-medium text-muted-foreground">
+                            {it.formattedPrecioDetal}
+                          </td>
                           <td className="py-2.5 px-3 text-right font-medium text-foreground">
+                            {it.formattedPrecioSinIva}
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-semibold text-sky-600 dark:text-sky-400">
+                            {it.formattedValorIva}
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-semibold text-slate-800 dark:text-slate-200">
                             {currency === "COP" && it.unitDiscount && it.unitDiscount > 0 ? (
                               <div className="flex flex-col items-end">
                                 <span className="text-[10px] line-through text-muted-foreground">
                                   {formatCurrency(it.basePvp || 0)}
                                 </span>
                                 <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                                  {it.formattedPrecioAntesIva}
+                                  {it.formattedPrecioUnitConIva}
                                 </span>
                               </div>
                             ) : (
-                              it.formattedPrecioAntesIva
+                              it.formattedPrecioUnitConIva
                             )}
                           </td>
-                          <td className="py-2.5 px-3 text-right font-semibold text-sky-700 dark:text-sky-300">
-                            {it.formattedPrecioUnitIvaInc}
-                          </td>
                           <td className="py-2.5 px-3 text-right font-bold text-foreground">
-                            {it.formattedTotalPriceWithIva}
+                            {it.formattedTotalPrice}
                           </td>
                           <td className="py-2.5 px-3 text-center">
                             <button
@@ -513,15 +525,19 @@ export function CotizadorModal({
                     </div>
                     {currency === "COP" && quotation.totalDiscount > 0 && (
                       <div className="text-emerald-600 dark:text-emerald-400 font-bold">
-                        Ahorro total aplicado: -{quotation.formattedTotalDiscount}
+                        Ahorro total aplicado ({quotation.tierInfo.badge}): -{quotation.formattedTotalDiscount}
                       </div>
                     )}
                   </div>
 
                   <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2 sm:gap-4 text-right">
                     <div className="text-xs text-muted-foreground">
-                      <span>Subtotal Antes de IVA: </span>
-                      <span className="font-semibold text-foreground">{quotation.formattedSubtotalAntesIva}</span>
+                      <span>Subtotal Detal: </span>
+                      <span className="font-semibold text-foreground">{quotation.formattedSubtotalDetal}</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      <span>Subtotal Sin IVA: </span>
+                      <span className="font-semibold text-foreground">{quotation.formattedSubtotalSinIva}</span>
                     </div>
                     <div className="text-xs font-bold text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-950/40 px-2 py-1 rounded border border-sky-200 dark:border-sky-800">
                       <span>Total IVA (19%): </span>

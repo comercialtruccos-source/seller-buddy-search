@@ -801,7 +801,7 @@ function OrderModal({
               </span>
             </div>
 
-            {tierInfo.unitsToNextTier > 0 && (
+            {tierInfo.unitsToNextTier !== undefined && tierInfo.unitsToNextTier > 0 && (
               <div className="mt-2 space-y-1">
                 <div className="h-1.5 w-full overflow-hidden rounded-full bg-border">
                   <div

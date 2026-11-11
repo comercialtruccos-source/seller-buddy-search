@@ -106,21 +106,33 @@ export interface QuotationItemSummary {
   basePvm?: number;
   unitDiscount?: number;
   discountPercentage?: number;
-  unitPrice: number; // Precio unitario antes de IVA
-  precioAntesIva: number; // Alias explícito: Precio antes de IVA
-  precioUnitIvaInc: number; // Precio unitario con IVA incluido (unitPrice * 1.19)
-  totalPrice: number; // Subtotal neto antes de IVA (cantidad * unitPrice)
-  ivaRate: number; // Tasa de IVA (0.19)
-  unitIva: number; // IVA por unidad
-  lineIva: number; // IVA total de la fila (cantidad * unitIva)
-  totalPriceWithIva: number; // Total de la fila con IVA incluido (cantidad * precioUnitIvaInc)
+  precioDetal: number; // Precio detal original (con IVA incluido)
+  precioSinIva: number; // Precio sin IVA (antes de IVA = precioUnitConIva / 1.19)
+  valorIva: number; // Valor unitario del IVA (19% = precioUnitConIva - precioSinIva)
+  precioUnitConIva: number; // Precio unitario final con IVA incluido
+  totalLineSinIva: number; // Subtotal línea sin IVA (cantidad * precioSinIva)
+  totalLineIva: number; // Total IVA de la línea (cantidad * valorIva)
+  totalPrice: number; // Total final con IVA de la línea (cantidad * precioUnitConIva)
+  ivaRate: number; // Tasa de IVA (0.19 o 0 para USD)
+  unitIva: number; // Alias: valor del IVA unitario
+  lineIva: number; // Alias: totalLineIva
+  unitPrice: number; // Alias: precioUnitConIva
+  precioAntesIva: number; // Alias: precioSinIva
+  precioUnitIvaInc: number; // Alias: precioUnitConIva
+  totalPriceWithIva: number; // Alias: totalPrice
   currency: QuotationCurrency;
-  formattedUnitPrice: string;
-  formattedPrecioAntesIva: string; // Formato: Precio antes de IVA
-  formattedPrecioUnitIvaInc: string; // Formato: Precio unitario IVA incluido
-  formattedTotalPrice: string; // Subtotal neto formateado
-  formattedIva: string; // IVA de la fila formateado
-  formattedTotalPriceWithIva: string; // Total con IVA formateado
+  formattedPrecioDetal: string; // Formato: Precio detal
+  formattedPrecioSinIva: string; // Formato: Precio sin IVA
+  formattedValorIva: string; // Formato: Valor del IVA
+  formattedPrecioUnitConIva: string; // Formato: Precio unitario con IVA
+  formattedTotalLineSinIva: string; // Formato: Subtotal sin IVA
+  formattedTotalLineIva: string; // Formato: Total IVA
+  formattedTotalPrice: string; // Formato: Total fila con IVA
+  formattedUnitPrice: string; // Alias
+  formattedPrecioAntesIva: string; // Alias
+  formattedPrecioUnitIvaInc: string; // Alias
+  formattedIva: string; // Alias
+  formattedTotalPriceWithIva: string; // Alias
 }
 
 export interface QuotationConfig {
@@ -144,20 +156,22 @@ export interface QuotationData {
   items: QuotationItemSummary[];
   totalUnits: number;
   totalReferences: number;
-  subtotalDetal: number;
-  totalDiscount: number;
-  subtotalBase: number; // Suma de todos los subtotales netos de prendas antes de IVA
-  subtotalAntesIva: number; // Alias explícito: Subtotal antes de IVA
+  subtotalDetal: number; // Suma de todos los precios detal * cantidad
+  totalDiscount: number; // Ahorro total respecto al detal
+  subtotalSinIva: number; // Suma de todos los subtotales de prendas sin IVA
   totalIva: number; // Suma de todas las cantidades del IVA (19%)
-  totalWithIva: number; // Total general con IVA incluido (subtotalBase + totalIva)
+  totalWithIva: number; // Total general con IVA incluido (subtotalSinIva + totalIva)
   totalAmount: number; // Total general
+  subtotalBase: number; // Alias: subtotalSinIva
+  subtotalAntesIva: number; // Alias: subtotalSinIva
   formattedSubtotalDetal: string;
   formattedTotalDiscount: string;
-  formattedSubtotalBase: string;
-  formattedSubtotalAntesIva: string;
+  formattedSubtotalSinIva: string;
   formattedTotalIva: string; // Celda donde se suman todas las cantidades del IVA
   formattedTotalWithIva: string;
   formattedTotal: string;
+  formattedSubtotalBase: string; // Alias
+  formattedSubtotalAntesIva: string; // Alias
 }
 
 export function calculateQuotationSummary(
@@ -177,6 +191,8 @@ export function calculateQuotationSummary(
   let subtotalDetal = 0;
   let subtotalMayorista = 0;
   let totalAmount = 0;
+  let subtotalSinIva = 0;
+  let totalIva = 0;
   let totalUsd = 0;
   let hasUsdPrices = false;
 
@@ -193,9 +209,16 @@ export function calculateQuotationSummary(
     const lineTotalCop = unitPriceCop * qty;
     const lineTotalUsd = usd * qty;
 
+    const unitSinIva = Math.round(unitPriceCop / 1.19);
+    const unitIva = unitPriceCop - unitSinIva;
+    const lineSinIva = unitSinIva * qty;
+    const lineIva = unitIva * qty;
+
     subtotalDetal += pvp * qty;
     subtotalMayorista += pvm * qty;
     totalAmount += lineTotalCop;
+    subtotalSinIva += lineSinIva;
+    totalIva += lineIva;
     totalUsd += lineTotalUsd;
 
     return {
@@ -204,9 +227,14 @@ export function calculateQuotationSummary(
       cantidad: qty,
       basePvp: pvp,
       basePvm: pvm,
+      precioDetal: pvp,
+      precioSinIva: unitSinIva,
+      valorIva: unitIva,
       unitPriceCop,
       unitDiscountCop,
       lineTotalCop,
+      lineSinIva,
+      lineIva,
       unitPriceUsd: usd,
       lineTotalUsd,
     };
@@ -220,6 +248,8 @@ export function calculateQuotationSummary(
     subtotalDetal,
     subtotalMayorista,
     totalAmount,
+    subtotalSinIva,
+    totalIva,
     totalSavings,
     totalUsd,
     hasUsdPrices,
@@ -254,53 +284,77 @@ export function buildQuotationData(
 
   const itemSummaries: QuotationItemSummary[] = activeItems.map((it) => {
     const invRow = inventoryLookup?.[it.sku];
+    // Los precios de catálogo (PVP y PVM) ya tienen el 19% de IVA incluido
     const basePvp = it.pvp ?? invRow?.pvp ?? it.pvm ?? invRow?.pvm ?? 0;
     const basePvm = it.pvm ?? invRow?.pvm ?? 0;
-    let unitPrice = 0;
+    const precioDetal = basePvp > 0 ? basePvp : basePvm;
+    const precioMayorista = basePvm > 0 ? basePvm : precioDetal;
+
+    let precioUnitConIva = 0;
     let unitDiscount = 0;
     let discountPercentage = 0;
 
     if (isUsd) {
       // Regla: No tocar precios en dólares. Se mantienen fijos sin descuentos.
       if (it.precioUsd && it.precioUsd > 0) {
-        unitPrice = it.precioUsd;
+        precioUnitConIva = it.precioUsd;
       } else if (invRow?.precioUsd && invRow.precioUsd > 0) {
-        unitPrice = invRow.precioUsd;
+        precioUnitConIva = invRow.precioUsd;
       } else {
-        unitPrice = Math.ceil(((basePvm / 1.19 + 1000) / trmFallback) * 100) / 100;
+        precioUnitConIva = Math.ceil(((basePvm / 1.19 + 1000) / trmFallback) * 100) / 100;
       }
     } else {
-      // En COP aplican las condiciones de cotización:
+      // En COP aplican las condiciones de cotización sobre el precio con IVA incluido:
       // - < 12 unidades: sin descuento (PVP detal)
       // - 12 a 23 unidades: 30% descuento sobre detal
       // - >= 24 unidades: precio mayorista (PVM)
       if (totalUnits < 12) {
-        unitPrice = basePvp > 0 ? basePvp : basePvm;
+        precioUnitConIva = precioDetal;
         unitDiscount = 0;
         discountPercentage = 0;
       } else if (totalUnits <= 23) {
-        const pvpRef = basePvp > 0 ? basePvp : basePvm;
-        unitDiscount = Math.round(pvpRef * 0.3);
-        unitPrice = Math.max(0, pvpRef - unitDiscount);
+        unitDiscount = Math.round(precioDetal * 0.3);
+        precioUnitConIva = Math.max(0, precioDetal - unitDiscount);
         discountPercentage = 30;
       } else {
-        unitPrice = basePvm > 0 ? basePvm : basePvp;
-        unitDiscount = Math.max(0, basePvp - basePvm);
-        discountPercentage = 0;
+        precioUnitConIva = precioMayorista;
+        unitDiscount = Math.max(0, precioDetal - precioMayorista);
+        discountPercentage = precioDetal > 0 ? Math.round(((precioDetal - precioMayorista) / precioDetal) * 100) : 0;
       }
     }
 
-    // Calculation required: units * price
-    const subtotalLine = it.cantidad * unitPrice;
-    const ivaRate = 0.19;
-    const precioUnitIvaInc = isUsd
-      ? Math.round(unitPrice * 1.19 * 100) / 100
-      : Math.round(unitPrice * 1.19);
-    const totalPriceWithIva = isUsd
-      ? Math.round(it.cantidad * precioUnitIvaInc * 100) / 100
-      : Math.round(it.cantidad * precioUnitIvaInc);
-    const lineIva = totalPriceWithIva - subtotalLine;
-    const unitIva = precioUnitIvaInc - unitPrice;
+    // Como los precios de venta detal y mayorista ya tienen IVA incluido:
+    // Precio sin IVA = Precio con IVA / 1.19
+    // Valor del IVA = Precio con IVA - Precio sin IVA
+    let precioSinIva = 0;
+    let valorIva = 0;
+    const ivaRate = isUsd ? 0 : 0.19;
+
+    if (isUsd) {
+      precioSinIva = precioUnitConIva;
+      valorIva = 0;
+    } else {
+      precioSinIva = Math.round(precioUnitConIva / 1.19);
+      valorIva = precioUnitConIva - precioSinIva;
+    }
+
+    const totalLineSinIva = isUsd
+      ? Math.round(it.cantidad * precioSinIva * 100) / 100
+      : Math.round(it.cantidad * precioSinIva);
+    const totalLineIva = isUsd
+      ? 0
+      : Math.round(it.cantidad * valorIva);
+    const totalPrice = isUsd
+      ? Math.round(it.cantidad * precioUnitConIva * 100) / 100
+      : Math.round(it.cantidad * precioUnitConIva);
+
+    const formattedPrecioDetal = isUsd ? formatUsd(precioDetal) : formatCurrency(precioDetal);
+    const formattedPrecioSinIva = isUsd ? formatUsd(precioSinIva) : formatCurrency(precioSinIva);
+    const formattedValorIva = isUsd ? formatUsd(valorIva) : formatCurrency(valorIva);
+    const formattedPrecioUnitConIva = isUsd ? formatUsd(precioUnitConIva) : formatCurrency(precioUnitConIva);
+    const formattedTotalLineSinIva = isUsd ? formatUsd(totalLineSinIva) : formatCurrency(totalLineSinIva);
+    const formattedTotalLineIva = isUsd ? formatUsd(totalLineIva) : formatCurrency(totalLineIva);
+    const formattedTotalPrice = isUsd ? formatUsd(totalPrice) : formatCurrency(totalPrice);
 
     return {
       sku: it.sku,
@@ -313,33 +367,51 @@ export function buildQuotationData(
       basePvm,
       unitDiscount,
       discountPercentage,
-      unitPrice,
-      precioAntesIva: unitPrice,
-      precioUnitIvaInc,
-      totalPrice: subtotalLine,
+      precioDetal,
+      precioSinIva,
+      valorIva,
+      precioUnitConIva,
+      totalLineSinIva,
+      totalLineIva,
+      totalPrice,
       ivaRate,
-      unitIva,
-      lineIva,
-      totalPriceWithIva,
+      unitIva: valorIva,
+      lineIva: totalLineIva,
+      unitPrice: precioUnitConIva,
+      precioAntesIva: precioSinIva,
+      precioUnitIvaInc: precioUnitConIva,
+      totalPriceWithIva: totalPrice,
       currency: config.currency,
-      formattedUnitPrice: isUsd ? formatUsd(unitPrice) : formatCurrency(unitPrice),
-      formattedPrecioAntesIva: isUsd ? formatUsd(unitPrice) : formatCurrency(unitPrice),
-      formattedPrecioUnitIvaInc: isUsd ? formatUsd(precioUnitIvaInc) : formatCurrency(precioUnitIvaInc),
-      formattedTotalPrice: isUsd ? formatUsd(subtotalLine) : formatCurrency(subtotalLine),
-      formattedIva: isUsd ? formatUsd(lineIva) : formatCurrency(lineIva),
-      formattedTotalPriceWithIva: isUsd ? formatUsd(totalPriceWithIva) : formatCurrency(totalPriceWithIva),
+      formattedPrecioDetal,
+      formattedPrecioSinIva,
+      formattedValorIva,
+      formattedPrecioUnitConIva,
+      formattedTotalLineSinIva,
+      formattedTotalLineIva,
+      formattedTotalPrice,
+      formattedUnitPrice: formattedPrecioUnitConIva,
+      formattedPrecioAntesIva: formattedPrecioSinIva,
+      formattedPrecioUnitIvaInc: formattedPrecioUnitConIva,
+      formattedIva: formattedTotalLineIva,
+      formattedTotalPriceWithIva: formattedTotalPrice,
     };
   });
 
-  const subtotalBase = itemSummaries.reduce((sum, it) => sum + it.totalPrice, 0);
-  const totalIva = itemSummaries.reduce((sum, it) => sum + it.lineIva, 0);
-  const totalWithIva = subtotalBase + totalIva;
+  const subtotalSinIva = itemSummaries.reduce((sum, it) => sum + it.totalLineSinIva, 0);
+  const totalIva = itemSummaries.reduce((sum, it) => sum + it.totalLineIva, 0);
+  const totalWithIva = itemSummaries.reduce((sum, it) => sum + it.totalPrice, 0);
   const subtotalDetal = itemSummaries.reduce(
-    (sum, it) => sum + (it.basePvp || it.unitPrice) * it.cantidad,
+    (sum, it) => sum + it.precioDetal * it.cantidad,
     0
   );
-  const totalDiscount = isUsd ? 0 : Math.max(0, subtotalDetal - subtotalBase);
+  const totalDiscount = isUsd ? 0 : Math.max(0, subtotalDetal - totalWithIva);
   const distinctRefs = new Set(itemSummaries.map((it) => it.referencia)).size;
+
+  const formattedSubtotalDetal = formatCurrency(subtotalDetal);
+  const formattedTotalDiscount = formatCurrency(totalDiscount);
+  const formattedSubtotalSinIva = isUsd ? formatUsd(subtotalSinIva) : formatCurrency(subtotalSinIva);
+  const formattedTotalIva = isUsd ? formatUsd(totalIva) : formatCurrency(totalIva);
+  const formattedTotalWithIva = isUsd ? formatUsd(totalWithIva) : formatCurrency(totalWithIva);
 
   return {
     quotationNumber,
@@ -356,18 +428,20 @@ export function buildQuotationData(
     totalReferences: distinctRefs,
     subtotalDetal,
     totalDiscount,
-    subtotalBase,
-    subtotalAntesIva: subtotalBase,
+    subtotalSinIva,
     totalIva,
     totalWithIva,
     totalAmount: totalWithIva,
-    formattedSubtotalDetal: formatCurrency(subtotalDetal),
-    formattedTotalDiscount: formatCurrency(totalDiscount),
-    formattedSubtotalBase: isUsd ? formatUsd(subtotalBase) : formatCurrency(subtotalBase),
-    formattedSubtotalAntesIva: isUsd ? formatUsd(subtotalBase) : formatCurrency(subtotalBase),
-    formattedTotalIva: isUsd ? formatUsd(totalIva) : formatCurrency(totalIva),
-    formattedTotalWithIva: isUsd ? formatUsd(totalWithIva) : formatCurrency(totalWithIva),
-    formattedTotal: isUsd ? formatUsd(totalWithIva) : formatCurrency(totalWithIva),
+    subtotalBase: subtotalSinIva,
+    subtotalAntesIva: subtotalSinIva,
+    formattedSubtotalDetal,
+    formattedTotalDiscount,
+    formattedSubtotalSinIva,
+    formattedTotalIva,
+    formattedTotalWithIva,
+    formattedTotal: formattedTotalWithIva,
+    formattedSubtotalBase: formattedSubtotalSinIva,
+    formattedSubtotalAntesIva: formattedSubtotalSinIva,
   };
 }
 
@@ -397,7 +471,9 @@ export function downloadQuotationExcel(quotation: QuotationData): void {
       "COLOR",
       "TALLA",
       "CANTIDAD",
-      `PRECIO ANTES DE IVA (${quotation.currency})`,
+      `PRECIO DETAL (${quotation.currency})`,
+      `PRECIO SIN IVA (${quotation.currency})`,
+      `VALOR IVA (19%) (${quotation.currency})`,
       `PRECIO UNITARIO IVA INCLUIDO (${quotation.currency})`,
       `TOTAL (${quotation.currency})`,
     ],
@@ -411,26 +487,45 @@ export function downloadQuotationExcel(quotation: QuotationData): void {
       it.color,
       it.talla,
       it.cantidad,
-      it.unitPrice,
-      it.precioUnitIvaInc,
-      it.totalPriceWithIva,
+      it.precioDetal,
+      it.precioSinIva,
+      it.valorIva,
+      it.precioUnitConIva,
+      it.totalPrice,
     ]);
   });
 
   aoa.push([]);
+  aoa.push([
+    "",
+    "",
+    "",
+    "",
+    "",
+    "TOTAL UNIDADES:",
+    quotation.totalUnits,
+    "",
+    "",
+    "",
+    "",
+  ]);
+  aoa.push([
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "SUBTOTAL PRECIO DETAL:",
+    "",
+    "",
+    "",
+    quotation.subtotalDetal,
+  ]);
   if (!isUsd && quotation.totalDiscount > 0) {
     aoa.push([
       "",
       "",
-      "",
-      "",
-      "Subtotal Detal:",
-      "",
-      "",
-      "",
-      quotation.subtotalDetal,
-    ]);
-    aoa.push([
       "",
       "",
       "",
@@ -447,13 +542,17 @@ export function downloadQuotationExcel(quotation: QuotationData): void {
     "",
     "",
     "",
-    "SUBTOTAL ANTES DE IVA:",
+    "",
+    "",
+    "SUBTOTAL SIN IVA (ANTES DE IVA):",
     "",
     "",
     "",
-    quotation.subtotalAntesIva,
+    quotation.subtotalSinIva,
   ]);
   aoa.push([
+    "",
+    "",
     "",
     "",
     "",
@@ -469,14 +568,17 @@ export function downloadQuotationExcel(quotation: QuotationData): void {
     "",
     "",
     "",
-    "TOTAL UNIDADES:",
-    quotation.totalUnits,
+    "",
     "",
     `TOTAL COTIZACIÓN (${quotation.currency}):`,
+    "",
+    "",
+    "",
     quotation.totalWithIva,
   ]);
   aoa.push([]);
-  aoa.push(["* Precios calculados con el 19% del IVA agregado según formato comercial."]);
+  aoa.push(["* Precios detal y mayorista incluyen el 19% de IVA."]);
+  aoa.push(["* Precio sin IVA = Precio con IVA / 1.19 | Valor IVA = 19% discriminado."]);
   aoa.push(["* Cotización válida por 15 días calendario. Sujeta a rotación de inventario."]);
 
   const ws = XLSX.utils.aoa_to_sheet(aoa);
@@ -485,12 +587,14 @@ export function downloadQuotationExcel(quotation: QuotationData): void {
   ws["!cols"] = [
     { wch: 5 },  // #
     { wch: 16 }, // REF
-    { wch: 34 }, // DESCRIPCION
+    { wch: 32 }, // DESCRIPCION
     { wch: 16 }, // COLOR
     { wch: 10 }, // TALLA
-    { wch: 14 }, // CANTIDAD
-    { wch: 24 }, // PRECIO ANTES DE IVA
-    { wch: 28 }, // PRECIO UNITARIO IVA INCLUIDO
+    { wch: 12 }, // CANTIDAD
+    { wch: 20 }, // PRECIO DETAL
+    { wch: 20 }, // PRECIO SIN IVA
+    { wch: 20 }, // VALOR IVA (19%)
+    { wch: 26 }, // PRECIO UNITARIO IVA INCLUIDO
     { wch: 22 }, // TOTAL
   ];
 
@@ -735,17 +839,19 @@ export function generateQuotationPdfBlob(quotation: QuotationData): Blob {
       currentY -= cardH + 12;
     }
 
-    // 4. Products Table Headers (Formato oficial Trucco's: REF, DESCRIPCION, COLOR, TALLA, CANTIDAD, PRECIO ANTES DE IVA, PRECIO UNITARIO IVA INCLUIDO, TOTAL)
+    // 4. Products Table Headers: REF, DESCRIPCION, COLOR, TALLA, CANT, PRECIO DETAL, PRECIO SIN IVA, VALOR IVA, P. UNIT C/IVA, TOTAL
     const colX = {
       num: 36, // w: 16 -> 52
-      ref: 52, // w: 56 -> 108
-      desc: 108, // w: 122 -> 230
-      col: 230, // w: 50 -> 280
-      talla: 280, // w: 24 -> 304
-      cant: 304, // w: 26 -> 330
-      precioAntesIva: 330, // w: 74 -> 404
-      precioUnitIvaInc: 404, // w: 84 -> 488
-      tot: 488, // w: 88 -> 576
+      ref: 52, // w: 50 -> 102
+      desc: 102, // w: 108 -> 210
+      col: 210, // w: 40 -> 250
+      talla: 250, // w: 22 -> 272
+      cant: 272, // w: 22 -> 294
+      precioDetal: 294, // w: 54 -> 348
+      precioSinIva: 348, // w: 58 -> 406
+      valorIva: 406, // w: 52 -> 458
+      precioUnitConIva: 458, // w: 58 -> 516
+      tot: 516, // w: 60 -> 576
     };
 
     const headerH = 19;
@@ -762,11 +868,13 @@ export function generateQuotationPdfBlob(quotation: QuotationData): Blob {
     s += `BT /F2 6.5 Tf ${colX.ref + 3} ${currentY - 13} Td (REF) Tj ET\n`;
     s += `BT /F2 6.5 Tf ${colX.desc + 3} ${currentY - 13} Td (DESCRIPCION) Tj ET\n`;
     s += `BT /F2 6.5 Tf ${colX.col + 3} ${currentY - 13} Td (COLOR) Tj ET\n`;
-    s += `BT /F2 6.5 Tf ${colX.talla + 3} ${currentY - 13} Td (TALLA) Tj ET\n`;
-    s += `BT /F2 6.5 Tf ${colX.cant + 3} ${currentY - 13} Td (CANT) Tj ET\n`;
-    s += `BT /F2 5.8 Tf ${colX.precioAntesIva + 6} ${currentY - 13} Td (PRECIO ANTES IVA) Tj ET\n`;
-    s += `BT /F2 5.8 Tf ${colX.precioUnitIvaInc + 4} ${currentY - 13} Td (P. UNIT. IVA INCLUIDO) Tj ET\n`;
-    s += `BT /F2 6.5 Tf ${colX.tot + 26} ${currentY - 13} Td (TOTAL) Tj ET\n`;
+    s += `BT /F2 6 Tf ${colX.talla + 2} ${currentY - 13} Td (TALLA) Tj ET\n`;
+    s += `BT /F2 6 Tf ${colX.cant + 2} ${currentY - 13} Td (CANT) Tj ET\n`;
+    s += `BT /F2 5.5 Tf ${colX.precioDetal + 8} ${currentY - 13} Td (P. DETAL) Tj ET\n`;
+    s += `BT /F2 5.5 Tf ${colX.precioSinIva + 6} ${currentY - 13} Td (P. SIN IVA) Tj ET\n`;
+    s += `BT /F2 5.5 Tf ${colX.valorIva + 6} ${currentY - 13} Td (VALOR IVA) Tj ET\n`;
+    s += `BT /F2 5.5 Tf ${colX.precioUnitConIva + 4} ${currentY - 13} Td (P. UNIT C/IVA) Tj ET\n`;
+    s += `BT /F2 6.5 Tf ${colX.tot + 18} ${currentY - 13} Td (TOTAL) Tj ET\n`;
     s += "Q\n";
 
     currentY -= headerH;
@@ -799,41 +907,53 @@ export function generateQuotationPdfBlob(quotation: QuotationData): Blob {
       s += `BT /F2 7.2 Tf ${colX.ref + 3} ${currentY - 11.5} Td (${escapePdf(it.referencia)}) Tj ET\n`;
 
       // Description (DESCRIPCION)
-      const descClean = it.descripcion.length > 25 ? it.descripcion.substring(0, 23) + ".." : it.descripcion;
+      const descClean = it.descripcion.length > 22 ? it.descripcion.substring(0, 20) + ".." : it.descripcion;
       s += "0.15 0.15 0.18 rg\n";
       s += `BT /F1 7.2 Tf ${colX.desc + 3} ${currentY - 11.5} Td (${escapePdf(descClean)}) Tj ET\n`;
 
       // Color (COLOR)
-      const colClean = it.color.length > 13 ? it.color.substring(0, 11) + ".." : it.color;
+      const colClean = it.color.length > 10 ? it.color.substring(0, 9) + ".." : it.color;
       s += "0.25 0.25 0.30 rg\n";
       s += `BT /F1 7.2 Tf ${colX.col + 3} ${currentY - 11.5} Td (${escapePdf(colClean)}) Tj ET\n`;
 
       // Talla (TALLA)
       s += "0.04 0.04 0.04 rg\n";
       const tallaStr = escapePdf(it.talla);
-      const tallaX = colX.talla + 12 - tallaStr.length * 2.2;
+      const tallaX = colX.talla + 11 - tallaStr.length * 2.1;
       s += `BT /F2 7.2 Tf ${tallaX} ${currentY - 11.5} Td (${tallaStr}) Tj ET\n`;
 
       // Cantidad (CANTIDAD)
       const cantStr = String(it.cantidad);
-      const cantX = colX.cant + 13 - cantStr.length * 2.5;
+      const cantX = colX.cant + 11 - cantStr.length * 2.3;
       s += `BT /F2 7.5 Tf ${cantX} ${currentY - 11.5} Td (${cantStr}) Tj ET\n`;
 
-      // PRECIO ANTES DE IVA (Right-aligned at 400)
-      const pAntesStr = escapePdf(it.formattedPrecioAntesIva);
-      const pAntesX = 400 - pAntesStr.length * 4.2;
-      s += "0.30 0.30 0.35 rg\n";
-      s += `BT /F1 7.2 Tf ${pAntesX} ${currentY - 11.5} Td (${pAntesStr}) Tj ET\n`;
+      // PRECIO DETAL (Right-aligned at 345)
+      const pDetalStr = escapePdf(it.formattedPrecioDetal);
+      const pDetalX = 345 - pDetalStr.length * 4.0;
+      s += "0.40 0.40 0.45 rg\n";
+      s += `BT /F1 7 Tf ${pDetalX} ${currentY - 11.5} Td (${pDetalStr}) Tj ET\n`;
 
-      // PRECIO UNITARIO IVA INCLUIDO (Right-aligned at 484)
-      const pUnitIvaStr = escapePdf(it.formattedPrecioUnitIvaInc);
-      const pUnitIvaX = 484 - pUnitIvaStr.length * 4.2;
-      s += "0.15 0.25 0.35 rg\n";
-      s += `BT /F2 7.2 Tf ${pUnitIvaX} ${currentY - 11.5} Td (${pUnitIvaStr}) Tj ET\n`;
+      // PRECIO SIN IVA (Right-aligned at 403)
+      const pSinIvaStr = escapePdf(it.formattedPrecioSinIva);
+      const pSinIvaX = 403 - pSinIvaStr.length * 4.0;
+      s += "0.20 0.20 0.25 rg\n";
+      s += `BT /F1 7 Tf ${pSinIvaX} ${currentY - 11.5} Td (${pSinIvaStr}) Tj ET\n`;
 
-      // TOTAL (Right-aligned at 572, bold noir)
-      const totStr = escapePdf(it.formattedTotalPriceWithIva);
-      const totX = 572 - totStr.length * 4.4;
+      // VALOR IVA (Right-aligned at 455)
+      const valIvaStr = escapePdf(it.formattedValorIva);
+      const valIvaX = 455 - valIvaStr.length * 4.0;
+      s += "0.10 0.45 0.75 rg\n";
+      s += `BT /F1 7 Tf ${valIvaX} ${currentY - 11.5} Td (${valIvaStr}) Tj ET\n`;
+
+      // PRECIO UNITARIO CON IVA (Right-aligned at 513)
+      const pUnitConIvaStr = escapePdf(it.formattedPrecioUnitConIva);
+      const pUnitConIvaX = 513 - pUnitConIvaStr.length * 4.1;
+      s += "0.15 0.20 0.28 rg\n";
+      s += `BT /F2 7.2 Tf ${pUnitConIvaX} ${currentY - 11.5} Td (${pUnitConIvaStr}) Tj ET\n`;
+
+      // TOTAL (Right-aligned at 573, bold noir)
+      const totStr = escapePdf(it.formattedTotalPrice);
+      const totX = 573 - totStr.length * 4.4;
       s += "0.04 0.04 0.04 rg\n";
       s += `BT /F2 7.5 Tf ${totX} ${currentY - 11.5} Td (${totStr}) Tj ET\n`;
       s += "Q\n";
@@ -855,29 +975,41 @@ export function generateQuotationPdfBlob(quotation: QuotationData): Blob {
       s += `${marginLeft} ${currentY} m ${marginRight} ${currentY} l S\n`;
 
       s += "0.15 0.20 0.28 rg\n";
-      s += `BT /F2 7 Tf ${colX.desc + 3} ${currentY - 11.5} Td (TOTALES TABLA:) Tj ET\n`;
+      s += `BT /F2 7 Tf ${colX.desc + 3} ${currentY - 11.5} Td (TOTALES:) Tj ET\n`;
 
       // Total units in cant column
       const totalUnitsStr = String(quotation.totalUnits);
-      const totCantX = colX.cant + 13 - totalUnitsStr.length * 2.5;
+      const totCantX = colX.cant + 11 - totalUnitsStr.length * 2.3;
       s += `BT /F2 7.5 Tf ${totCantX} ${currentY - 11.5} Td (${totalUnitsStr}) Tj ET\n`;
 
-      // Sum of Subtotal Antes de IVA
-      const subAntesStr = escapePdf(quotation.formattedSubtotalAntesIva);
-      const subAntesX = 400 - subAntesStr.length * 4.2;
+      // Sum of Detal
+      const totDetalStr = escapePdf(quotation.formattedSubtotalDetal);
+      const totDetalX = 345 - totDetalStr.length * 4.0;
+      s += "0.35 0.35 0.40 rg\n";
+      s += `BT /F1 7 Tf ${totDetalX} ${currentY - 11.5} Td (${totDetalStr}) Tj ET\n`;
+
+      // Sum of Subtotal Sin IVA
+      const subSinIvaStr = escapePdf(quotation.formattedSubtotalSinIva);
+      const subSinIvaX = 403 - subSinIvaStr.length * 4.0;
       s += "0.20 0.25 0.30 rg\n";
-      s += `BT /F2 7.2 Tf ${subAntesX} ${currentY - 11.5} Td (${subAntesStr}) Tj ET\n`;
+      s += `BT /F2 7.2 Tf ${subSinIvaX} ${currentY - 11.5} Td (${subSinIvaStr}) Tj ET\n`;
+
+      // Sum of Valor IVA (19%)
+      const totIvaBarStr = escapePdf(quotation.formattedTotalIva);
+      const totIvaBarX = 455 - totIvaBarStr.length * 4.0;
+      s += "0.10 0.45 0.75 rg\n";
+      s += `BT /F2 7.2 Tf ${totIvaBarX} ${currentY - 11.5} Td (${totIvaBarStr}) Tj ET\n`;
 
       // Sum of Total in Total column
       const totColStr = escapePdf(quotation.formattedTotalWithIva);
-      const totColX = 572 - totColStr.length * 4.4;
+      const totColX = 573 - totColStr.length * 4.4;
       s += "0.04 0.04 0.04 rg\n";
       s += `BT /F2 7.5 Tf ${totColX} ${currentY - 11.5} Td (${totColStr}) Tj ET\n`;
       s += "Q\n";
       currentY -= totBarH;
 
       currentY -= 14;
-      const sumH = 96;
+      const sumH = 104;
       const rightW = 210;
       const leftW = usableWidth - rightW - 12; // 540 - 210 - 12 = 318 pt
       const rightX = marginLeft + leftW + 12; // 366 pt
@@ -909,7 +1041,11 @@ export function generateQuotationPdfBlob(quotation: QuotationData): Blob {
         }
       }
 
-      s += `BT /F1 6.8 Tf ${marginLeft + 10} ${lineY} Td (* Precios calculados con el 19% del IVA agregado y discriminado.) Tj ET\n`;
+      s += `BT /F1 6.8 Tf ${marginLeft + 10} ${lineY} Td (* Precios detallan: Precio Detal, Precio sin IVA, Valor IVA y Total con IVA.) Tj ET\n`;
+      lineY -= stepY;
+      linesDrawn++;
+
+      s += `BT /F1 6.8 Tf ${marginLeft + 10} ${lineY} Td (* Base sin IVA = Precio con IVA / 1.19 | IVA 19% discriminado por prenda.) Tj ET\n`;
       lineY -= stepY;
       linesDrawn++;
 
@@ -937,40 +1073,63 @@ export function generateQuotationPdfBlob(quotation: QuotationData): Blob {
 
       // Row 1: Unidades
       s += "0.75 0.75 0.80 rg\n";
-      s += `BT /F1 7.2 Tf ${rightX + 12} ${currentY - 16} Td (UNIDADES SELECCIONADAS:) Tj ET\n`;
+      s += `BT /F1 7.2 Tf ${rightX + 12} ${currentY - 15} Td (UNIDADES TOTALES:) Tj ET\n`;
       s += "1 1 1 rg\n";
       const unitsStr = `${quotation.totalUnits} uds. (${quotation.totalReferences} refs)`;
       const unitsX = rightX + rightW - 12 - unitsStr.length * 4.6;
-      s += `BT /F2 8 Tf ${unitsX} ${currentY - 16} Td (${unitsStr}) Tj ET\n`;
+      s += `BT /F2 8 Tf ${unitsX} ${currentY - 15} Td (${unitsStr}) Tj ET\n`;
 
-      // Row 2: Subtotal Neto (antes de IVA)
+      // Row 2: Total Precio Detal
       s += "0.75 0.75 0.80 rg\n";
-      s += `BT /F1 7.2 Tf ${rightX + 12} ${currentY - 29} Td (SUBTOTAL NETO:) Tj ET\n`;
+      s += `BT /F1 7.2 Tf ${rightX + 12} ${currentY - 27} Td (TOTAL PRECIO DETAL:) Tj ET\n`;
       s += "1 1 1 rg\n";
-      const subNetoStr = escapePdf(quotation.formattedSubtotalBase);
-      const subNetoX = rightX + rightW - 12 - subNetoStr.length * 4.8;
-      s += `BT /F2 8.5 Tf ${subNetoX} ${currentY - 29} Td (${subNetoStr}) Tj ET\n`;
+      const subDetalCardStr = escapePdf(quotation.formattedSubtotalDetal);
+      const subDetalCardX = rightX + rightW - 12 - subDetalCardStr.length * 4.8;
+      s += `BT /F2 8 Tf ${subDetalCardX} ${currentY - 27} Td (${subDetalCardStr}) Tj ET\n`;
 
-      // Row 3: TOTAL IVA (19%) - CELDA DONDE SE SUMEN TODAS LAS CANTIDADES DEL IVA
-      s += "0.65 0.80 0.95 rg\n"; // Light slate cyan highlight
-      s += `BT /F2 7.5 Tf ${rightX + 12} ${currentY - 43} Td (TOTAL IVA (19%):) Tj ET\n`;
-      s += "0.68 0.85 1.0 rg\n"; // Highlighted crisp color for IVA total
-      const totIvaStr = escapePdf(quotation.formattedTotalIva);
-      const totIvaX = rightX + rightW - 12 - totIvaStr.length * 5.0;
-      s += `BT /F2 9 Tf ${totIvaX} ${currentY - 43} Td (${totIvaStr}) Tj ET\n`;
+      // Row 3: Descuento / Ahorro
+      if (quotation.totalDiscount > 0) {
+        s += "0.50 0.85 0.65 rg\n";
+        s += `BT /F2 7.2 Tf ${rightX + 12} ${currentY - 39} Td (AHORRO (${escapePdf(quotation.tierInfo.badge)}):) Tj ET\n`;
+        const discCardStr = `-${escapePdf(quotation.formattedTotalDiscount)}`;
+        const discCardX = rightX + rightW - 12 - discCardStr.length * 4.8;
+        s += `BT /F2 8 Tf ${discCardX} ${currentY - 39} Td (${discCardStr}) Tj ET\n`;
+      } else {
+        s += "0.65 0.70 0.75 rg\n";
+        s += `BT /F1 7.2 Tf ${rightX + 12} ${currentY - 39} Td (ESCALA APLICADA:) Tj ET\n`;
+        const badgeStr = escapePdf(quotation.tierInfo.badge);
+        const badgeX = rightX + rightW - 12 - badgeStr.length * 4.8;
+        s += `BT /F2 8 Tf ${badgeX} ${currentY - 39} Td (${badgeStr}) Tj ET\n`;
+      }
+
+      // Row 4: Subtotal Sin IVA
+      s += "0.75 0.75 0.80 rg\n";
+      s += `BT /F1 7.2 Tf ${rightX + 12} ${currentY - 51} Td (SUBTOTAL SIN IVA:) Tj ET\n`;
+      s += "1 1 1 rg\n";
+      const subSinIvaCardStr = escapePdf(quotation.formattedSubtotalSinIva);
+      const subSinIvaCardX = rightX + rightW - 12 - subSinIvaCardStr.length * 4.8;
+      s += `BT /F2 8.5 Tf ${subSinIvaCardX} ${currentY - 51} Td (${subSinIvaCardStr}) Tj ET\n`;
+
+      // Row 5: TOTAL IVA (19%) - CASILLA DONDE SE SUMEN TODAS LAS CANTIDADES DEL IVA
+      s += "0.65 0.82 1.0 rg\n"; // Light cyan highlight
+      s += `BT /F2 7.5 Tf ${rightX + 12} ${currentY - 65} Td (TOTAL IVA (19%):) Tj ET\n`;
+      s += "0.70 0.88 1.0 rg\n"; // Crisp cyan amount
+      const totIvaCardStr = escapePdf(quotation.formattedTotalIva);
+      const totIvaCardX = rightX + rightW - 12 - totIvaCardStr.length * 5.0;
+      s += `BT /F2 9 Tf ${totIvaCardX} ${currentY - 65} Td (${totIvaCardStr}) Tj ET\n`;
 
       // Hairline divider in card
       s += "0.22 0.22 0.28 RG 0.5 w\n";
-      s += `${rightX + 12} ${currentY - 54} m ${rightX + rightW - 12} ${currentY - 54} l S\n`;
+      s += `${rightX + 12} ${currentY - 76} m ${rightX + rightW - 12} ${currentY - 76} l S\n`;
 
-      // Row 4: Grand Total Cotización (con IVA incluido)
+      // Row 6: Grand Total Cotización (con IVA incluido)
       s += "0.90 0.90 0.95 rg\n";
-      s += `BT /F2 8 Tf ${rightX + 12} ${currentY - 73} Td (TOTAL COTIZACION:) Tj ET\n`;
+      s += `BT /F2 8 Tf ${rightX + 12} ${currentY - 92} Td (TOTAL COTIZACION:) Tj ET\n`;
 
       s += "1 1 1 rg\n"; // Crisp pure white amount
       const totGrandStr = escapePdf(quotation.formattedTotalWithIva);
       const totGrandX = rightX + rightW - 12 - totGrandStr.length * 7.5;
-      s += `BT /F2 13.5 Tf ${totGrandX} ${currentY - 74} Td (${totGrandStr}) Tj ET\n`;
+      s += `BT /F2 13 Tf ${totGrandX} ${currentY - 93} Td (${totGrandStr}) Tj ET\n`;
       s += "Q\n";
     }
 
@@ -1117,9 +1276,11 @@ export function openQuotationPrintView(quotation: QuotationData): void {
       <td style="padding: 7px 8px; font-size: 11px; color: #334155;">${it.color}</td>
       <td style="padding: 7px 8px; font-size: 11px; text-align: center; font-weight: 600; color: #0f172a;">${it.talla}</td>
       <td style="padding: 7px 8px; font-size: 11px; text-align: center; font-weight: bold; color: #0f172a;">${it.cantidad}</td>
-      <td style="padding: 7px 8px; font-size: 11px; text-align: right; color: #475569;">${it.formattedPrecioAntesIva}</td>
-      <td style="padding: 7px 8px; font-size: 11px; text-align: right; color: #0284c7; font-weight: 600;">${it.formattedPrecioUnitIvaInc}</td>
-      <td style="padding: 7px 8px; font-size: 11px; text-align: right; font-weight: bold; color: #0f172a;">${it.formattedTotalPriceWithIva}</td>
+      <td style="padding: 7px 8px; font-size: 11px; text-align: right; color: #64748b;">${it.formattedPrecioDetal}</td>
+      <td style="padding: 7px 8px; font-size: 11px; text-align: right; color: #334155;">${it.formattedPrecioSinIva}</td>
+      <td style="padding: 7px 8px; font-size: 11px; text-align: right; color: #0284c7; font-weight: 600;">${it.formattedValorIva}</td>
+      <td style="padding: 7px 8px; font-size: 11px; text-align: right; color: #0f172a; font-weight: 600;">${it.formattedPrecioUnitConIva}</td>
+      <td style="padding: 7px 8px; font-size: 11px; text-align: right; font-weight: bold; color: #0f172a;">${it.formattedTotalPrice}</td>
     </tr>
   `
     )
@@ -1386,15 +1547,17 @@ export function openQuotationPrintView(quotation: QuotationData): void {
     <table>
       <thead>
         <tr>
-          <th style="width: 24px; text-align: center;">#</th>
-          <th style="text-align: left; width: 75px;">REF</th>
+          <th style="width: 22px; text-align: center;">#</th>
+          <th style="text-align: left; width: 65px;">REF</th>
           <th style="text-align: left;">DESCRIPCIÓN</th>
-          <th style="text-align: left; width: 95px;">COLOR</th>
-          <th style="text-align: center; width: 40px;">TALLA</th>
-          <th style="text-align: center; width: 45px;">CANT</th>
-          <th style="text-align: right; width: 110px;">PRECIO ANTES IVA</th>
-          <th style="text-align: right; width: 130px;">P. UNIT. IVA INCLUIDO</th>
-          <th style="text-align: right; width: 95px;">TOTAL</th>
+          <th style="text-align: left; width: 85px;">COLOR</th>
+          <th style="text-align: center; width: 35px;">TALLA</th>
+          <th style="text-align: center; width: 35px;">CANT</th>
+          <th style="text-align: right; width: 85px;">P. DETAL</th>
+          <th style="text-align: right; width: 85px;">P. SIN IVA</th>
+          <th style="text-align: right; width: 80px;">VALOR IVA</th>
+          <th style="text-align: right; width: 95px;">P. UNIT C/IVA</th>
+          <th style="text-align: right; width: 90px;">TOTAL</th>
         </tr>
       </thead>
       <tbody>
@@ -1406,7 +1569,8 @@ export function openQuotationPrintView(quotation: QuotationData): void {
       <div class="obs-card">
         <h4>Observaciones y Condiciones Comerciales</h4>
         <p>• ${quotation.notes}</p>
-        <p>• Formato con IVA del 19%: Precio antes de IVA, Precio unitario con IVA incluido y Total.</p>
+        <p>• Precios detallan: Precio Detal, Precio sin IVA (Base), Valor IVA (19%) y Precio con IVA incluido.</p>
+        <p>• Fórmula comercial: Precio sin IVA = Precio con IVA / 1.19 | IVA 19% discriminado.</p>
         <p>• Precios y disponibilidad física de prendas sujetos a confirmación en bodega al momento de la orden.</p>
       </div>
       <div class="total-card">
@@ -1416,8 +1580,21 @@ export function openQuotationPrintView(quotation: QuotationData): void {
             <strong>${quotation.totalUnits} uds. (${quotation.totalReferences} refs)</strong>
           </div>
           <div class="row">
-            <span>SUBTOTAL ANTES DE IVA:</span>
-            <strong>${quotation.formattedSubtotalAntesIva}</strong>
+            <span>TOTAL PRECIO DETAL:</span>
+            <strong>${quotation.formattedSubtotalDetal}</strong>
+          </div>
+          ${
+            quotation.totalDiscount > 0
+              ? `
+          <div class="row" style="color: #4ade80;">
+            <span>AHORRO (${quotation.tierInfo.badge}):</span>
+            <strong>-${quotation.formattedTotalDiscount}</strong>
+          </div>`
+              : ""
+          }
+          <div class="row">
+            <span>SUBTOTAL SIN IVA:</span>
+            <strong>${quotation.formattedSubtotalSinIva}</strong>
           </div>
           <div class="row" style="color: #60a5fa; font-weight: bold; border-top: 1px dashed #374151; padding-top: 6px; margin-top: 6px;">
             <span>TOTAL IVA (19%):</span>
