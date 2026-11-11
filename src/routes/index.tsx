@@ -58,6 +58,10 @@ import {
   downloadSavedOrder,
   deleteOrderFromDb,
 } from "@/lib/order";
+import {
+  calculateItemUnitPrice,
+  calculateQuotationSummary,
+} from "@/lib/quotation";
 
 const colorToHex = (colorStr: string) => {
   const c = colorStr.toLowerCase();
@@ -700,8 +704,8 @@ function OrderModal({
 }) {
   const [customerName, setCustomerName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-  const total = order.reduce((s, i) => s + i.pvm * i.cantidad, 0);
-  const unidades = order.reduce((s, i) => s + i.cantidad, 0);
+  const summary = useMemo(() => calculateQuotationSummary(order), [order]);
+  const { totalUnits: unidades, tierInfo, subtotalDetal, totalAmount, totalSavings, totalUsd } = summary;
 
   const handleDownloadOnly = () => {
     if (order.length === 0) {
@@ -772,6 +776,47 @@ function OrderModal({
           </button>
         </div>
 
+        {/* Tier incentive & Progress Banner */}
+        {order.length > 0 && (
+          <div className="border-b border-border bg-muted/20 px-4 py-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span
+                  className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-black uppercase tracking-wide ${
+                    tierInfo.tier === "mayorista"
+                      ? "bg-primary text-primary-foreground"
+                      : tierInfo.tier === "descuento_30"
+                      ? "bg-emerald-600 text-white"
+                      : "bg-muted-foreground/20 text-foreground"
+                  }`}
+                >
+                  {tierInfo.badge}
+                </span>
+                <span className="text-xs font-semibold text-foreground">
+                  {tierInfo.label}
+                </span>
+              </div>
+              <span className="text-xs font-bold text-muted-foreground">
+                {unidades} {unidades === 1 ? "unidad" : "unidades"}
+              </span>
+            </div>
+
+            {tierInfo.unitsToNextTier > 0 && (
+              <div className="mt-2 space-y-1">
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-border">
+                  <div
+                    className="h-full bg-primary transition-all duration-300"
+                    style={{ width: `${tierInfo.progressPercent}%` }}
+                  />
+                </div>
+                <p className="text-[11px] font-medium text-primary">
+                  {tierInfo.nextTierPrompt}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="flex-1 overflow-y-auto p-4">
           {order.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center text-center text-muted-foreground">
@@ -782,79 +827,111 @@ function OrderModal({
             </div>
           ) : (
             <div className="space-y-2">
-              {order.map((it) => (
-                <div
-                  key={it.sku}
-                  className="flex items-center gap-3 rounded-xl border border-border bg-background/50 p-3"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="rounded-md bg-primary px-1.5 py-0.5 font-mono text-[10px] font-bold text-primary-foreground">
-                        {it.referencia}
-                      </span>
-                      <span className="text-xs font-semibold text-foreground capitalize">
-                        {it.color}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        · Talla {it.talla}
-                      </span>
+              {order.map((it) => {
+                const itemPrice = calculateItemUnitPrice(it, unidades);
+                const itemTotal = itemPrice * it.cantidad;
+                const pvp = Number(it.pvp) || Number(it.pvm) || 0;
+
+                return (
+                  <div
+                    key={it.sku}
+                    className="flex items-center gap-3 rounded-xl border border-border bg-background/50 p-3"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="rounded-md bg-primary px-1.5 py-0.5 font-mono text-[10px] font-bold text-primary-foreground">
+                          {it.referencia}
+                        </span>
+                        <span className="text-xs font-semibold text-foreground capitalize">
+                          {it.color}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          · Talla {it.talla}
+                        </span>
+                      </div>
+                      <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                        {it.descripcion}
+                      </p>
+                      <div className="mt-1 flex flex-wrap items-baseline gap-1.5">
+                        <span className="text-xs font-bold text-primary">
+                          {formatCurrency(itemPrice)}{" "}
+                          <span className="font-normal text-muted-foreground">c/u</span>
+                        </span>
+                        {tierInfo.tier === "descuento_30" && pvp > itemPrice && (
+                          <span className="text-[11px] text-muted-foreground line-through">
+                            {formatCurrency(pvp)}
+                          </span>
+                        )}
+                        {tierInfo.tier === "descuento_30" && (
+                          <span className="rounded bg-emerald-500/15 px-1 py-0.2 text-[9px] font-bold text-emerald-700 dark:text-emerald-300">
+                            -30% Detal
+                          </span>
+                        )}
+                        {tierInfo.tier === "mayorista" && (
+                          <span className="rounded bg-primary/10 px-1 py-0.2 text-[9px] font-bold text-primary">
+                            Mayorista
+                          </span>
+                        )}
+                        {tierInfo.tier === "detal" && (
+                          <span className="rounded bg-muted px-1 py-0.2 text-[9px] font-medium text-muted-foreground">
+                            Detal
+                          </span>
+                        )}
+                        <span className="text-[11px] text-muted-foreground">
+                          (Subtotal: {formatCurrency(itemTotal)})
+                        </span>
+                      </div>
                     </div>
-                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                      {it.descripcion}
-                    </p>
-                    <p className="mt-1 text-xs font-bold text-primary">
-                      {formatCurrency(it.pvm)} <span className="font-normal text-muted-foreground">c/u</span>
-                    </p>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => setOrderQty(it.sku, it.cantidad - 1)}
+                        className="flex h-7 w-7 items-center justify-center rounded-lg border border-border bg-background transition-colors hover:bg-muted"
+                      >
+                        <Minus className="h-3.5 w-3.5" />
+                      </button>
+                      <input
+                        type="number"
+                        min={1}
+                        max={it.saldo}
+                        value={it.cantidad}
+                        onChange={(e) => {
+                          const targetVal = Number(e.target.value) || 0;
+                          const res = setOrderQty(it.sku, targetVal);
+                          if (res.clamped && targetVal > it.saldo) {
+                            toast.error(
+                              `Solo hay ${it.saldo} unidades disponibles de esta variante.`,
+                              { id: `limit-${it.sku}` }
+                            );
+                          }
+                        }}
+                        className="w-12 rounded-lg border border-border bg-background py-1 text-center text-sm font-bold outline-none focus:border-accent"
+                      />
+                      <button
+                        onClick={() => {
+                          const res = setOrderQty(it.sku, it.cantidad + 1);
+                          if (res.clamped) {
+                            toast.error(
+                              `Solo hay ${it.saldo} unidades disponibles de esta variante.`,
+                              { id: `limit-${it.sku}` }
+                            );
+                          }
+                        }}
+                        disabled={it.cantidad >= it.saldo}
+                        className="flex h-7 w-7 items-center justify-center rounded-lg border border-border bg-background transition-colors hover:bg-muted disabled:opacity-40"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={() => removeOrderItem(it.sku)}
+                        className="ml-1 flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                        aria-label="Eliminar"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => setOrderQty(it.sku, it.cantidad - 1)}
-                      className="flex h-7 w-7 items-center justify-center rounded-lg border border-border bg-background transition-colors hover:bg-muted"
-                    >
-                      <Minus className="h-3.5 w-3.5" />
-                    </button>
-                    <input
-                      type="number"
-                      min={1}
-                      max={it.saldo}
-                      value={it.cantidad}
-                      onChange={(e) => {
-                        const targetVal = Number(e.target.value) || 0;
-                        const res = setOrderQty(it.sku, targetVal);
-                        if (res.clamped && targetVal > it.saldo) {
-                          toast.error(
-                            `Solo hay ${it.saldo} unidades disponibles de esta variante.`,
-                            { id: `limit-${it.sku}` }
-                          );
-                        }
-                      }}
-                      className="w-12 rounded-lg border border-border bg-background py-1 text-center text-sm font-bold outline-none focus:border-accent"
-                    />
-                    <button
-                      onClick={() => {
-                        const res = setOrderQty(it.sku, it.cantidad + 1);
-                        if (res.clamped) {
-                          toast.error(
-                            `Solo hay ${it.saldo} unidades disponibles de esta variante.`,
-                            { id: `limit-${it.sku}` }
-                          );
-                        }
-                      }}
-                      disabled={it.cantidad >= it.saldo}
-                      className="flex h-7 w-7 items-center justify-center rounded-lg border border-border bg-background transition-colors hover:bg-muted disabled:opacity-40"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      onClick={() => removeOrderItem(it.sku)}
-                      className="ml-1 flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                      aria-label="Eliminar"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -876,13 +953,32 @@ function OrderModal({
               />
             </div>
           )}
-          <div className="mb-3 flex items-center justify-between">
-            <span className="text-sm font-semibold text-muted-foreground">
-              Total mayorista
-            </span>
-            <span className="text-xl font-extrabold text-primary">
-              {formatCurrency(total)}
-            </span>
+          <div className="mb-3 space-y-1.5 rounded-xl border border-border/60 bg-background/60 p-3 text-xs">
+            <div className="flex items-center justify-between text-muted-foreground">
+              <span>Subtotal Detal (PVP):</span>
+              <span className={totalSavings > 0 ? "line-through" : "font-semibold text-foreground"}>
+                {formatCurrency(subtotalDetal)}
+              </span>
+            </div>
+
+            {totalSavings > 0 && (
+              <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-400 font-semibold">
+                <span>Ahorro aplicado ({tierInfo.label}):</span>
+                <span>-{formatCurrency(totalSavings)}</span>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between pt-1 border-t border-border/60 text-sm font-extrabold text-foreground">
+              <span>Total Cotización:</span>
+              <span className="text-lg text-primary">{formatCurrency(totalAmount)}</span>
+            </div>
+
+            {totalUsd > 0 && (
+              <div className="flex items-center justify-between pt-1 border-t border-dashed border-border/40 text-[11px] text-muted-foreground">
+                <span>Ref. Total USD (sin descuentos):</span>
+                <span className="font-bold text-foreground">{formatUsd(totalUsd)}</span>
+              </div>
+            )}
           </div>
           <div className="flex flex-col gap-2">
             <div className="flex gap-2">
@@ -1367,6 +1463,31 @@ function ReferenceCard({
               badge="USD"
             />
           )}
+        </div>
+
+        {/* Quotation Tiers Helper Banner */}
+        <div className="mx-5 mb-4 rounded-xl border border-border/70 bg-muted/25 p-3 text-xs">
+          <div className="flex items-center gap-1.5 font-bold text-foreground mb-1.5 text-[11px] uppercase tracking-wider">
+            <Tag className="h-3.5 w-3.5 text-primary" />
+            <span>Condiciones de cotización por volumen</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 text-[11px]">
+            <div className="flex items-center justify-between rounded-lg bg-background/80 px-2.5 py-1.5 border border-border/60">
+              <span className="text-muted-foreground">&lt; 12 unidades:</span>
+              <span className="font-semibold text-foreground">Precio Detal</span>
+            </div>
+            <div className="flex items-center justify-between rounded-lg bg-emerald-500/10 px-2.5 py-1.5 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400">
+              <span className="font-semibold">12 a 23 unidades:</span>
+              <span className="font-extrabold">30% Dto Detal</span>
+            </div>
+            <div className="flex items-center justify-between rounded-lg bg-primary/10 px-2.5 py-1.5 border border-primary/20 text-primary">
+              <span className="font-semibold">≥ 24 unidades:</span>
+              <span className="font-extrabold">Precio Mayorista</span>
+            </div>
+          </div>
+          <p className="mt-1.5 text-[10px] text-muted-foreground">
+            * El descuento aplica únicamente sobre el precio detal (COP). Los precios en dólares (USD) son fijos y no reciben descuento.
+          </p>
         </div>
 
         {/* Inventory Header */}

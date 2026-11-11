@@ -10,14 +10,89 @@ import {
 } from "./brandAssets";
 
 export type QuotationCurrency = "COP" | "USD";
-export type CopPriceType = "PVM" | "PVP";
+export type CopPriceType = "AUTO" | "PVM" | "PVP";
 
-export interface QuotationConfig {
-  currency: QuotationCurrency;
-  copPriceType: CopPriceType;
-  customerName?: string;
-  advisorName?: string;
-  notes?: string;
+export type QuotationTier = "detal" | "descuento_30" | "mayorista";
+
+export interface QuotationTierInfo {
+  tier: QuotationTier;
+  label: string;
+  badge: string;
+  discountPercentage: number;
+  description: string;
+  nextTierPrompt?: string;
+  unitsToNextTier?: number;
+  progressPercent: number;
+}
+
+export function getQuotationTier(totalUnits: number): QuotationTierInfo {
+  if (totalUnits < 12) {
+    const unitsToNextTier = 12 - totalUnits;
+    return {
+      tier: "detal",
+      label: "Precio Detal (Sin Descuento)",
+      badge: "Detal",
+      discountPercentage: 0,
+      description: "Menos de 12 unidades: aplica precio detal sin descuento.",
+      unitsToNextTier,
+      nextTierPrompt: `Agrega ${unitsToNextTier} ${
+        unitsToNextTier === 1 ? "unidad más" : "unidades más"
+      } para activar 30% de descuento sobre detal.`,
+      progressPercent: Math.max(0, Math.min(100, Math.round((totalUnits / 12) * 100))),
+    };
+  }
+
+  if (totalUnits <= 23) {
+    const unitsToNextTier = 24 - totalUnits;
+    return {
+      tier: "descuento_30",
+      label: "30% Descuento sobre Detal",
+      badge: "-30% Dto",
+      discountPercentage: 30,
+      description: "De 12 a 23 unidades: 30% de descuento sobre el precio detal.",
+      unitsToNextTier,
+      nextTierPrompt: `Agrega ${unitsToNextTier} ${
+        unitsToNextTier === 1 ? "unidad más" : "unidades más"
+      } para alcanzar Precio Mayorista.`,
+      progressPercent: Math.max(
+        0,
+        Math.min(100, Math.round(((totalUnits - 12) / (24 - 12)) * 100))
+      ),
+    };
+  }
+
+  return {
+    tier: "mayorista",
+    label: "Precio Mayorista (PVM)",
+    badge: "Mayorista",
+    discountPercentage: 0,
+    description: "24 o más unidades: las prendas quedan con precio mayorista.",
+    unitsToNextTier: 0,
+    nextTierPrompt: undefined,
+    progressPercent: 100,
+  };
+}
+
+export function calculateItemUnitPrice(
+  item: { pvm: number; pvp?: number; precioUsd?: number },
+  totalUnits: number
+): number {
+  const pvm = Number(item.pvm) || 0;
+  const pvp = Number(item.pvp) || pvm;
+
+  if (totalUnits < 12) {
+    return pvp > 0 ? pvp : pvm;
+  }
+  if (totalUnits <= 23) {
+    const baseDetal = pvp > 0 ? pvp : pvm;
+    const discount = Math.round(baseDetal * 0.3);
+    return Math.max(0, baseDetal - discount);
+  }
+  return pvm > 0 ? pvm : pvp;
+}
+
+export function getItemUsdPrice(item: { precioUsd?: number }): number {
+  return Number(item.precioUsd) || 0;
 }
 
 export interface QuotationItemSummary {
@@ -27,11 +102,23 @@ export interface QuotationItemSummary {
   color: string;
   talla: string;
   cantidad: number;
+  basePvp?: number;
+  basePvm?: number;
+  unitDiscount?: number;
+  discountPercentage?: number;
   unitPrice: number;
   totalPrice: number;
   currency: QuotationCurrency;
   formattedUnitPrice: string;
   formattedTotalPrice: string;
+}
+
+export interface QuotationConfig {
+  currency: QuotationCurrency;
+  copPriceType?: CopPriceType;
+  customerName?: string;
+  advisorName?: string;
+  notes?: string;
 }
 
 export interface QuotationData {
@@ -43,17 +130,91 @@ export interface QuotationData {
   notes: string;
   currency: QuotationCurrency;
   copPriceType: CopPriceType;
+  tierInfo: QuotationTierInfo;
   items: QuotationItemSummary[];
   totalUnits: number;
   totalReferences: number;
+  subtotalDetal: number;
+  totalDiscount: number;
   totalAmount: number;
+  formattedSubtotalDetal: string;
+  formattedTotalDiscount: string;
   formattedTotal: string;
 }
 
+export function calculateQuotationSummary(
+  items: Array<{
+    pvm: number;
+    pvp?: number;
+    precioUsd?: number;
+    cantidad: number;
+    sku?: string;
+    referencia?: string;
+  }>
+) {
+  const activeItems = items.filter((it) => (Number(it.cantidad) || 0) > 0);
+  const totalUnits = activeItems.reduce((s, it) => s + (Number(it.cantidad) || 0), 0);
+  const tierInfo = getQuotationTier(totalUnits);
+
+  let subtotalDetal = 0;
+  let subtotalMayorista = 0;
+  let totalAmount = 0;
+  let totalUsd = 0;
+  let hasUsdPrices = false;
+
+  const itemPrices = items.map((item) => {
+    const qty = Number(item.cantidad) || 0;
+    const pvm = Number(item.pvm) || 0;
+    const pvp = Number(item.pvp) || pvm;
+    const usd = getItemUsdPrice(item);
+
+    if (usd > 0) hasUsdPrices = true;
+
+    const unitPriceCop = calculateItemUnitPrice(item, totalUnits);
+    const unitDiscountCop = Math.max(0, pvp - unitPriceCop);
+    const lineTotalCop = unitPriceCop * qty;
+    const lineTotalUsd = usd * qty;
+
+    subtotalDetal += pvp * qty;
+    subtotalMayorista += pvm * qty;
+    totalAmount += lineTotalCop;
+    totalUsd += lineTotalUsd;
+
+    return {
+      sku: item.sku || "",
+      referencia: item.referencia || "",
+      cantidad: qty,
+      basePvp: pvp,
+      basePvm: pvm,
+      unitPriceCop,
+      unitDiscountCop,
+      lineTotalCop,
+      unitPriceUsd: usd,
+      lineTotalUsd,
+    };
+  });
+
+  const totalSavings = Math.max(0, subtotalDetal - totalAmount);
+
+  return {
+    totalUnits,
+    tierInfo,
+    subtotalDetal,
+    subtotalMayorista,
+    totalAmount,
+    totalSavings,
+    totalUsd,
+    hasUsdPrices,
+    itemPrices,
+  };
+}
+
 /**
- * Calculates item and total prices based on the advisor's chosen currency:
- * - COP: Multiplies units by PVM (wholesale) or PVP (retail).
- * - USD: Multiplies units by precioUsd.
+ * Calculates item and total prices based on the commercial quotation rules:
+ * - < 12 units: Detal price (PVP) without discount.
+ * - 12 - 23 units: 30% discount applied solely to retail price (PVP).
+ * - >= 24 units: Wholesale price (PVM).
+ * - USD currency: completely untouched, no discounts applied.
  */
 export function buildQuotationData(
   items: OrderItem[],
@@ -69,51 +230,76 @@ export function buildQuotationData(
   const isUsd = config.currency === "USD";
   const trmFallback = 4000;
 
-  const itemSummaries: QuotationItemSummary[] = items
-    .filter((it) => it.cantidad > 0)
-    .map((it) => {
-      const invRow = inventoryLookup?.[it.sku];
-      let unitPrice = 0;
+  const activeItems = items.filter((it) => it.cantidad > 0);
+  const totalUnits = activeItems.reduce((sum, it) => sum + it.cantidad, 0);
+  const tierInfo = getQuotationTier(totalUnits);
 
-      if (isUsd) {
-        // Priority: item.precioUsd -> invRow.precioUsd -> calculated fallback from PVM / TRM
-        if (it.precioUsd && it.precioUsd > 0) {
-          unitPrice = it.precioUsd;
-        } else if (invRow?.precioUsd && invRow.precioUsd > 0) {
-          unitPrice = invRow.precioUsd;
-        } else {
-          const basePvm = it.pvm || invRow?.pvm || 0;
-          unitPrice = Math.ceil(((basePvm / 1.19 + 1000) / trmFallback) * 100) / 100;
-        }
+  const itemSummaries: QuotationItemSummary[] = activeItems.map((it) => {
+    const invRow = inventoryLookup?.[it.sku];
+    const basePvp = it.pvp ?? invRow?.pvp ?? it.pvm ?? invRow?.pvm ?? 0;
+    const basePvm = it.pvm ?? invRow?.pvm ?? 0;
+    let unitPrice = 0;
+    let unitDiscount = 0;
+    let discountPercentage = 0;
+
+    if (isUsd) {
+      // Regla: No tocar precios en dólares. Se mantienen fijos sin descuentos.
+      if (it.precioUsd && it.precioUsd > 0) {
+        unitPrice = it.precioUsd;
+      } else if (invRow?.precioUsd && invRow.precioUsd > 0) {
+        unitPrice = invRow.precioUsd;
       } else {
-        // Colombian Pesos (COP)
-        if (config.copPriceType === "PVP") {
-          unitPrice = it.pvp ?? invRow?.pvp ?? it.pvm ?? 0;
-        } else {
-          unitPrice = it.pvm ?? invRow?.pvm ?? 0;
-        }
+        unitPrice = Math.ceil(((basePvm / 1.19 + 1000) / trmFallback) * 100) / 100;
       }
+    } else {
+      // En COP aplican las condiciones de cotización:
+      // - < 12 unidades: sin descuento (PVP detal)
+      // - 12 a 23 unidades: 30% descuento sobre detal
+      // - >= 24 unidades: precio mayorista (PVM)
+      if (totalUnits < 12) {
+        unitPrice = basePvp > 0 ? basePvp : basePvm;
+        unitDiscount = 0;
+        discountPercentage = 0;
+      } else if (totalUnits <= 23) {
+        const pvpRef = basePvp > 0 ? basePvp : basePvm;
+        unitDiscount = Math.round(pvpRef * 0.3);
+        unitPrice = Math.max(0, pvpRef - unitDiscount);
+        discountPercentage = 30;
+      } else {
+        unitPrice = basePvm > 0 ? basePvm : basePvp;
+        unitDiscount = Math.max(0, basePvp - basePvm);
+        discountPercentage = 0;
+      }
+    }
 
-      // Calculation required: units * price
-      const totalPrice = it.cantidad * unitPrice;
+    // Calculation required: units * price
+    const totalPrice = it.cantidad * unitPrice;
 
-      return {
-        sku: it.sku,
-        referencia: it.referencia,
-        descripcion: it.descripcion,
-        color: it.color,
-        talla: it.talla,
-        cantidad: it.cantidad,
-        unitPrice,
-        totalPrice,
-        currency: config.currency,
-        formattedUnitPrice: isUsd ? formatUsd(unitPrice) : formatCurrency(unitPrice),
-        formattedTotalPrice: isUsd ? formatUsd(totalPrice) : formatCurrency(totalPrice),
-      };
-    });
+    return {
+      sku: it.sku,
+      referencia: it.referencia,
+      descripcion: it.descripcion,
+      color: it.color,
+      talla: it.talla,
+      cantidad: it.cantidad,
+      basePvp,
+      basePvm,
+      unitDiscount,
+      discountPercentage,
+      unitPrice,
+      totalPrice,
+      currency: config.currency,
+      formattedUnitPrice: isUsd ? formatUsd(unitPrice) : formatCurrency(unitPrice),
+      formattedTotalPrice: isUsd ? formatUsd(totalPrice) : formatCurrency(totalPrice),
+    };
+  });
 
-  const totalUnits = itemSummaries.reduce((sum, it) => sum + it.cantidad, 0);
   const totalAmount = itemSummaries.reduce((sum, it) => sum + it.totalPrice, 0);
+  const subtotalDetal = itemSummaries.reduce(
+    (sum, it) => sum + (it.basePvp || it.unitPrice) * it.cantidad,
+    0
+  );
+  const totalDiscount = isUsd ? 0 : Math.max(0, subtotalDetal - totalAmount);
   const distinctRefs = new Set(itemSummaries.map((it) => it.referencia)).size;
 
   return {
@@ -124,11 +310,16 @@ export function buildQuotationData(
     advisorName: (config.advisorName || "").trim() || "Asesor Trucco's Jeans",
     notes: (config.notes || "").trim() || "Cotización comercial sujeta a disponibilidad de inventario.",
     currency: config.currency,
-    copPriceType: config.copPriceType,
+    copPriceType: config.copPriceType || "AUTO",
+    tierInfo,
     items: itemSummaries,
     totalUnits,
     totalReferences: distinctRefs,
+    subtotalDetal,
+    totalDiscount,
     totalAmount,
+    formattedSubtotalDetal: formatCurrency(subtotalDetal),
+    formattedTotalDiscount: formatCurrency(totalDiscount),
     formattedTotal: isUsd ? formatUsd(totalAmount) : formatCurrency(totalAmount),
   };
 }
@@ -139,8 +330,8 @@ export function buildQuotationData(
 export function downloadQuotationExcel(quotation: QuotationData): void {
   const isUsd = quotation.currency === "USD";
   const currencyLabel = isUsd
-    ? "Dólares Americanos (USD)"
-    : `Pesos Colombianos (COP) - ${quotation.copPriceType === "PVM" ? "Mayorista (PVM)" : "Detal (PVP)"}`;
+    ? "Dólares Americanos (USD) - Tarifa fija internacional"
+    : `Pesos Colombianos (COP) - Escala: ${quotation.tierInfo.label}`;
 
   const aoa: (string | number)[][] = [
     ["TRUCCO'S JEANS - COMERCIAL TRUCCOS S.A.S. (NIT 900.228.614-1)"],
@@ -178,6 +369,28 @@ export function downloadQuotationExcel(quotation: QuotationData): void {
   });
 
   aoa.push([]);
+  if (!isUsd && quotation.totalDiscount > 0) {
+    aoa.push([
+      "",
+      "",
+      "",
+      "",
+      "Subtotal Detal:",
+      "",
+      "",
+      quotation.subtotalDetal,
+    ]);
+    aoa.push([
+      "",
+      "",
+      "",
+      "",
+      `Descuento aplicado (${quotation.tierInfo.badge}):`,
+      "",
+      "",
+      -quotation.totalDiscount,
+    ]);
+  }
   aoa.push([
     "",
     "",
@@ -309,9 +522,7 @@ export function generateQuotationPdfBlob(quotation: QuotationData): Blob {
   const isUsd = quotation.currency === "USD";
   const currencyBadgeText = isUsd
     ? "DOLARES (USD)"
-    : quotation.copPriceType === "PVM"
-    ? "COP - MAYORISTA PVM"
-    : "COP - DETAL PVP";
+    : `COP - ${quotation.tierInfo.badge.toUpperCase()}`;
 
   // Pagination planning
   const rowsPerPageFirst = 16;
@@ -774,8 +985,8 @@ export function downloadQuotationPdf(quotation: QuotationData): void {
 export function openQuotationPrintView(quotation: QuotationData): void {
   const isUsd = quotation.currency === "USD";
   const currencyBadge = isUsd
-    ? "DÓLARES AMERICANOS (USD)"
-    : `PESOS COLOMBIANOS (COP) - ${quotation.copPriceType === "PVM" ? "MAYORISTA (PVM)" : "DETAL (PVP)"}`;
+    ? "DÓLARES AMERICANOS (USD) - TARIFA FIJA"
+    : `PESOS COLOMBIANOS (COP) - ${quotation.tierInfo.label.toUpperCase()}`;
 
   const rowsHtml = quotation.items
     .map(

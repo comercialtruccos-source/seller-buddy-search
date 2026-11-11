@@ -2,6 +2,7 @@ import { useEffect, useSyncExternalStore } from "react";
 import * as XLSX from "xlsx";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { calculateItemUnitPrice, calculateQuotationSummary } from "./quotation";
 
 export interface OrderItem {
   sku: string;
@@ -15,6 +16,7 @@ export interface OrderItem {
   precioUsd?: number;
   saldo: number;
   cantidad: number;
+  unitPrice?: number;
 }
 
 const STORAGE_KEY = "pedido_actual_v1";
@@ -126,7 +128,11 @@ export function clearOrder() {
   emit();
 }
 
-export function downloadOrderXls(order: OrderItem[], customerName?: string) {
+export function downloadOrderXls(
+  order: OrderItem[],
+  customerName?: string,
+  isAlreadyPriced: boolean = false
+) {
   const aoa: (string | number)[][] = [
     [
       "StrProducto",
@@ -146,12 +152,18 @@ export function downloadOrderXls(order: OrderItem[], customerName?: string) {
     return trimmed;
   };
 
+  const totalUnits = order.reduce((s, i) => s + (Number(i.cantidad) || 0), 0);
+
   for (const it of order) {
     if (it.cantidad <= 0) continue;
+    const unitPrice = isAlreadyPriced
+      ? (it.unitPrice ?? it.pvm)
+      : calculateItemUnitPrice(it, totalUnits);
+
     aoa.push([
       it.referencia,
       it.cantidad,
-      it.pvm,
+      unitPrice,
       "01",
       formatNumeric(it.talla),
       formatNumeric(it.codColor),
@@ -233,8 +245,9 @@ export async function saveOrderToDb(customerName: string, items: OrderItem[]): P
     throw new Error(errors.join("\n"));
   }
 
-  // 4. Insert order header
-  const totalAmount = items.reduce((s, i) => s + i.pvm * i.cantidad, 0);
+  // 4. Calculate total amount according to quotation conditions
+  const summary = calculateQuotationSummary(items);
+  const totalAmount = summary.totalAmount;
   const { data: orderData, error: orderError } = await supabase
     .from("orders")
     .insert({
@@ -246,7 +259,7 @@ export async function saveOrderToDb(customerName: string, items: OrderItem[]): P
 
   if (orderError) throw orderError;
 
-  // 5. Insert order items
+  // 5. Insert order items with the applied unit price from quotation conditions
   const itemsToInsert = items.map((it) => ({
     order_id: orderData.id,
     sku: it.sku,
@@ -255,7 +268,7 @@ export async function saveOrderToDb(customerName: string, items: OrderItem[]): P
     talla: it.talla,
     color: it.color,
     cod_color: it.codColor,
-    pvm: it.pvm,
+    pvm: calculateItemUnitPrice(it, summary.totalUnits),
     cantidad: it.cantidad,
   }));
 
@@ -296,11 +309,13 @@ export async function downloadSavedOrder(orderId: string, customerName: string) 
     color: item.color,
     codColor: item.cod_color,
     pvm: Number(item.pvm),
+    pvp: Number(item.pvm),
+    unitPrice: Number(item.pvm),
     saldo: 99999, // dummy stock value for export
     cantidad: item.cantidad,
   }));
 
-  downloadOrderXls(orderItems, customerName);
+  downloadOrderXls(orderItems, customerName, true);
 }
 
 export async function deleteOrderFromDb(orderId: string): Promise<void> {

@@ -24,7 +24,8 @@ import {
   clearOrder,
   OrderItem,
 } from "../lib/order";
-import { InventoryRow, formatCurrency } from "../lib/inventory";
+import { InventoryRow, formatCurrency, formatUsd } from "../lib/inventory";
+import { calculateQuotationSummary, calculateItemUnitPrice } from "../lib/quotation";
 
 interface VoiceOrderAssistantModalProps {
   open: boolean;
@@ -218,8 +219,9 @@ export const VoiceOrderAssistantModal: React.FC<VoiceOrderAssistantModalProps> =
 
   if (!open) return null;
 
-  const totalItems = order.reduce((s, i) => s + i.cantidad, 0);
-  const totalPrice = order.reduce((s, i) => s + i.cantidad * i.pvm, 0);
+  const quotationSummary = React.useMemo(() => calculateQuotationSummary(order), [order]);
+  const totalItems = quotationSummary.totalUnits;
+  const totalPrice = quotationSummary.totalAmount;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-md animate-fade-in">
@@ -361,10 +363,26 @@ export const VoiceOrderAssistantModal: React.FC<VoiceOrderAssistantModalProps> =
                   <span className="text-muted-foreground">Total artículos:</span>
                   <span className="font-bold text-accent">{totalItems} uds</span>
                 </div>
+                <div className="flex justify-between border-b border-border pb-1.5">
+                  <span className="text-muted-foreground">Escala:</span>
+                  <span className="font-bold text-primary">{quotationSummary.tierInfo.badge}</span>
+                </div>
+                {quotationSummary.totalSavings > 0 && (
+                  <div className="flex justify-between border-b border-border pb-1.5 text-emerald-600 dark:text-emerald-400">
+                    <span>Ahorro aplicado:</span>
+                    <span className="font-bold">-{formatCurrency(quotationSummary.totalSavings)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Total PVM:</span>
+                  <span className="text-muted-foreground font-semibold">Total Cotización:</span>
                   <span className="font-bold text-foreground">{formatCurrency(totalPrice)}</span>
                 </div>
+                {quotationSummary.hasUsdPrices && (
+                  <div className="flex justify-between pt-1 border-t border-border/50 text-[11px] text-muted-foreground">
+                    <span>Total USD (fijo):</span>
+                    <span className="font-bold">{formatUsd(quotationSummary.totalUsd)}</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -379,24 +397,32 @@ export const VoiceOrderAssistantModal: React.FC<VoiceOrderAssistantModalProps> =
                   El pedido está vacío. Háblale al asistente para agregar productos.
                 </div>
               ) : (
-                order.map((item) => (
-                  <div
-                    key={item.sku}
-                    className="flex items-center justify-between rounded-xl border border-border bg-card p-2.5 text-xs shadow-sm"
-                  >
-                    <div>
-                      <span className="font-bold text-foreground">{item.referencia}</span>
-                      <p className="text-[10px] text-muted-foreground">
-                        {item.color} - Talla {item.talla}
-                      </p>
+                order.map((item) => {
+                  const unitPrice = calculateItemUnitPrice(item, totalItems);
+                  return (
+                    <div
+                      key={item.sku}
+                      className="flex items-center justify-between rounded-xl border border-border bg-card p-2.5 text-xs shadow-sm"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-foreground">{item.referencia}</span>
+                          <span className="text-[10px] text-muted-foreground truncate">
+                            {item.color} · T{item.talla}
+                          </span>
+                        </div>
+                        <p className="text-[11px] font-semibold text-primary mt-0.5">
+                          {formatCurrency(unitPrice)} <span className="font-normal text-muted-foreground">c/u</span>
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="rounded-lg bg-accent/10 px-2 py-0.5 font-bold text-accent">
+                          x{item.cantidad}
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="rounded-lg bg-accent/10 px-2 py-0.5 font-bold text-accent">
-                        x{item.cantidad}
-                      </span>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
 

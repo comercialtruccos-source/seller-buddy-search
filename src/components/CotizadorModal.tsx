@@ -213,38 +213,19 @@ export function CotizadorModal({
                 </div>
 
                 {currency === "COP" && (
-                  <div className="mt-3 pt-2.5 border-t border-border flex items-center gap-2">
+                  <div className="mt-3 pt-2.5 border-t border-border flex flex-wrap items-center justify-between gap-2">
                     <span className="text-[10px] font-bold text-muted-foreground uppercase">
-                      Tipo de Precio:
+                      Escala aplicada:
                     </span>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setCopPriceType("PVM");
-                      }}
-                      className={`px-2.5 py-1 rounded text-[11px] font-bold transition-colors ${
-                        copPriceType === "PVM"
-                          ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
-                          : "bg-muted text-muted-foreground hover:bg-muted/80"
-                      }`}
-                    >
-                      Mayorista (PVM)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setCopPriceType("PVP");
-                      }}
-                      className={`px-2.5 py-1 rounded text-[11px] font-bold transition-colors ${
-                        copPriceType === "PVP"
-                          ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
-                          : "bg-muted text-muted-foreground hover:bg-muted/80"
-                      }`}
-                    >
-                      Detal (PVP)
-                    </button>
+                    <span className={`px-2 py-0.5 rounded text-[11px] font-black uppercase tracking-wide ${
+                      quotation.tierInfo.tier === "detal"
+                        ? "bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/25"
+                        : quotation.tierInfo.tier === "descuento_30"
+                        ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25"
+                        : "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
+                    }`}>
+                      {quotation.tierInfo.label} ({quotation.tierInfo.badge})
+                    </span>
                   </div>
                 )}
               </div>
@@ -278,14 +259,63 @@ export function CotizadorModal({
                     <span className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
                       ✓ Precios en dólares asignados a cada prenda
                     </span>
-                    <span className="text-[10px] font-mono font-bold bg-muted px-1.5 py-0.5 rounded">
-                      USD ($)
+                    <span className="text-[10px] font-mono font-bold bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
+                      USD ($) · Tarifa fija sin descuentos
                     </span>
                   </div>
                 )}
               </div>
             </div>
           </div>
+
+          {/* Commercial Volume Scale Banner */}
+          {currency === "COP" && quotation.items.length > 0 && (
+            <div className={`rounded-2xl border p-4 transition-colors ${
+              quotation.tierInfo.tier === "detal"
+                ? "bg-amber-500/10 border-amber-500/25 text-amber-950 dark:text-amber-200"
+                : quotation.tierInfo.tier === "descuento_30"
+                ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-950 dark:text-emerald-200"
+                : "bg-primary/10 border-primary/20 text-primary"
+            }`}>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-black uppercase tracking-wide ${
+                    quotation.tierInfo.tier === "detal"
+                      ? "bg-amber-500/20 text-amber-900 dark:text-amber-300"
+                      : quotation.tierInfo.tier === "descuento_30"
+                      ? "bg-emerald-500/20 text-emerald-800 dark:text-emerald-300"
+                      : "bg-primary/20 text-primary"
+                  }`}>
+                    {quotation.tierInfo.badge}
+                  </span>
+                  <span className="text-xs font-semibold">
+                    {quotation.tierInfo.tier === "detal" && "Escala Detal (Menos de 12 uds: sin descuento)"}
+                    {quotation.tierInfo.tier === "descuento_30" && "30% Descuento Detal aplicado (12 a 23 unidades)"}
+                    {quotation.tierInfo.tier === "mayorista" && "Tarifa Mayorista Plena activada (24 o más unidades)"}
+                  </span>
+                </div>
+                <span className="text-xs font-bold whitespace-nowrap">
+                  {quotation.totalUnits} uds totales
+                </span>
+              </div>
+
+              {quotation.tierInfo.nextTierPrompt && (
+                <div className="mt-2 text-xs">
+                  <p className="font-medium text-foreground/90">
+                    💡 {quotation.tierInfo.nextTierPrompt}
+                  </p>
+                  <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+                    <div
+                      className={`h-full transition-all duration-300 ${
+                        quotation.tierInfo.tier === "detal" ? "bg-amber-500" : "bg-emerald-500"
+                      }`}
+                      style={{ width: `${quotation.tierInfo.progressPercent}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* STEP 2: Optional Client & Advisor Information */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-2xl border border-border bg-card p-4">
@@ -436,7 +466,18 @@ export function CotizadorModal({
                             </div>
                           </td>
                           <td className="py-2.5 px-3 text-right font-medium text-foreground">
-                            {it.formattedUnitPrice}
+                            {currency === "COP" && it.unitDiscount && it.unitDiscount > 0 ? (
+                              <div className="flex flex-col items-end">
+                                <span className="text-[10px] line-through text-muted-foreground">
+                                  {formatCurrency(it.basePvp || 0)}
+                                </span>
+                                <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                                  {it.formattedUnitPrice}
+                                </span>
+                              </div>
+                            ) : (
+                              it.formattedUnitPrice
+                            )}
                           </td>
                           <td className="py-2.5 px-3 text-right font-bold text-foreground">
                             {it.formattedTotalPrice}
@@ -459,20 +500,33 @@ export function CotizadorModal({
 
                 {/* Subtotal & Summary footer of the table */}
                 <div className="bg-muted/40 p-4 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-3">
-                  <div className="text-xs text-muted-foreground">
-                    <span>
+                  <div className="text-xs text-muted-foreground space-y-0.5">
+                    <div>
                       Total: <strong>{quotation.totalUnits}</strong> prendas de{" "}
                       <strong>{quotation.totalReferences}</strong> referencias
-                    </span>
+                    </div>
+                    {currency === "COP" && quotation.totalDiscount > 0 && (
+                      <div className="text-emerald-600 dark:text-emerald-400 font-bold">
+                        Ahorro total aplicado: -{quotation.formattedTotalDiscount}
+                      </div>
+                    )}
                   </div>
 
-                  <div className="flex items-center gap-4 text-right">
-                    <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                      Total Cotización ({currency}):
-                    </span>
-                    <span className="text-xl font-black text-slate-900 dark:text-slate-100">
-                      {quotation.formattedTotal}
-                    </span>
+                  <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2 sm:gap-4 text-right">
+                    {currency === "COP" && quotation.totalDiscount > 0 && (
+                      <div className="text-xs text-muted-foreground">
+                        <span>Subtotal Detal: </span>
+                        <span className="font-semibold text-foreground">{quotation.formattedSubtotalDetal}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                        Total Cotización ({currency}):
+                      </span>
+                      <span className="text-xl font-black text-slate-900 dark:text-slate-100">
+                        {quotation.formattedTotal}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
