@@ -107,6 +107,8 @@ export interface QuotationItemSummary {
   unitDiscount?: number;
   discountPercentage?: number;
   precioDetal: number; // Precio detal original (con IVA incluido)
+  precioMayorista: number; // Precio mayorista de catálogo (con IVA incluido)
+  precioBaseCatalogo: number; // Precio base según escala (detal si < 24 uds, mayorista si >= 24 uds)
   precioSinIva: number; // Precio sin IVA (antes de IVA = precioUnitConIva / 1.19)
   valorIva: number; // Valor unitario del IVA (19% = precioUnitConIva - precioSinIva)
   precioUnitConIva: number; // Precio unitario final con IVA incluido
@@ -122,6 +124,8 @@ export interface QuotationItemSummary {
   totalPriceWithIva: number; // Alias: totalPrice
   currency: QuotationCurrency;
   formattedPrecioDetal: string; // Formato: Precio detal
+  formattedPrecioMayorista: string; // Formato: Precio mayorista
+  formattedPrecioBaseCatalogo: string; // Formato: Precio base según escala
   formattedPrecioSinIva: string; // Formato: Precio sin IVA
   formattedValorIva: string; // Formato: Valor del IVA
   formattedPrecioUnitConIva: string; // Formato: Precio unitario con IVA
@@ -156,8 +160,13 @@ export interface QuotationData {
   items: QuotationItemSummary[];
   totalUnits: number;
   totalReferences: number;
+  isMayorista: boolean; // true si totalUnits >= 24
+  basePriceColumnLabel: string; // "P. MAYORISTA" o "P. DETAL"
+  basePriceExcelLabel: string; // "PRECIO MAYORISTA" o "PRECIO DETAL"
   subtotalDetal: number; // Suma de todos los precios detal * cantidad
-  totalDiscount: number; // Ahorro total respecto al detal
+  subtotalMayorista: number; // Suma de todos los precios mayoristas * cantidad
+  subtotalCatalogo: number; // Subtotal base de catálogo (mayorista si >= 24, detal si < 24)
+  totalDiscount: number; // Ahorro total respecto al detal (0 en mayorista)
   subtotalSinIva: number; // Suma de todos los subtotales de prendas sin IVA
   totalIva: number; // Suma de todas las cantidades del IVA (19%)
   totalWithIva: number; // Total general con IVA incluido (subtotalSinIva + totalIva)
@@ -165,6 +174,8 @@ export interface QuotationData {
   subtotalBase: number; // Alias: subtotalSinIva
   subtotalAntesIva: number; // Alias: subtotalSinIva
   formattedSubtotalDetal: string;
+  formattedSubtotalMayorista: string;
+  formattedSubtotalCatalogo: string;
   formattedTotalDiscount: string;
   formattedSubtotalSinIva: string;
   formattedTotalIva: string; // Celda donde se suman todas las cantidades del IVA
@@ -281,6 +292,9 @@ export function buildQuotationData(
   const activeItems = items.filter((it) => it.cantidad > 0);
   const totalUnits = activeItems.reduce((sum, it) => sum + it.cantidad, 0);
   const tierInfo = getQuotationTier(totalUnits);
+  const isMayorista = tierInfo.tier === "mayorista";
+  const basePriceColumnLabel = isMayorista ? "P. MAYORISTA" : "P. DETAL";
+  const basePriceExcelLabel = isMayorista ? "PRECIO MAYORISTA" : "PRECIO DETAL";
 
   const itemSummaries: QuotationItemSummary[] = activeItems.map((it) => {
     const invRow = inventoryLookup?.[it.sku];
@@ -289,6 +303,8 @@ export function buildQuotationData(
     const basePvm = it.pvm ?? invRow?.pvm ?? 0;
     const precioDetal = basePvp > 0 ? basePvp : basePvm;
     const precioMayorista = basePvm > 0 ? basePvm : precioDetal;
+    // Si la cotización es mayorista (>= 24 unidades), el precio base de catálogo es el precio mayorista
+    const precioBaseCatalogo = isMayorista ? precioMayorista : precioDetal;
 
     let precioUnitConIva = 0;
     let unitDiscount = 0;
@@ -318,8 +334,8 @@ export function buildQuotationData(
         discountPercentage = 30;
       } else {
         precioUnitConIva = precioMayorista;
-        unitDiscount = Math.max(0, precioDetal - precioMayorista);
-        discountPercentage = precioDetal > 0 ? Math.round(((precioDetal - precioMayorista) / precioDetal) * 100) : 0;
+        unitDiscount = 0;
+        discountPercentage = 0;
       }
     }
 
@@ -349,6 +365,8 @@ export function buildQuotationData(
       : Math.round(it.cantidad * precioUnitConIva);
 
     const formattedPrecioDetal = isUsd ? formatUsd(precioDetal) : formatCurrency(precioDetal);
+    const formattedPrecioMayorista = isUsd ? formatUsd(precioMayorista) : formatCurrency(precioMayorista);
+    const formattedPrecioBaseCatalogo = isUsd ? formatUsd(precioBaseCatalogo) : formatCurrency(precioBaseCatalogo);
     const formattedPrecioSinIva = isUsd ? formatUsd(precioSinIva) : formatCurrency(precioSinIva);
     const formattedValorIva = isUsd ? formatUsd(valorIva) : formatCurrency(valorIva);
     const formattedPrecioUnitConIva = isUsd ? formatUsd(precioUnitConIva) : formatCurrency(precioUnitConIva);
@@ -368,6 +386,8 @@ export function buildQuotationData(
       unitDiscount,
       discountPercentage,
       precioDetal,
+      precioMayorista,
+      precioBaseCatalogo,
       precioSinIva,
       valorIva,
       precioUnitConIva,
@@ -383,6 +403,8 @@ export function buildQuotationData(
       totalPriceWithIva: totalPrice,
       currency: config.currency,
       formattedPrecioDetal,
+      formattedPrecioMayorista,
+      formattedPrecioBaseCatalogo,
       formattedPrecioSinIva,
       formattedValorIva,
       formattedPrecioUnitConIva,
@@ -404,10 +426,17 @@ export function buildQuotationData(
     (sum, it) => sum + it.precioDetal * it.cantidad,
     0
   );
-  const totalDiscount = isUsd ? 0 : Math.max(0, subtotalDetal - totalWithIva);
+  const subtotalMayorista = itemSummaries.reduce(
+    (sum, it) => sum + it.precioMayorista * it.cantidad,
+    0
+  );
+  const subtotalCatalogo = isMayorista ? subtotalMayorista : subtotalDetal;
+  const totalDiscount = isUsd || isMayorista ? 0 : Math.max(0, subtotalDetal - totalWithIva);
   const distinctRefs = new Set(itemSummaries.map((it) => it.referencia)).size;
 
   const formattedSubtotalDetal = formatCurrency(subtotalDetal);
+  const formattedSubtotalMayorista = isUsd ? formatUsd(subtotalMayorista) : formatCurrency(subtotalMayorista);
+  const formattedSubtotalCatalogo = isUsd ? formatUsd(subtotalCatalogo) : formatCurrency(subtotalCatalogo);
   const formattedTotalDiscount = formatCurrency(totalDiscount);
   const formattedSubtotalSinIva = isUsd ? formatUsd(subtotalSinIva) : formatCurrency(subtotalSinIva);
   const formattedTotalIva = isUsd ? formatUsd(totalIva) : formatCurrency(totalIva);
@@ -426,7 +455,12 @@ export function buildQuotationData(
     items: itemSummaries,
     totalUnits,
     totalReferences: distinctRefs,
+    isMayorista,
+    basePriceColumnLabel,
+    basePriceExcelLabel,
     subtotalDetal,
+    subtotalMayorista,
+    subtotalCatalogo,
     totalDiscount,
     subtotalSinIva,
     totalIva,
@@ -435,6 +469,8 @@ export function buildQuotationData(
     subtotalBase: subtotalSinIva,
     subtotalAntesIva: subtotalSinIva,
     formattedSubtotalDetal,
+    formattedSubtotalMayorista,
+    formattedSubtotalCatalogo,
     formattedTotalDiscount,
     formattedSubtotalSinIva,
     formattedTotalIva,
@@ -471,7 +507,7 @@ export function downloadQuotationExcel(quotation: QuotationData): void {
       "COLOR",
       "TALLA",
       "CANTIDAD",
-      `PRECIO DETAL (${quotation.currency})`,
+      `${quotation.basePriceExcelLabel} (${quotation.currency})`,
       `PRECIO SIN IVA (${quotation.currency})`,
       `VALOR IVA (19%) (${quotation.currency})`,
       `PRECIO UNITARIO IVA INCLUIDO (${quotation.currency})`,
@@ -487,7 +523,7 @@ export function downloadQuotationExcel(quotation: QuotationData): void {
       it.color,
       it.talla,
       it.cantidad,
-      it.precioDetal,
+      it.precioBaseCatalogo,
       it.precioSinIva,
       it.valorIva,
       it.precioUnitConIva,
@@ -516,13 +552,13 @@ export function downloadQuotationExcel(quotation: QuotationData): void {
     "",
     "",
     "",
-    "SUBTOTAL PRECIO DETAL:",
+    quotation.isMayorista ? "SUBTOTAL PRECIO MAYORISTA:" : "SUBTOTAL PRECIO DETAL:",
     "",
     "",
     "",
-    quotation.subtotalDetal,
+    quotation.subtotalCatalogo,
   ]);
-  if (!isUsd && quotation.totalDiscount > 0) {
+  if (!isUsd && !quotation.isMayorista && quotation.totalDiscount > 0) {
     aoa.push([
       "",
       "",
@@ -870,7 +906,7 @@ export function generateQuotationPdfBlob(quotation: QuotationData): Blob {
     s += `BT /F2 6.5 Tf ${colX.col + 3} ${currentY - 13} Td (COLOR) Tj ET\n`;
     s += `BT /F2 6 Tf ${colX.talla + 2} ${currentY - 13} Td (TALLA) Tj ET\n`;
     s += `BT /F2 6 Tf ${colX.cant + 2} ${currentY - 13} Td (CANT) Tj ET\n`;
-    s += `BT /F2 5.5 Tf ${colX.precioDetal + 8} ${currentY - 13} Td (P. DETAL) Tj ET\n`;
+    s += `BT /F2 5.5 Tf ${colX.precioDetal + (quotation.isMayorista ? 2 : 8)} ${currentY - 13} Td (${quotation.basePriceColumnLabel}) Tj ET\n`;
     s += `BT /F2 5.5 Tf ${colX.precioSinIva + 6} ${currentY - 13} Td (P. SIN IVA) Tj ET\n`;
     s += `BT /F2 5.5 Tf ${colX.valorIva + 6} ${currentY - 13} Td (VALOR IVA) Tj ET\n`;
     s += `BT /F2 5.5 Tf ${colX.precioUnitConIva + 4} ${currentY - 13} Td (P. UNIT C/IVA) Tj ET\n`;
@@ -927,11 +963,11 @@ export function generateQuotationPdfBlob(quotation: QuotationData): Blob {
       const cantX = colX.cant + 11 - cantStr.length * 2.3;
       s += `BT /F2 7.5 Tf ${cantX} ${currentY - 11.5} Td (${cantStr}) Tj ET\n`;
 
-      // PRECIO DETAL (Right-aligned at 345)
-      const pDetalStr = escapePdf(it.formattedPrecioDetal);
-      const pDetalX = 345 - pDetalStr.length * 4.0;
+      // PRECIO BASE (DETAL o MAYORISTA según escala) (Right-aligned at 345)
+      const pBaseStr = escapePdf(it.formattedPrecioBaseCatalogo);
+      const pBaseX = 345 - pBaseStr.length * 4.0;
       s += "0.40 0.40 0.45 rg\n";
-      s += `BT /F1 7 Tf ${pDetalX} ${currentY - 11.5} Td (${pDetalStr}) Tj ET\n`;
+      s += `BT /F1 7 Tf ${pBaseX} ${currentY - 11.5} Td (${pBaseStr}) Tj ET\n`;
 
       // PRECIO SIN IVA (Right-aligned at 403)
       const pSinIvaStr = escapePdf(it.formattedPrecioSinIva);
@@ -982,11 +1018,11 @@ export function generateQuotationPdfBlob(quotation: QuotationData): Blob {
       const totCantX = colX.cant + 11 - totalUnitsStr.length * 2.3;
       s += `BT /F2 7.5 Tf ${totCantX} ${currentY - 11.5} Td (${totalUnitsStr}) Tj ET\n`;
 
-      // Sum of Detal
-      const totDetalStr = escapePdf(quotation.formattedSubtotalDetal);
-      const totDetalX = 345 - totDetalStr.length * 4.0;
+      // Sum of Base de Catálogo (Mayorista o Detal)
+      const totBaseStr = escapePdf(quotation.formattedSubtotalCatalogo);
+      const totBaseX = 345 - totBaseStr.length * 4.0;
       s += "0.35 0.35 0.40 rg\n";
-      s += `BT /F1 7 Tf ${totDetalX} ${currentY - 11.5} Td (${totDetalStr}) Tj ET\n`;
+      s += `BT /F1 7 Tf ${totBaseX} ${currentY - 11.5} Td (${totBaseStr}) Tj ET\n`;
 
       // Sum of Subtotal Sin IVA
       const subSinIvaStr = escapePdf(quotation.formattedSubtotalSinIva);
@@ -1041,7 +1077,10 @@ export function generateQuotationPdfBlob(quotation: QuotationData): Blob {
         }
       }
 
-      s += `BT /F1 6.8 Tf ${marginLeft + 10} ${lineY} Td (* Precios detallan: Precio Detal, Precio sin IVA, Valor IVA y Total con IVA.) Tj ET\n`;
+      const obsLabel = quotation.isMayorista
+        ? "* Precios detallan: Precio Mayorista, Precio sin IVA, Valor IVA y Total con IVA."
+        : "* Precios detallan: Precio Detal, Precio sin IVA, Valor IVA y Total con IVA.";
+      s += `BT /F1 6.8 Tf ${marginLeft + 10} ${lineY} Td (${obsLabel}) Tj ET\n`;
       lineY -= stepY;
       linesDrawn++;
 
@@ -1079,16 +1118,17 @@ export function generateQuotationPdfBlob(quotation: QuotationData): Blob {
       const unitsX = rightX + rightW - 12 - unitsStr.length * 4.6;
       s += `BT /F2 8 Tf ${unitsX} ${currentY - 15} Td (${unitsStr}) Tj ET\n`;
 
-      // Row 2: Total Precio Detal
+      // Row 2: Subtotal Mayorista o Detal
       s += "0.75 0.75 0.80 rg\n";
-      s += `BT /F1 7.2 Tf ${rightX + 12} ${currentY - 27} Td (TOTAL PRECIO DETAL:) Tj ET\n`;
+      const catTitle = quotation.isMayorista ? "TOTAL PRECIO MAYORISTA:" : "TOTAL PRECIO DETAL:";
+      s += `BT /F1 7.2 Tf ${rightX + 12} ${currentY - 27} Td (${catTitle}) Tj ET\n`;
       s += "1 1 1 rg\n";
-      const subDetalCardStr = escapePdf(quotation.formattedSubtotalDetal);
-      const subDetalCardX = rightX + rightW - 12 - subDetalCardStr.length * 4.8;
-      s += `BT /F2 8 Tf ${subDetalCardX} ${currentY - 27} Td (${subDetalCardStr}) Tj ET\n`;
+      const subCatCardStr = escapePdf(quotation.formattedSubtotalCatalogo);
+      const subCatCardX = rightX + rightW - 12 - subCatCardStr.length * 4.8;
+      s += `BT /F2 8 Tf ${subCatCardX} ${currentY - 27} Td (${subCatCardStr}) Tj ET\n`;
 
-      // Row 3: Descuento / Ahorro
-      if (quotation.totalDiscount > 0) {
+      // Row 3: Descuento o Tarifa
+      if (!quotation.isMayorista && quotation.totalDiscount > 0) {
         s += "0.50 0.85 0.65 rg\n";
         s += `BT /F2 7.2 Tf ${rightX + 12} ${currentY - 39} Td (AHORRO (${escapePdf(quotation.tierInfo.badge)}):) Tj ET\n`;
         const discCardStr = `-${escapePdf(quotation.formattedTotalDiscount)}`;
@@ -1096,7 +1136,7 @@ export function generateQuotationPdfBlob(quotation: QuotationData): Blob {
         s += `BT /F2 8 Tf ${discCardX} ${currentY - 39} Td (${discCardStr}) Tj ET\n`;
       } else {
         s += "0.65 0.70 0.75 rg\n";
-        s += `BT /F1 7.2 Tf ${rightX + 12} ${currentY - 39} Td (ESCALA APLICADA:) Tj ET\n`;
+        s += `BT /F1 7.2 Tf ${rightX + 12} ${currentY - 39} Td (TARIFA APLICADA:) Tj ET\n`;
         const badgeStr = escapePdf(quotation.tierInfo.badge);
         const badgeX = rightX + rightW - 12 - badgeStr.length * 4.8;
         s += `BT /F2 8 Tf ${badgeX} ${currentY - 39} Td (${badgeStr}) Tj ET\n`;
@@ -1276,7 +1316,7 @@ export function openQuotationPrintView(quotation: QuotationData): void {
       <td style="padding: 7px 8px; font-size: 11px; color: #334155;">${it.color}</td>
       <td style="padding: 7px 8px; font-size: 11px; text-align: center; font-weight: 600; color: #0f172a;">${it.talla}</td>
       <td style="padding: 7px 8px; font-size: 11px; text-align: center; font-weight: bold; color: #0f172a;">${it.cantidad}</td>
-      <td style="padding: 7px 8px; font-size: 11px; text-align: right; color: #64748b;">${it.formattedPrecioDetal}</td>
+      <td style="padding: 7px 8px; font-size: 11px; text-align: right; color: #64748b;">${it.formattedPrecioBaseCatalogo}</td>
       <td style="padding: 7px 8px; font-size: 11px; text-align: right; color: #334155;">${it.formattedPrecioSinIva}</td>
       <td style="padding: 7px 8px; font-size: 11px; text-align: right; color: #0284c7; font-weight: 600;">${it.formattedValorIva}</td>
       <td style="padding: 7px 8px; font-size: 11px; text-align: right; color: #0f172a; font-weight: 600;">${it.formattedPrecioUnitConIva}</td>
@@ -1553,7 +1593,7 @@ export function openQuotationPrintView(quotation: QuotationData): void {
           <th style="text-align: left; width: 85px;">COLOR</th>
           <th style="text-align: center; width: 35px;">TALLA</th>
           <th style="text-align: center; width: 35px;">CANT</th>
-          <th style="text-align: right; width: 85px;">P. DETAL</th>
+          <th style="text-align: right; width: 85px;">${quotation.basePriceColumnLabel}</th>
           <th style="text-align: right; width: 85px;">P. SIN IVA</th>
           <th style="text-align: right; width: 80px;">VALOR IVA</th>
           <th style="text-align: right; width: 95px;">P. UNIT C/IVA</th>
@@ -1569,7 +1609,7 @@ export function openQuotationPrintView(quotation: QuotationData): void {
       <div class="obs-card">
         <h4>Observaciones y Condiciones Comerciales</h4>
         <p>• ${quotation.notes}</p>
-        <p>• Precios detallan: Precio Detal, Precio sin IVA (Base), Valor IVA (19%) y Precio con IVA incluido.</p>
+        <p>• Precios detallan: ${quotation.isMayorista ? "Precio Mayorista" : "Precio Detal"}, Precio sin IVA (Base), Valor IVA (19%) y Precio con IVA incluido.</p>
         <p>• Fórmula comercial: Precio sin IVA = Precio con IVA / 1.19 | IVA 19% discriminado.</p>
         <p>• Precios y disponibilidad física de prendas sujetos a confirmación en bodega al momento de la orden.</p>
       </div>
@@ -1580,11 +1620,11 @@ export function openQuotationPrintView(quotation: QuotationData): void {
             <strong>${quotation.totalUnits} uds. (${quotation.totalReferences} refs)</strong>
           </div>
           <div class="row">
-            <span>TOTAL PRECIO DETAL:</span>
-            <strong>${quotation.formattedSubtotalDetal}</strong>
+            <span>${quotation.isMayorista ? "TOTAL PRECIO MAYORISTA:" : "TOTAL PRECIO DETAL:"}</span>
+            <strong>${quotation.formattedSubtotalCatalogo}</strong>
           </div>
           ${
-            quotation.totalDiscount > 0
+            !quotation.isMayorista && quotation.totalDiscount > 0
               ? `
           <div class="row" style="color: #4ade80;">
             <span>AHORRO (${quotation.tierInfo.badge}):</span>

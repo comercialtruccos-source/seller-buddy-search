@@ -420,7 +420,7 @@ export function CotizadorModal({
                         <th className="py-2.5 px-3">Color / Talla</th>
                         <th className="py-2.5 px-3 text-center">Cant.</th>
                         <th className="py-2.5 px-3 text-right">
-                          P. Detal
+                          {quotation.basePriceColumnLabel}
                         </th>
                         <th className="py-2.5 px-3 text-right">
                           Precio Sin IVA
@@ -475,7 +475,7 @@ export function CotizadorModal({
                             </div>
                           </td>
                           <td className="py-2.5 px-3 text-right font-medium text-muted-foreground">
-                            {it.formattedPrecioDetal}
+                            {it.formattedPrecioBaseCatalogo}
                           </td>
                           <td className="py-2.5 px-3 text-right font-medium text-foreground">
                             {it.formattedPrecioSinIva}
@@ -532,8 +532,8 @@ export function CotizadorModal({
 
                   <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2 sm:gap-4 text-right">
                     <div className="text-xs text-muted-foreground">
-                      <span>Subtotal Detal: </span>
-                      <span className="font-semibold text-foreground">{quotation.formattedSubtotalDetal}</span>
+                      <span>{quotation.isMayorista ? "Subtotal Mayorista: " : "Subtotal Detal: "}</span>
+                      <span className="font-semibold text-foreground">{quotation.formattedSubtotalCatalogo}</span>
                     </div>
                     <div className="text-xs text-muted-foreground">
                       <span>Subtotal Sin IVA: </span>
