@@ -25,6 +25,7 @@ import {
   Calculator,
   FileSpreadsheet,
   FileText,
+  MapPin,
 } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import { useQuery } from "@tanstack/react-query";
@@ -45,6 +46,7 @@ import {
   loadInventory,
   searchReferences,
   type InventoryRow,
+  type VariantGroup,
   type ReferenceGroup,
 } from "@/lib/inventory";
 import { getShopifyProductImage } from "@/lib/shopify";
@@ -1241,7 +1243,7 @@ function ReferenceCard({
 
   // Group variants by color
   const variantsByColor = useMemo(() => {
-    const grouped: Record<string, InventoryRow[]> = {};
+    const grouped: Record<string, VariantGroup[]> = {};
     for (const v of group.variantes) {
       let activeSaldo = v.saldo;
       if (localBodega && v.saldosPorBodega) {
@@ -1438,6 +1440,7 @@ function ReferenceCard({
               </span>
               {Object.entries(group.saldosPorBodega).map(([bodega, saldo]) => {
                 const isSelected = localBodega === bodega;
+                const ubicacion = group.ubicacionesPorBodega?.[bodega];
                 return (
                   <button 
                     key={bodega}
@@ -1447,13 +1450,51 @@ function ReferenceCard({
                         ? "bg-accent text-accent-foreground border-accent hover:bg-accent/90" 
                         : "bg-accent/10 text-accent border-accent/20 hover:bg-accent/20"
                     }`}
-                    title={`Ver stock solo en ${bodega}`}
+                    title={
+                      ubicacion
+                        ? `${bodega}: ${saldo} uds · Ubicación: ${ubicacion}`
+                        : `Ver stock solo en ${bodega}`
+                    }
                   >
-                    {bodega}: {saldo}
+                    <span>{bodega}: {saldo}</span>
+                    {ubicacion && (
+                      <span className="inline-flex items-center gap-0.5 font-mono text-[9px] bg-black/10 dark:bg-white/10 px-1 py-0.5 rounded font-semibold">
+                        <MapPin className="h-2.5 w-2.5" />
+                        {ubicacion}
+                      </span>
+                    )}
                   </button>
                 );
               })}
             </div>
+            {group.ubicacionesPorBodega && Object.keys(group.ubicacionesPorBodega).length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5 mb-2 text-xs">
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+                  <MapPin className="h-3 w-3 text-primary" />
+                  <span>Ubicaciones:</span>
+                </span>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {Object.entries(group.ubicacionesPorBodega).map(([bName, uLoc]) => {
+                    const isSelected = localBodega === bName;
+                    return (
+                      <span
+                        key={bName}
+                        onClick={() => setLocalBodega(isSelected ? null : bName)}
+                        className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10.5px] font-mono border transition-colors cursor-pointer ${
+                          isSelected
+                            ? "bg-accent text-accent-foreground border-accent font-bold shadow-xs"
+                            : "bg-muted/50 text-foreground border-border hover:bg-muted"
+                        }`}
+                        title={`Clic para filtrar stock en ${bName}`}
+                      >
+                        <strong className="text-muted-foreground font-semibold">{bName}:</strong>
+                        <span className="font-bold">{uLoc}</span>
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-1 mt-2">
               <h2 className="text-xl sm:text-2xl font-black text-foreground tracking-tight uppercase">
                 {group.descripcion}
@@ -1557,7 +1598,17 @@ function ReferenceCard({
                         disabled={!hasStock}
                         onClick={() => copySku(v.sku, v.talla, color)}
                         className={`inline-flex items-center gap-2 border px-3 py-1.5 ${hasStock ? "rounded-l-xl border-r-0" : "rounded-xl"} text-[11.5px] font-bold duration-200 relative ${badgeColor}`}
-                        title={hasStock ? `Click para copiar SKU: ${v.sku}` : "Sin stock disponible"}
+                        title={
+                          hasStock
+                            ? `Click para copiar SKU: ${v.sku}${
+                                localBodega && v.ubicacionesPorBodega?.[localBodega]
+                                  ? ` | Ubicación en ${localBodega}: ${v.ubicacionesPorBodega[localBodega]}`
+                                  : v.ubicaciones
+                                  ? ` | Ubicación: ${v.ubicaciones}`
+                                  : ""
+                              }`
+                            : "Sin stock disponible"
+                        }
                       >
                         <span className="tracking-wide">Talla {v.talla}</span>
                         <span className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded-md text-[10px] font-extrabold shadow-inner ${

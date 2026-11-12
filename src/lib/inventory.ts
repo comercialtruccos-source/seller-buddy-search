@@ -12,10 +12,12 @@ export interface InventoryRow {
   precioUsd: number; // precio en dólares (USD)
   imageUrl?: string;
   bodega?: string;
+  ubicaciones?: string; // Ubicación en bodega principal o tiendas (UBICACIONES)
 }
 
 export interface VariantGroup extends InventoryRow {
   saldosPorBodega: Record<string, number>;
+  ubicacionesPorBodega: Record<string, string>;
 }
 
 export interface ReferenceGroup {
@@ -26,6 +28,7 @@ export interface ReferenceGroup {
   precioUsd: number;
   totalSaldo: number;
   saldosPorBodega: Record<string, number>;
+  ubicacionesPorBodega: Record<string, string>;
   variantes: VariantGroup[];
   imageUrl?: string;
 }
@@ -195,17 +198,34 @@ export function parseInventoryCsv(text: string, trm?: number): InventoryRow[] {
   let iSaldo = getIdx(["saldo", "cantidad"]);
   let iTalla = getIdx(["talla"], true);
   let iCodColor = getIdx(["codcolor", "cod_color"]);
+  let iUbicaciones = getIdx(["ubicaciones", "ubicacion", "ubicación", "ubic"]);
   let iSku = getIdx(["sku"], true);
   let iPvm = getIdx(["pvm"]);
   let iPvp = getIdx(["pvp"]);
 
   // Fallbacks for data without headers (or if exact column names weren't found)
-  // Heuristic: If colCount >= 12, or if the second column (index 1) looks like a bodega name
-  const isNewFormat = colCount >= 12 || 
-    (firstLineCols[1] && (firstLineCols[1].toUpperCase().includes("PRINCIPAL") || firstLineCols[1].toUpperCase().includes("VENTA")));
+  // Check format:
+  // - 13 columns format with UBICACIONES: Referencia, Bodega, Descripción, Talla-Lote, Color, Saldo, Talla, CodColor, UBICACIONES, SKU, PVM, PVP, IMG
+  // - 12 columns format with Bodega: Referencia, Bodega, Descripción, Talla-Lote, Color, Saldo, Talla, CodColor, SKU, PVM, PVP, IMG
+  // - 10-11 columns format without Bodega
+  const is13ColFormat = colCount >= 13 || iUbicaciones !== -1;
+  const is12ColFormat = !is13ColFormat && (colCount >= 12 || 
+    (firstLineCols[1] && (firstLineCols[1].toUpperCase().includes("PRINCIPAL") || firstLineCols[1].toUpperCase().includes("VENTA"))));
 
-  if (isNewFormat && iBodega === -1 && iRef === -1) {
-    // New format with Bodega (12 columns)
+  if (is13ColFormat && iBodega === -1 && iRef === -1) {
+    if (iRef === -1) iRef = 0;
+    if (iBodega === -1) iBodega = 1;
+    if (iDesc === -1) iDesc = 2;
+    if (iTallaLote === -1) iTallaLote = 3;
+    if (iColor === -1) iColor = 4;
+    if (iSaldo === -1) iSaldo = 5;
+    if (iTalla === -1) iTalla = 6;
+    if (iCodColor === -1) iCodColor = 7;
+    if (iUbicaciones === -1) iUbicaciones = 8;
+    if (iSku === -1) iSku = 9;
+    if (iPvm === -1) iPvm = 10;
+    if (iPvp === -1) iPvp = 11;
+  } else if (is12ColFormat && iBodega === -1 && iRef === -1) {
     if (iRef === -1) iRef = 0;
     if (iBodega === -1) iBodega = 1;
     if (iDesc === -1) iDesc = 2;
@@ -217,7 +237,7 @@ export function parseInventoryCsv(text: string, trm?: number): InventoryRow[] {
     if (iSku === -1) iSku = 8;
     if (iPvm === -1) iPvm = 9;
     if (iPvp === -1) iPvp = 10;
-  } else if (!isNewFormat && iBodega === -1 && iRef === -1) {
+  } else if (!is13ColFormat && !is12ColFormat && iBodega === -1 && iRef === -1) {
     // Old format without Bodega (10 or 11 columns)
     if (iRef === -1) iRef = 0;
     if (iDesc === -1) iDesc = 1;
@@ -263,6 +283,12 @@ export function parseInventoryCsv(text: string, trm?: number): InventoryRow[] {
       }
     }
 
+    const rawUbicacion = iUbicaciones !== -1 && cols[iUbicaciones] ? cols[iUbicaciones].trim() : "";
+    const ubicaciones =
+      rawUbicacion === "#N/D" || rawUbicacion === "#N/A" || rawUbicacion.toLowerCase() === "null"
+        ? ""
+        : rawUbicacion;
+
     const row: InventoryRow = {
       referencia,
       descripcion: cols[iDesc] ?? "",
@@ -275,7 +301,8 @@ export function parseInventoryCsv(text: string, trm?: number): InventoryRow[] {
       pvm,
       pvp: toNumber(cols[iPvp]),
       precioUsd,
-      bodega: iBodega !== -1 ? (cols[iBodega] || "PRINCIPAL 1004").trim() : "PRINCIPAL 1004"
+      bodega: iBodega !== -1 ? (cols[iBodega] || "PRINCIPAL 1004").trim() : "PRINCIPAL 1004",
+      ubicaciones,
     };
 
     let rawImgUrl = "";
@@ -305,17 +332,29 @@ export function groupByReferencia(rows: InventoryRow[]): ReferenceGroup[] {
   for (const row of rows) {
     const existing = map.get(row.referencia);
     const bodegaName = row.bodega || "PRINCIPAL 1004";
+    const ubi = (row.ubicaciones || "").trim();
     
     if (existing) {
       const existingVariant = existing.variantes.find(v => v.sku === row.sku);
       if (existingVariant) {
         existingVariant.saldo += row.saldo;
         existingVariant.saldosPorBodega[bodegaName] = (existingVariant.saldosPorBodega[bodegaName] || 0) + row.saldo;
+        if (ubi) {
+          existingVariant.ubicacionesPorBodega[bodegaName] = ubi;
+          if (!existingVariant.ubicaciones) existingVariant.ubicaciones = ubi;
+        }
       } else {
-        existing.variantes.push({ ...row, saldosPorBodega: { [bodegaName]: row.saldo } });
+        existing.variantes.push({
+          ...row,
+          saldosPorBodega: { [bodegaName]: row.saldo },
+          ubicacionesPorBodega: ubi ? { [bodegaName]: ubi } : {},
+        });
       }
       existing.totalSaldo += row.saldo;
       existing.saldosPorBodega[bodegaName] = (existing.saldosPorBodega[bodegaName] || 0) + row.saldo;
+      if (ubi) {
+        existing.ubicacionesPorBodega[bodegaName] = ubi;
+      }
       // Keep the max known prices in case of inconsistencies.
       existing.pvm = existing.pvm || row.pvm;
       existing.pvp = existing.pvp || row.pvp;
@@ -332,7 +371,12 @@ export function groupByReferencia(rows: InventoryRow[]): ReferenceGroup[] {
         precioUsd: row.precioUsd,
         totalSaldo: row.saldo,
         saldosPorBodega: { [bodegaName]: row.saldo },
-        variantes: [{ ...row, saldosPorBodega: { [bodegaName]: row.saldo } }],
+        ubicacionesPorBodega: ubi ? { [bodegaName]: ubi } : {},
+        variantes: [{
+          ...row,
+          saldosPorBodega: { [bodegaName]: row.saldo },
+          ubicacionesPorBodega: ubi ? { [bodegaName]: ubi } : {},
+        }],
         imageUrl: row.imageUrl,
       });
     }
@@ -426,6 +470,15 @@ export function searchReferences(
         normalizeText(v.sku).includes(word)
       );
       if (matchesSku) return true;
+      // Word matches Ubicación in any bodega or variant
+      const matchesUbicacion =
+        Object.values(group.ubicacionesPorBodega || {}).some((u) =>
+          normalizeText(u).includes(word)
+        ) ||
+        group.variantes.some((v) =>
+          normalizeText(v.ubicaciones || "").includes(word)
+        );
+      if (matchesUbicacion) return true;
 
       return false;
     });
@@ -480,6 +533,7 @@ interface InventoryDbRow {
   precio_usd?: number;
   image_url?: string;
   bodega?: string;
+  ubicaciones?: string;
   created_at?: string;
 }
 
@@ -535,6 +589,7 @@ function fromDb(row: InventoryDbRow): InventoryRow {
     precioUsd: row.precio_usd ?? 0,
     imageUrl: row.image_url ?? "",
     bodega: row.bodega ?? "PRINCIPAL 1004",
+    ubicaciones: row.ubicaciones ?? "",
   };
 }
 
@@ -553,6 +608,7 @@ function toDb(row: InventoryRow): InventoryDbRow {
     precio_usd: row.precioUsd,
     image_url: row.imageUrl ?? "",
     bodega: row.bodega ?? "PRINCIPAL 1004",
+    ubicaciones: row.ubicaciones ?? "",
   };
 }
 
@@ -631,8 +687,23 @@ export async function saveInventory(rows: InventoryRow[], disabledBodegas: strin
     const batch = payload.slice(i, i + batchSize);
     const { error: insertError } = await supabase
       .from("inventory")
-      .insert(batch);
-    if (insertError) throw insertError;
+      .insert(batch as any);
+    if (insertError) {
+      // Graceful fallback if remote DB migration hasn't added column 'ubicaciones' yet
+      if (
+        insertError.message?.includes("ubicaciones") ||
+        (insertError as any).code === "PGRST204" ||
+        (insertError as any).code === "42703"
+      ) {
+        const fallbackBatch = batch.map(({ ubicaciones, ...rest }: any) => rest);
+        const { error: retryError } = await supabase
+          .from("inventory")
+          .insert(fallbackBatch as any);
+        if (retryError) throw retryError;
+      } else {
+        throw insertError;
+      }
+    }
   }
 
   // Read back the latest timestamp for an accurate "last updated" value.

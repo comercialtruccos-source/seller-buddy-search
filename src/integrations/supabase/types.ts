@@ -129,6 +129,7 @@ export type Database = {
           sku: string
           talla: string
           talla_lote: string
+          ubicaciones: string | null
         }
         Insert: {
           bodega?: string
@@ -146,6 +147,7 @@ export type Database = {
           sku?: string
           talla?: string
           talla_lote?: string
+          ubicaciones?: string | null
         }
         Update: {
           bodega?: string
@@ -163,6 +165,7 @@ export type Database = {
           sku?: string
           talla?: string
           talla_lote?: string
+          ubicaciones?: string | null
         }
         Relationships: []
       }

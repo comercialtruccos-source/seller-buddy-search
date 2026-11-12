@@ -969,31 +969,42 @@ function Cargar() {
           <div className="border-t border-border pt-6">
             <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
               <AlertCircle className="h-4 w-4" />
-              Columnas requeridas del archivo CSV
+              Columnas requeridas del archivo CSV / Excel
             </h3>
             <p className="text-xs text-muted-foreground mb-4">
-              El archivo CSV debe contener las siguientes columnas separadas por comas (incluyendo la cabecera):
+              El archivo CSV o texto copiado de Excel debe contener las siguientes columnas (incluyendo la cabecera):
             </p>
             <div className="flex flex-wrap gap-1.5 font-mono text-[10px]">
               {[
                 "Referencia",
+                "Bodega",
                 "Descripción",
                 "Talla - Lote",
                 "Color",
                 "Saldo",
                 "Talla",
                 "CodColor",
+                "UBICACIONES",
                 "SKU",
                 "PVM UNIT",
                 "PVP UNIT",
-                "Bodega (Opcional)",
-                "Image (Opcional)",
+                "IMG",
               ].map((h) => (
-                <span key={h} className="rounded bg-muted px-2 py-1 text-foreground border border-border">
+                <span
+                  key={h}
+                  className={`rounded px-2 py-1 border ${
+                    h === "UBICACIONES"
+                      ? "bg-primary/10 text-primary border-primary/30 font-bold"
+                      : "bg-muted text-foreground border-border"
+                  }`}
+                >
                   {h}
                 </span>
               ))}
             </div>
+            <p className="text-[11px] text-muted-foreground/80 mt-3">
+              💡 La nueva columna <strong>UBICACIONES</strong> permite registrar y consultar en tiempo real la ubicación física de cada prenda en la bodega principal y en las diferentes tiendas.
+            </p>
           </div>
         </div>
       </main>
