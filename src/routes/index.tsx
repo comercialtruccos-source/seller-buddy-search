@@ -1464,10 +1464,10 @@ function ReferenceCard({
                   <button 
                     key={bodega}
                     onClick={() => setLocalBodega(isSelected ? null : bodega)}
-                    className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-bold border transition-all cursor-pointer ${
+                    className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-bold border transition-colors cursor-pointer ${
                       isSelected 
-                        ? "bg-accent text-accent-foreground border-accent shadow-xs hover:bg-accent/90" 
-                        : "bg-accent/10 text-accent border-accent/25 hover:bg-accent/20"
+                        ? "bg-accent text-accent-foreground border-accent hover:bg-accent/90" 
+                        : "bg-accent/10 text-accent border-accent/20 hover:bg-accent/20"
                     }`}
                     title={
                       ubicacion
@@ -1476,16 +1476,6 @@ function ReferenceCard({
                     }
                   >
                     <span>{bodega}: {saldo}</span>
-                    {ubicacion ? (
-                      <span className={`inline-flex items-center gap-1 font-mono text-[9.5px] px-1.5 py-0.5 rounded font-black tracking-tight border ${
-                        isSelected 
-                          ? "bg-black/20 text-accent-foreground border-white/20" 
-                          : "bg-primary/10 text-primary border-primary/25 dark:bg-primary/20 dark:text-primary-foreground"
-                      }`}>
-                        <MapPin className="h-2.5 w-2.5 shrink-0" />
-                        <span>{ubicacion}</span>
-                      </span>
-                    ) : null}
                   </button>
                 );
               })}
