@@ -357,11 +357,27 @@ function Index() {
         }
       }
 
+      const newUbicacionesPorBodega: Record<string, string> = {};
+      for (const b of Object.keys(newSaldosPorBodega)) {
+        if (g.ubicacionesPorBodega?.[b]) {
+          newUbicacionesPorBodega[b] = g.ubicacionesPorBodega[b];
+        } else {
+          const varUbi = variantes.find((v) => v.ubicacionesPorBodega?.[b]?.trim())?.ubicacionesPorBodega?.[b];
+          if (varUbi) newUbicacionesPorBodega[b] = varUbi;
+        }
+      }
+      if (g.ubicacion && Object.keys(newUbicacionesPorBodega).length === 0) {
+        for (const b of Object.keys(newSaldosPorBodega)) {
+          newUbicacionesPorBodega[b] = g.ubicacion;
+        }
+      }
+
       out.push({
         ...g,
         variantes,
         totalSaldo: newTotalSaldo,
         saldosPorBodega: newSaldosPorBodega,
+        ubicacionesPorBodega: newUbicacionesPorBodega,
       });
     }
     return out;
@@ -1440,15 +1456,18 @@ function ReferenceCard({
               </span>
               {Object.entries(group.saldosPorBodega).map(([bodega, saldo]) => {
                 const isSelected = localBodega === bodega;
-                const ubicacion = group.ubicacionesPorBodega?.[bodega];
+                const ubicacion =
+                  group.ubicacionesPorBodega?.[bodega] ||
+                  (bodega.toUpperCase().includes("PRINCIPAL") || bodega.includes("1004") ? group.ubicacion : undefined) ||
+                  (Object.keys(group.saldosPorBodega).length === 1 ? group.ubicacion : undefined);
                 return (
                   <button 
                     key={bodega}
                     onClick={() => setLocalBodega(isSelected ? null : bodega)}
-                    className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[10px] font-bold border transition-colors cursor-pointer ${
+                    className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-bold border transition-all cursor-pointer ${
                       isSelected 
-                        ? "bg-accent text-accent-foreground border-accent hover:bg-accent/90" 
-                        : "bg-accent/10 text-accent border-accent/20 hover:bg-accent/20"
+                        ? "bg-accent text-accent-foreground border-accent shadow-xs hover:bg-accent/90" 
+                        : "bg-accent/10 text-accent border-accent/25 hover:bg-accent/20"
                     }`}
                     title={
                       ubicacion
@@ -1457,41 +1476,52 @@ function ReferenceCard({
                     }
                   >
                     <span>{bodega}: {saldo}</span>
-                    {ubicacion && (
-                      <span className="inline-flex items-center gap-0.5 font-mono text-[9px] bg-black/10 dark:bg-white/10 px-1 py-0.5 rounded font-semibold">
-                        <MapPin className="h-2.5 w-2.5" />
-                        {ubicacion}
+                    {ubicacion ? (
+                      <span className={`inline-flex items-center gap-1 font-mono text-[9.5px] px-1.5 py-0.5 rounded font-black tracking-tight border ${
+                        isSelected 
+                          ? "bg-black/20 text-accent-foreground border-white/20" 
+                          : "bg-primary/10 text-primary border-primary/25 dark:bg-primary/20 dark:text-primary-foreground"
+                      }`}>
+                        <MapPin className="h-2.5 w-2.5 shrink-0" />
+                        <span>{ubicacion}</span>
                       </span>
-                    )}
+                    ) : null}
                   </button>
                 );
               })}
             </div>
-            {group.ubicacionesPorBodega && Object.keys(group.ubicacionesPorBodega).length > 0 && (
+            {(group.ubicacion || (group.ubicacionesPorBodega && Object.keys(group.ubicacionesPorBodega).length > 0)) && (
               <div className="flex flex-wrap items-center gap-1.5 mb-2 text-xs">
                 <span className="inline-flex items-center gap-1 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
                   <MapPin className="h-3 w-3 text-primary" />
                   <span>Ubicaciones:</span>
                 </span>
                 <div className="flex flex-wrap items-center gap-1.5">
-                  {Object.entries(group.ubicacionesPorBodega).map(([bName, uLoc]) => {
-                    const isSelected = localBodega === bName;
-                    return (
-                      <span
-                        key={bName}
-                        onClick={() => setLocalBodega(isSelected ? null : bName)}
-                        className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10.5px] font-mono border transition-colors cursor-pointer ${
-                          isSelected
-                            ? "bg-accent text-accent-foreground border-accent font-bold shadow-xs"
-                            : "bg-muted/50 text-foreground border-border hover:bg-muted"
-                        }`}
-                        title={`Clic para filtrar stock en ${bName}`}
-                      >
-                        <strong className="text-muted-foreground font-semibold">{bName}:</strong>
-                        <span className="font-bold">{uLoc}</span>
-                      </span>
-                    );
-                  })}
+                  {Object.keys(group.ubicacionesPorBodega || {}).length > 0 ? (
+                    Object.entries(group.ubicacionesPorBodega).map(([bName, uLoc]) => {
+                      const isSelected = localBodega === bName;
+                      return (
+                        <span
+                          key={bName}
+                          onClick={() => setLocalBodega(isSelected ? null : bName)}
+                          className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10.5px] font-mono border transition-colors cursor-pointer ${
+                            isSelected
+                              ? "bg-accent text-accent-foreground border-accent font-bold shadow-xs"
+                              : "bg-muted/50 text-foreground border-border hover:bg-muted"
+                          }`}
+                          title={`Clic para filtrar stock en ${bName}`}
+                        >
+                          <strong className="text-muted-foreground font-semibold">{bName}:</strong>
+                          <span className="font-bold text-primary dark:text-primary">{uLoc}</span>
+                        </span>
+                      );
+                    })
+                  ) : group.ubicacion ? (
+                    <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10.5px] font-mono border bg-muted/50 text-foreground border-border">
+                      <strong className="text-muted-foreground font-semibold">General:</strong>
+                      <span className="font-bold text-primary dark:text-primary">{group.ubicacion}</span>
+                    </span>
+                  ) : null}
                 </div>
               </div>
             )}

@@ -29,6 +29,7 @@ export interface ReferenceGroup {
   totalSaldo: number;
   saldosPorBodega: Record<string, number>;
   ubicacionesPorBodega: Record<string, string>;
+  ubicacion?: string; // Ubicación general o principal de la referencia
   variantes: VariantGroup[];
   imageUrl?: string;
 }
@@ -198,7 +199,7 @@ export function parseInventoryCsv(text: string, trm?: number): InventoryRow[] {
   let iSaldo = getIdx(["saldo", "cantidad"]);
   let iTalla = getIdx(["talla"], true);
   let iCodColor = getIdx(["codcolor", "cod_color"]);
-  let iUbicaciones = getIdx(["ubicaciones", "ubicacion", "ubicación", "ubic"]);
+  let iUbicaciones = getIdx(["ubicaciones", "ubicacion", "ubicación", "ubic", "localizacion", "localización", "pasillo", "estante"]);
   let iSku = getIdx(["sku"], true);
   let iPvm = getIdx(["pvm"]);
   let iPvp = getIdx(["pvp"]);
@@ -212,7 +213,7 @@ export function parseInventoryCsv(text: string, trm?: number): InventoryRow[] {
   const is12ColFormat = !is13ColFormat && (colCount >= 12 || 
     (firstLineCols[1] && (firstLineCols[1].toUpperCase().includes("PRINCIPAL") || firstLineCols[1].toUpperCase().includes("VENTA"))));
 
-  if (is13ColFormat && iBodega === -1 && iRef === -1) {
+  if (is13ColFormat) {
     if (iRef === -1) iRef = 0;
     if (iBodega === -1) iBodega = 1;
     if (iDesc === -1) iDesc = 2;
@@ -284,8 +285,17 @@ export function parseInventoryCsv(text: string, trm?: number): InventoryRow[] {
     }
 
     const rawUbicacion = iUbicaciones !== -1 && cols[iUbicaciones] ? cols[iUbicaciones].trim() : "";
+    const cleanLower = rawUbicacion.toLowerCase();
     const ubicaciones =
-      rawUbicacion === "#N/D" || rawUbicacion === "#N/A" || rawUbicacion.toLowerCase() === "null"
+      !rawUbicacion ||
+      cleanLower === "#n/d" ||
+      cleanLower === "#n/a" ||
+      cleanLower === "#ref!" ||
+      cleanLower === "null" ||
+      cleanLower === "undefined" ||
+      cleanLower === "n/a" ||
+      cleanLower === "n/d" ||
+      cleanLower === "-"
         ? ""
         : rawUbicacion;
 
@@ -331,7 +341,7 @@ export function groupByReferencia(rows: InventoryRow[]): ReferenceGroup[] {
   const map = new Map<string, ReferenceGroup>();
   for (const row of rows) {
     const existing = map.get(row.referencia);
-    const bodegaName = row.bodega || "PRINCIPAL 1004";
+    const bodegaName = (row.bodega || "PRINCIPAL 1004").trim();
     const ubi = (row.ubicaciones || "").trim();
     
     if (existing) {
@@ -354,6 +364,7 @@ export function groupByReferencia(rows: InventoryRow[]): ReferenceGroup[] {
       existing.saldosPorBodega[bodegaName] = (existing.saldosPorBodega[bodegaName] || 0) + row.saldo;
       if (ubi) {
         existing.ubicacionesPorBodega[bodegaName] = ubi;
+        if (!existing.ubicacion) existing.ubicacion = ubi;
       }
       // Keep the max known prices in case of inconsistencies.
       existing.pvm = existing.pvm || row.pvm;
@@ -372,6 +383,7 @@ export function groupByReferencia(rows: InventoryRow[]): ReferenceGroup[] {
         totalSaldo: row.saldo,
         saldosPorBodega: { [bodegaName]: row.saldo },
         ubicacionesPorBodega: ubi ? { [bodegaName]: ubi } : {},
+        ubicacion: ubi || undefined,
         variantes: [{
           ...row,
           saldosPorBodega: { [bodegaName]: row.saldo },
@@ -381,6 +393,16 @@ export function groupByReferencia(rows: InventoryRow[]): ReferenceGroup[] {
       });
     }
   }
+
+  // Ensure that if a reference has a general location and bodegas have none, bodegas inherit it
+  for (const group of map.values()) {
+    if (group.ubicacion && Object.keys(group.ubicacionesPorBodega).length === 0) {
+      for (const b of Object.keys(group.saldosPorBodega)) {
+        group.ubicacionesPorBodega[b] = group.ubicacion;
+      }
+    }
+  }
+
   return Array.from(map.values());
 }
 
@@ -575,10 +597,20 @@ export function fixMojibake(input: string): string {
 }
 
 function fromDb(row: InventoryDbRow): InventoryRow {
+  let tallaLote = row.talla_lote || "";
+  let ubicaciones = (row.ubicaciones || "").trim();
+
+  // Dual-layer decoding fallback: if DB column 'ubicaciones' was empty/null, extract from talla_lote encoding
+  if (!ubicaciones && tallaLote.includes("[UBIC]")) {
+    const parts = tallaLote.split("[UBIC]");
+    tallaLote = parts[0] || "";
+    ubicaciones = (parts[1] || "").trim();
+  }
+
   return {
     referencia: row.referencia,
     descripcion: fixMojibake(row.descripcion),
-    tallaLote: row.talla_lote,
+    tallaLote,
     color: fixMojibake(row.color),
     saldo: row.saldo,
     talla: row.talla,
@@ -589,15 +621,20 @@ function fromDb(row: InventoryDbRow): InventoryRow {
     precioUsd: row.precio_usd ?? 0,
     imageUrl: row.image_url ?? "",
     bodega: row.bodega ?? "PRINCIPAL 1004",
-    ubicaciones: row.ubicaciones ?? "",
+    ubicaciones,
   };
 }
 
 function toDb(row: InventoryRow): InventoryDbRow {
+  const ubic = (row.ubicaciones || "").trim();
+  const rawTallaLote = row.tallaLote || "";
+  // Dual-layer encoding fallback: encode in talla_lote in case remote DB lacks the 'ubicaciones' column
+  const encodedTallaLote = ubic ? `${rawTallaLote}[UBIC]${ubic}` : rawTallaLote;
+
   return {
     referencia: row.referencia,
     descripcion: row.descripcion,
-    talla_lote: row.tallaLote,
+    talla_lote: encodedTallaLote,
     color: row.color,
     saldo: row.saldo,
     talla: row.talla,
@@ -608,7 +645,7 @@ function toDb(row: InventoryRow): InventoryDbRow {
     precio_usd: row.precioUsd,
     image_url: row.imageUrl ?? "",
     bodega: row.bodega ?? "PRINCIPAL 1004",
-    ubicaciones: row.ubicaciones ?? "",
+    ubicaciones: ubic,
   };
 }
 
@@ -655,6 +692,25 @@ export async function loadInventory(): Promise<{
       saldo: Math.max(0, r.saldo - reserved),
     };
   });
+
+  // Also merge with browser cache if available and DB rows had no ubicaciones
+  if (typeof window !== "undefined") {
+    try {
+      const cacheStr = localStorage.getItem("inventario_ubicaciones_cache");
+      if (cacheStr) {
+        const locCache: Record<string, Record<string, string>> = JSON.parse(cacheStr);
+        for (const r of rows) {
+          if (!r.ubicaciones && locCache[r.referencia]) {
+            const bName = r.bodega || "PRINCIPAL 1004";
+            r.ubicaciones = locCache[r.referencia][bName] || Object.values(locCache[r.referencia])[0] || "";
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Error reading ubicaciones cache", e);
+    }
+  }
+
   const updatedAt = (data ?? []).reduce<string | null>((latest, row) => {
     const created = (row as InventoryDbRow).created_at ?? null;
     if (!created) return latest;
@@ -679,6 +735,23 @@ export async function saveInventory(rows: InventoryRow[], disabledBodegas: strin
     .delete()
     .in("bodega", bodegasToReplace);
   if (deleteError) throw deleteError;
+
+  // Update browser localStorage cache of locations
+  if (typeof window !== "undefined") {
+    try {
+      const locCache: Record<string, Record<string, string>> = {};
+      for (const r of rows) {
+        const u = (r.ubicaciones || "").trim();
+        if (u) {
+          if (!locCache[r.referencia]) locCache[r.referencia] = {};
+          locCache[r.referencia][r.bodega || "PRINCIPAL 1004"] = u;
+        }
+      }
+      localStorage.setItem("inventario_ubicaciones_cache", JSON.stringify(locCache));
+    } catch (e) {
+      console.error("Error saving ubicaciones cache", e);
+    }
+  }
 
   // Insert new records in batches.
   const payload = rows.map((r) => toDb({ ...r, bodega: r.bodega || "PRINCIPAL 1004" }));
