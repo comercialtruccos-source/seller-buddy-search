@@ -16,6 +16,9 @@ import {
   CheckCircle2,
   Boxes,
   MessageSquareText,
+  Save,
+  Download,
+  Clock,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -26,6 +29,11 @@ import {
   downloadQuotationPdf,
   openQuotationPrintView,
 } from "@/lib/quotation";
+import {
+  saveQuotation,
+  approveQuotation,
+  downloadQuotationHgi,
+} from "@/lib/quotationsStore";
 import {
   useOrder,
   setOrderQty,
@@ -60,6 +68,8 @@ export function CotizadorModal({
   const [notes, setNotes] = useState(
     "Cotización válida por 15 días calendario. Sujeta a disponibilidad de inventario físico."
   );
+  const [savedQuotationId, setSavedQuotationId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (initialCustomerName) {
@@ -95,14 +105,73 @@ export function CotizadorModal({
 
   if (!open) return null;
 
-  const handleDownloadPdf = () => {
+  const handleSaveQuotation = async () => {
+    if (quotation.items.length === 0) {
+      toast.error("Debes seleccionar al menos una prenda para guardar la cotización.");
+      return;
+    }
+    try {
+      setIsSaving(true);
+      const saved = await saveQuotation(quotation, "pendiente");
+      setSavedQuotationId(saved.id);
+      toast.success(
+        `¡Cotización ${saved.quotationNumber} guardada en el sistema como Pendiente!`,
+        { duration: 4000 }
+      );
+      return saved;
+    } catch (err: any) {
+      console.error("Error saving quotation:", err);
+      toast.error(`Error al guardar cotización: ${err?.message || "error desconocido"}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleApproveAndDownloadHgi = async () => {
+    if (quotation.items.length === 0) {
+      toast.error("Debes seleccionar al menos una prenda para aprobar la cotización.");
+      return;
+    }
+    try {
+      setIsSaving(true);
+      toast.loading("Guardando cotización, aprobando y generando archivo HGI…", {
+        id: "modal-approve-hgi",
+      });
+      const saved = await saveQuotation(quotation, "pendiente");
+      const { quotation: approved } = await approveQuotation(saved.id, {
+        downloadHgi: true,
+        registerInOrders: true,
+      });
+      setSavedQuotationId(approved.id);
+      toast.success(
+        `¡Cotización ${approved.quotationNumber} aprobada! Se descargó el archivo HGI (.xls) para subir pedidos.`,
+        { id: "modal-approve-hgi", duration: 5500 }
+      );
+    } catch (err: any) {
+      console.error("Error approving quotation in modal:", err);
+      toast.error(`Error al aprobar cotización: ${err?.message || "error desconocido"}`, {
+        id: "modal-approve-hgi",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDownloadPdf = async () => {
     if (quotation.items.length === 0) {
       toast.error("Debes seleccionar al menos una prenda para generar la cotización.");
       return;
     }
+    // Auto-save so the quotation is never lost
+    try {
+      const saved = await saveQuotation(quotation, "pendiente");
+      setSavedQuotationId(saved.id);
+    } catch (err) {
+      console.warn("Auto-save quotation notice:", err);
+    }
     try {
       downloadQuotationPdf(quotation);
-      toast.success("Archivo PDF de la cotización generado y descargado exitosamente.", {
+      toast.success("Archivo PDF descargado y cotización guardada en el sistema.", {
         duration: 3500,
       });
     } catch (err: any) {
@@ -111,14 +180,21 @@ export function CotizadorModal({
     }
   };
 
-  const handleDownloadExcel = () => {
+  const handleDownloadExcel = async () => {
     if (quotation.items.length === 0) {
       toast.error("Debes seleccionar al menos una prenda para generar la cotización.");
       return;
     }
+    // Auto-save so the quotation is never lost
+    try {
+      const saved = await saveQuotation(quotation, "pendiente");
+      setSavedQuotationId(saved.id);
+    } catch (err) {
+      console.warn("Auto-save quotation notice:", err);
+    }
     try {
       downloadQuotationExcel(quotation);
-      toast.success("Archivo Excel (.xlsx) de la cotización descargado con éxito.", {
+      toast.success("Archivo Excel descargado y cotización guardada en el sistema.", {
         duration: 3500,
       });
     } catch (err: any) {
@@ -151,13 +227,24 @@ export function CotizadorModal({
               <Calculator className="h-5 w-5" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-lg font-black tracking-tight">Cotizador Comercial</h2>
-                <span className="rounded-full bg-slate-700/40 border border-slate-600/40 px-2.5 py-0.5 text-[10px] font-bold text-slate-300 tracking-wider">
-                  Trucco's Jeans
+                <span className="font-mono text-xs font-bold bg-white/10 border border-white/20 px-2 py-0.5 rounded text-white">
+                  {quotation.quotationNumber}
                 </span>
+                {savedQuotationId ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-bold">
+                    <CheckCircle2 className="h-2.5 w-2.5" />
+                    Guardada en Sistema
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 text-[10px] font-bold">
+                    <Clock className="h-2.5 w-2.5" />
+                    Borrador
+                  </span>
+                )}
               </div>
-              <p className="text-xs text-neutral-300">
+              <p className="text-xs text-neutral-300 mt-0.5">
                 Selecciona prendas y cotiza en Pesos Colombianos (COP) o Dólares (USD)
               </p>
             </div>
@@ -559,21 +646,34 @@ export function CotizadorModal({
         </div>
 
         {/* Footer Actions */}
-        <div className="border-t border-border bg-muted/20 px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-full sm:w-auto px-4 py-2.5 text-xs font-bold text-muted-foreground hover:text-foreground border border-border rounded-xl bg-card transition-colors"
-          >
-            Seguir seleccionando
-          </button>
+        <div className="border-t border-border bg-muted/20 px-6 py-4 flex flex-col lg:flex-row items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2.5 text-xs font-bold text-muted-foreground hover:text-foreground border border-border rounded-xl bg-card transition-colors"
+            >
+              Seguir seleccionando
+            </button>
 
-          <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+            <button
+              type="button"
+              onClick={handleSaveQuotation}
+              disabled={quotation.items.length === 0 || isSaving}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-primary/30 bg-primary/5 hover:bg-primary/10 px-3.5 py-2.5 text-xs font-bold text-primary transition-colors disabled:opacity-40"
+              title="Guardar esta cotización en el sistema"
+            >
+              <Save className="h-4 w-4" />
+              <span>{savedQuotationId ? "Actualizar en Sistema" : "Guardar Cotización"}</span>
+            </button>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto">
             <button
               type="button"
               onClick={handlePrint}
               disabled={quotation.items.length === 0}
-              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 rounded-xl border border-border bg-card px-3.5 py-2.5 text-xs font-bold text-foreground hover:bg-muted transition-colors disabled:opacity-40"
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 rounded-xl border border-border bg-card px-3 py-2.5 text-xs font-bold text-foreground hover:bg-muted transition-colors disabled:opacity-40"
               title="Vista previa e impresión"
             >
               <Printer className="h-3.5 w-3.5 text-muted-foreground" />
@@ -584,20 +684,31 @@ export function CotizadorModal({
               type="button"
               onClick={handleDownloadExcel}
               disabled={quotation.items.length === 0}
-              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-card px-4 py-2.5 text-xs font-bold text-foreground hover:bg-muted transition-all shadow-sm disabled:opacity-40"
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-card px-3.5 py-2.5 text-xs font-bold text-foreground hover:bg-muted transition-all shadow-xs disabled:opacity-40"
             >
               <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
-              <span>Descargar Excel (.xlsx)</span>
+              <span>Excel (.xlsx)</span>
             </button>
 
             <button
               type="button"
               onClick={handleDownloadPdf}
               disabled={quotation.items.length === 0}
-              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white px-5 py-2.5 text-xs font-bold shadow-md active:scale-95 transition-all disabled:opacity-40"
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-card px-3.5 py-2.5 text-xs font-bold text-foreground hover:bg-muted transition-all shadow-xs disabled:opacity-40"
             >
               <FileText className="h-4 w-4" />
-              <span>Descargar PDF (.pdf)</span>
+              <span>PDF (.pdf)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleApproveAndDownloadHgi}
+              disabled={quotation.items.length === 0 || isSaving}
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 text-xs font-bold shadow-md active:scale-95 transition-all disabled:opacity-40"
+              title="Aprobar directamente la cotización y descargar el archivo HGI para pedidos"
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              <span>Aprobar y Pedido HGI</span>
             </button>
           </div>
         </div>

@@ -237,6 +237,89 @@ export type Database = {
         }
         Relationships: []
       }
+      quotations: {
+        Row: {
+          id: string
+          quotation_number: string
+          customer_name: string
+          advisor_name: string
+          notes: string
+          currency: string
+          cop_price_type: string
+          total_units: number
+          total_references: number
+          subtotal_catalogo: number
+          subtotal_sin_iva: number
+          total_iva: number
+          total_amount: number
+          total_discount: number
+          tier_badge: string
+          status: string
+          approved_at: string | null
+          approved_by: string | null
+          order_id: string | null
+          items: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          quotation_number: string
+          customer_name: string
+          advisor_name?: string
+          notes?: string
+          currency?: string
+          cop_price_type?: string
+          total_units?: number
+          total_references?: number
+          subtotal_catalogo?: number
+          subtotal_sin_iva?: number
+          total_iva?: number
+          total_amount?: number
+          total_discount?: number
+          tier_badge?: string
+          status?: string
+          approved_at?: string | null
+          approved_by?: string | null
+          order_id?: string | null
+          items?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          quotation_number?: string
+          customer_name?: string
+          advisor_name?: string
+          notes?: string
+          currency?: string
+          cop_price_type?: string
+          total_units?: number
+          total_references?: number
+          subtotal_catalogo?: number
+          subtotal_sin_iva?: number
+          total_iva?: number
+          total_amount?: number
+          total_discount?: number
+          tier_badge?: string
+          status?: string
+          approved_at?: string | null
+          approved_by?: string | null
+          order_id?: string | null
+          items?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quotations_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

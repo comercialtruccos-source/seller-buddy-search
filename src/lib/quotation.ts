@@ -100,6 +100,7 @@ export interface QuotationItemSummary {
   referencia: string;
   descripcion: string;
   color: string;
+  codColor?: string; // Código de color para integración HGI
   talla: string;
   cantidad: number;
   basePvp?: number;
@@ -148,6 +149,7 @@ export interface QuotationConfig {
 }
 
 export interface QuotationData {
+  id?: string;
   quotationNumber: string;
   date: Date;
   dateFormatted: string;
@@ -156,6 +158,10 @@ export interface QuotationData {
   notes: string;
   currency: QuotationCurrency;
   copPriceType: CopPriceType;
+  status?: "pendiente" | "aprobada" | "rechazada";
+  approvedAt?: string;
+  approvedBy?: string;
+  orderId?: string;
   tierInfo: QuotationTierInfo;
   items: QuotationItemSummary[];
   totalUnits: number;
@@ -379,6 +385,7 @@ export function buildQuotationData(
       referencia: it.referencia,
       descripcion: it.descripcion,
       color: it.color,
+      codColor: it.codColor || invRow?.codColor || "",
       talla: it.talla,
       cantidad: it.cantidad,
       basePvp,

@@ -32,6 +32,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { VoiceSearchButton } from "@/components/VoiceSearchButton";
 import { VoiceOrderAssistantModal } from "@/components/VoiceOrderAssistantModal";
 import { CotizadorModal } from "@/components/CotizadorModal";
+import { QuotationsView } from "@/components/QuotationsView";
+import { useQuotations, useHydrateQuotations } from "@/lib/quotationsStore";
 
 
 import {
@@ -123,10 +125,13 @@ function Index() {
   }, []);
 
 
-  const [activeTab, setActiveTab] = useState<"catalogo" | "historial">("catalogo");
+  const [activeTab, setActiveTab] = useState<"catalogo" | "cotizaciones" | "historial">("catalogo");
   useHydrateOrder();
+  useHydrateQuotations();
   const order = useOrder();
   const orderCount = order.reduce((s, i) => s + i.cantidad, 0);
+  const quotations = useQuotations();
+  const pendingQuotationsCount = quotations.filter((q) => q.status === "pendiente").length;
 
   const reloadInventory = useCallback(async () => {
     try {
@@ -425,6 +430,22 @@ function Index() {
             Catálogo e Inventario
           </button>
           <button
+            onClick={() => setActiveTab("cotizaciones")}
+            className={`pb-2.5 px-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
+              activeTab === "cotizaciones"
+                ? "border-accent text-accent"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <FileText className="h-4 w-4" />
+            <span>Cotizaciones</span>
+            {pendingQuotationsCount > 0 && (
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500/20 px-1.5 text-[10px] font-black text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                {pendingQuotationsCount}
+              </span>
+            )}
+          </button>
+          <button
             onClick={() => setActiveTab("historial")}
             className={`pb-2.5 px-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
               activeTab === "historial"
@@ -581,6 +602,14 @@ function Index() {
               )}
             </div>
           </div>
+        )}
+
+        {activeTab === "cotizaciones" && (
+          <QuotationsView
+            onGoToCatalog={() => setActiveTab("catalogo")}
+            inventory={rows}
+            onOpenCotizador={() => setCotizadorOpen(true)}
+          />
         )}
 
         {activeTab === "historial" && (
