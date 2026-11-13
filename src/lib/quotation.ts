@@ -692,33 +692,20 @@ export function downloadQuotationExcel(quotation: QuotationData): void {
   }
 
   const ubiAoa: (string | number)[][] = [
-    ["UBICACIONES BODEGA 1001 - PRENDAS COTIZADAS"],
-    [`Cotización: ${quotation.quotationNumber} | Cliente: ${quotation.customerName} | Fecha: ${quotation.dateFormatted}`],
-    [],
-    ["#", "REFERENCIA", "DESCRIPCIÓN", "UBICACIÓN BODEGA 1001", "CANTIDAD COTIZADA", "TALLAS / CANTIDADES", "BODEGA"],
+    ["REFERENCIA", "DESCRIPCIÓN", "UBICACIÓN BODEGA 1001"],
   ];
-  let uIdx = 1;
   for (const item of refMap.values()) {
-    const tallasStr = Object.entries(item.tallas).map(([t, q]) => `T${t}: ${q}u`).join(", ");
     ubiAoa.push([
-      uIdx++,
       item.ref,
       item.desc,
       item.ubic,
-      item.cant,
-      tallasStr,
-      "BODEGA 1001",
     ]);
   }
   const wsUbi = XLSX.utils.aoa_to_sheet(ubiAoa);
   wsUbi["!cols"] = [
-    { wch: 6 },
-    { wch: 16 },
-    { wch: 32 },
-    { wch: 24 },
     { wch: 18 },
-    { wch: 28 },
-    { wch: 16 },
+    { wch: 38 },
+    { wch: 25 },
   ];
   XLSX.utils.book_append_sheet(wb, wsUbi, "Ubicaciones Bodega 1001");
 

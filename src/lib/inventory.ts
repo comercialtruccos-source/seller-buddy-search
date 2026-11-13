@@ -972,90 +972,30 @@ export async function deleteBodegasFromDb(bodegas: string[]): Promise<number> {
 
 /**
  * Exporta un archivo Excel (.xlsx) con la referencia y la ubicación física en la Bodega 1001.
- * Incluye dos hojas: Resumen por Referencia y Detalle por SKU y Talla.
+ * Contiene únicamente 3 columnas: REFERENCIA, DESCRIPCIÓN, UBICACIÓN BODEGA 1001.
  */
 export function exportUbicacionesBodega1001(groups: ReferenceGroup[]): void {
   if (!groups || groups.length === 0) {
     throw new Error("No hay referencias para exportar.");
   }
 
-  // 1. Hoja 1: Resumen por Referencia
   const refRows = groups.map((g) => {
     const ubicacion = getWarehouseLocation(g);
-    let saldoBodega1001 = 0;
-    for (const [bName, s] of Object.entries(g.saldosPorBodega || {})) {
-      if (isMainWarehouseBodega(bName) && !isStoreBodega(bName)) {
-        saldoBodega1001 += s;
-      }
-    }
-
-    const mainBodega =
-      Object.keys(g.saldosPorBodega || {}).find((b) => isMainWarehouseBodega(b) && !isStoreBodega(b)) ||
-      "BODEGA 1001";
-
     return {
       "REFERENCIA": g.referencia,
       "DESCRIPCIÓN": g.descripcion,
-      "UBICACIÓN": ubicacion || "SIN UBICACIÓN",
-      "BODEGA": mainBodega,
-      "SALDO BODEGA 1001": saldoBodega1001,
-      "SALDO TOTAL": g.totalSaldo,
+      "UBICACIÓN BODEGA 1001": ubicacion || "SIN UBICACIÓN",
     };
   });
 
-  // 2. Hoja 2: Detalle por SKU y Talla
-  const skuRows: any[] = [];
-  for (const g of groups) {
-    const refUbicacion = getWarehouseLocation(g);
-    for (const v of g.variantes || []) {
-      let saldoBodega1001 = 0;
-      for (const [bName, s] of Object.entries(v.saldosPorBodega || {})) {
-        if (isMainWarehouseBodega(bName) && !isStoreBodega(bName)) {
-          saldoBodega1001 += s;
-        }
-      }
-      skuRows.push({
-        "REFERENCIA": g.referencia,
-        "SKU": v.sku,
-        "DESCRIPCIÓN": g.descripcion,
-        "COLOR": v.color,
-        "TALLA": v.talla,
-        "UBICACIÓN": refUbicacion || v.ubicaciones || "SIN UBICACIÓN",
-        "BODEGA": "BODEGA 1001",
-        "SALDO BODEGA 1001": saldoBodega1001,
-        "SALDO TOTAL": v.saldo,
-      });
-    }
-  }
-
   const wb = XLSX.utils.book_new();
-
-  // Hoja 1
   const ws1 = XLSX.utils.json_to_sheet(refRows);
   ws1["!cols"] = [
-    { wch: 16 }, // REFERENCIA
-    { wch: 35 }, // DESCRIPCIÓN
-    { wch: 22 }, // UBICACIÓN
-    { wch: 18 }, // BODEGA
-    { wch: 20 }, // SALDO BODEGA 1001
-    { wch: 15 }, // SALDO TOTAL
+    { wch: 18 }, // REFERENCIA
+    { wch: 38 }, // DESCRIPCIÓN
+    { wch: 25 }, // UBICACIÓN BODEGA 1001
   ];
-  XLSX.utils.book_append_sheet(wb, ws1, "Ubicaciones Referencias");
-
-  // Hoja 2
-  const ws2 = XLSX.utils.json_to_sheet(skuRows);
-  ws2["!cols"] = [
-    { wch: 16 }, // REFERENCIA
-    { wch: 18 }, // SKU
-    { wch: 30 }, // DESCRIPCIÓN
-    { wch: 18 }, // COLOR
-    { wch: 10 }, // TALLA
-    { wch: 22 }, // UBICACIÓN
-    { wch: 18 }, // BODEGA
-    { wch: 20 }, // SALDO BODEGA 1001
-    { wch: 15 }, // SALDO TOTAL
-  ];
-  XLSX.utils.book_append_sheet(wb, ws2, "Detalle SKUs");
+  XLSX.utils.book_append_sheet(wb, ws1, "Ubicaciones Bodega 1001");
 
   const today = new Date().toISOString().slice(0, 10);
   const filename = `UBICACIONES_BODEGA_1001_${today}.xlsx`;
@@ -1063,31 +1003,22 @@ export function exportUbicacionesBodega1001(groups: ReferenceGroup[]): void {
 }
 
 /**
- * Exporta un archivo plano CSV con la referencia y la ubicación física en Bodega 1001.
+ * Exporta un archivo plano CSV con únicamente 3 columnas: REFERENCIA, DESCRIPCIÓN, UBICACIÓN BODEGA 1001.
  */
 export function exportUbicacionesBodega1001Csv(groups: ReferenceGroup[]): void {
   if (!groups || groups.length === 0) {
     throw new Error("No hay referencias para exportar.");
   }
 
-  const headers = ["REFERENCIA", "DESCRIPCION", "UBICACION", "BODEGA", "SALDO_BODEGA_1001", "SALDO_TOTAL"];
+  const headers = ["REFERENCIA", "DESCRIPCIÓN", "UBICACIÓN BODEGA 1001"];
   const rows = groups.map((g) => {
     const ubicacion = getWarehouseLocation(g);
-    let saldoBodega1001 = 0;
-    for (const [bName, s] of Object.entries(g.saldosPorBodega || {})) {
-      if (isMainWarehouseBodega(bName) && !isStoreBodega(bName)) {
-        saldoBodega1001 += s;
-      }
-    }
     const cleanDesc = (g.descripcion || "").replace(/"/g, '""');
-    const cleanUbic = (ubicacion || "SIN UBICACION").replace(/"/g, '""');
+    const cleanUbic = (ubicacion || "SIN UBICACIÓN").replace(/"/g, '""');
     return [
       g.referencia,
       `"${cleanDesc}"`,
       `"${cleanUbic}"`,
-      "BODEGA 1001",
-      saldoBodega1001,
-      g.totalSaldo,
     ].join(",");
   });
 
@@ -1191,9 +1122,10 @@ export function resolveBodega1001Location(
 /**
  * Exporta un archivo Excel (.xlsx) con las referencias seleccionadas en la cotización
  * y su ubicación física en la Bodega 1001.
- * Incluye dos hojas:
- * 1. "Ubicaciones Referencias" (Resumen por Referencia con cantidades cotizadas y ubicación 1001)
- * 2. "Detalle SKUs Cotizados" (Detalle por variante y talla con cantidades cotizadas y ubicación)
+ * Contiene únicamente las 3 columnas solicitadas:
+ * 1. REFERENCIA
+ * 2. DESCRIPCIÓN
+ * 3. UBICACIÓN BODEGA 1001
  */
 export function exportQuotationUbicacionesBodega1001(
   items: QuotedItemInput[],
@@ -1209,168 +1141,46 @@ export function exportQuotationUbicacionesBodega1001(
     throw new Error("No hay referencias seleccionadas en la cotización.");
   }
 
-  const rows: InventoryRow[] = Array.isArray(options?.inventory)
-    ? options.inventory
-    : options?.inventory
-    ? Object.values(options.inventory)
-    : [];
-
-  // Group by referencia
-  const refMap = new Map<
-    string,
-    {
-      referencia: string;
-      descripcion: string;
-      ubicacion: string;
-      cantidadTotal: number;
-      saldoBodega1001: number;
-      saldoTotal: number;
-      tallas: Record<string, number>;
-      colores: Set<string>;
-    }
-  >();
+  // Agrupar por referencia para consolidar exactamente 1 fila por referencia seleccionada
+  const refMap = new Map<string, { referencia: string; descripcion: string; ubicacion: string }>();
 
   for (const it of activeItems) {
     const ref = it.referencia.trim().toUpperCase();
-    const qty = it.cantidad ?? 1;
-    let entry = refMap.get(ref);
-    if (!entry) {
-      let saldo1001 = 0;
-      let saldoTot = 0;
-      for (const r of rows) {
-        if (r.referencia?.trim().toUpperCase() === ref) {
-          saldoTot += r.saldo || 0;
-          if (isMainWarehouseBodega(r.bodega || "") && !isStoreBodega(r.bodega || "")) {
-            saldo1001 += r.saldo || 0;
-          }
-        }
-      }
-
+    if (!refMap.has(ref)) {
       const ubi =
         (it.ubicacion || "").trim() ||
-        resolveBodega1001Location(ref, it.sku, options?.inventory);
+        resolveBodega1001Location(ref, it.sku, options?.inventory) ||
+        "SIN UBICACIÓN";
 
-      entry = {
+      refMap.set(ref, {
         referencia: it.referencia,
         descripcion: it.descripcion || "PRENDA",
-        ubicacion: ubi || "SIN UBICACIÓN",
-        cantidadTotal: 0,
-        saldoBodega1001: saldo1001,
-        saldoTotal: saldoTot,
-        tallas: {},
-        colores: new Set<string>(),
-      };
-      refMap.set(ref, entry);
-    }
-
-    entry.cantidadTotal += qty;
-    if (it.talla) {
-      entry.tallas[it.talla] = (entry.tallas[it.talla] || 0) + qty;
-    }
-    if (it.color) {
-      entry.colores.add(it.color);
-    }
-    if ((!entry.ubicacion || entry.ubicacion === "SIN UBICACIÓN") && it.ubicacion) {
-      entry.ubicacion = it.ubicacion;
-    }
-  }
-
-  // 1. Hoja 1: Resumen por Referencia Cotizada
-  const refRows: any[] = [];
-  let itemNum = 1;
-  for (const entry of refMap.values()) {
-    const tallasStr = Object.entries(entry.tallas)
-      .map(([t, q]) => `T${t}: ${q}u`)
-      .join(", ");
-
-    refRows.push({
-      "#": itemNum++,
-      "REFERENCIA": entry.referencia,
-      "DESCRIPCIÓN": entry.descripcion,
-      "UBICACIÓN BODEGA 1001": entry.ubicacion,
-      "CANTIDAD COTIZADA": entry.cantidadTotal,
-      "TALLAS / CANTIDADES": tallasStr || "N/A",
-      "COLORES": Array.from(entry.colores).join(", ") || "N/A",
-      "BODEGA": "BODEGA 1001",
-      "SALDO DISP. 1001": entry.saldoBodega1001 > 0 ? entry.saldoBodega1001 : "Disponible",
-      "SALDO TOTAL": entry.saldoTotal > 0 ? entry.saldoTotal : entry.cantidadTotal,
-    });
-  }
-
-  // 2. Hoja 2: Detalle SKUs y Variantes Cotizadas
-  const skuRows: any[] = [];
-  let skuNum = 1;
-  for (const it of activeItems) {
-    const ref = it.referencia.trim().toUpperCase();
-    const entry = refMap.get(ref);
-    const ubi =
-      (it.ubicacion || "").trim() ||
-      entry?.ubicacion ||
-      resolveBodega1001Location(ref, it.sku, options?.inventory) ||
-      "SIN UBICACIÓN";
-
-    let saldo1001 = 0;
-    let saldoTot = 0;
-    if (it.sku) {
-      for (const r of rows) {
-        if (r.sku === it.sku) {
-          saldoTot += r.saldo || 0;
-          if (isMainWarehouseBodega(r.bodega || "") && !isStoreBodega(r.bodega || "")) {
-            saldo1001 += r.saldo || 0;
-          }
-        }
+        ubicacion: ubi,
+      });
+    } else {
+      const existing = refMap.get(ref)!;
+      if ((!existing.ubicacion || existing.ubicacion === "SIN UBICACIÓN") && it.ubicacion) {
+        existing.ubicacion = it.ubicacion;
       }
     }
-
-    skuRows.push({
-      "#": skuNum++,
-      "REFERENCIA": it.referencia,
-      "SKU": it.sku || "N/A",
-      "DESCRIPCIÓN": it.descripcion || entry?.descripcion || "",
-      "COLOR": it.color || "",
-      "TALLA": it.talla || "",
-      "CANTIDAD COTIZADA": it.cantidad ?? 1,
-      "UBICACIÓN BODEGA 1001": ubi,
-      "BODEGA": "BODEGA 1001",
-      "SALDO DISP. 1001": saldo1001 > 0 ? saldo1001 : (entry?.saldoBodega1001 || "Disp."),
-      "SALDO TOTAL": saldoTot > 0 ? saldoTot : (it.cantidad ?? 1),
-    });
   }
 
+  const rows = Array.from(refMap.values()).map((entry) => ({
+    "REFERENCIA": entry.referencia,
+    "DESCRIPCIÓN": entry.descripcion,
+    "UBICACIÓN BODEGA 1001": entry.ubicacion,
+  }));
+
   const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(rows);
 
-  // Hoja 1
-  const ws1 = XLSX.utils.json_to_sheet(refRows);
-  ws1["!cols"] = [
-    { wch: 6 },  // #
-    { wch: 16 }, // REFERENCIA
-    { wch: 32 }, // DESCRIPCIÓN
-    { wch: 24 }, // UBICACIÓN BODEGA 1001
-    { wch: 18 }, // CANTIDAD COTIZADA
-    { wch: 28 }, // TALLAS / CANTIDADES
-    { wch: 20 }, // COLORES
-    { wch: 16 }, // BODEGA
-    { wch: 18 }, // SALDO DISP. 1001
-    { wch: 16 }, // SALDO TOTAL
+  ws["!cols"] = [
+    { wch: 18 }, // REFERENCIA
+    { wch: 38 }, // DESCRIPCIÓN
+    { wch: 25 }, // UBICACIÓN BODEGA 1001
   ];
-  XLSX.utils.book_append_sheet(wb, ws1, "Ubicaciones Referencias");
 
-  // Hoja 2
-  const ws2 = XLSX.utils.json_to_sheet(skuRows);
-  ws2["!cols"] = [
-    { wch: 6 },  // #
-    { wch: 16 }, // REFERENCIA
-    { wch: 20 }, // SKU
-    { wch: 28 }, // DESCRIPCIÓN
-    { wch: 16 }, // COLOR
-    { wch: 10 }, // TALLA
-    { wch: 18 }, // CANTIDAD COTIZADA
-    { wch: 24 }, // UBICACIÓN BODEGA 1001
-    { wch: 16 }, // BODEGA
-    { wch: 18 }, // SALDO DISP. 1001
-    { wch: 16 }, // SALDO TOTAL
-  ];
-  XLSX.utils.book_append_sheet(wb, ws2, "Detalle SKUs Cotizados");
+  XLSX.utils.book_append_sheet(wb, ws, "Ubicaciones Bodega 1001");
 
   const qNum = (options?.quotationNumber || "").replace(/[^A-Za-z0-9]/g, "_");
   const cust = (options?.customerName || "").replace(/[^A-Za-z0-9]/g, "_");
@@ -1388,6 +1198,7 @@ export function exportQuotationUbicacionesBodega1001(
 /**
  * Exporta un archivo plano CSV con las referencias seleccionadas en la cotización
  * y su ubicación en Bodega 1001.
+ * Contiene únicamente las 3 columnas: REFERENCIA, DESCRIPCIÓN, UBICACIÓN BODEGA 1001.
  */
 export function exportQuotationUbicacionesBodega1001Csv(
   items: QuotedItemInput[],
@@ -1402,34 +1213,37 @@ export function exportQuotationUbicacionesBodega1001Csv(
     throw new Error("No hay referencias seleccionadas en la cotización.");
   }
 
-  const headers = [
-    "REFERENCIA",
-    "SKU",
-    "DESCRIPCION",
-    "COLOR",
-    "TALLA",
-    "CANTIDAD_COTIZADA",
-    "UBICACION_BODEGA_1001",
-    "BODEGA",
-  ];
+  const refMap = new Map<string, { referencia: string; descripcion: string; ubicacion: string }>();
 
-  const rows = activeItems.map((it) => {
-    const ubi =
-      (it.ubicacion || "").trim() ||
-      resolveBodega1001Location(it.referencia, it.sku, options?.inventory) ||
-      "SIN UBICACION";
-    const cleanDesc = (it.descripcion || "").replace(/"/g, '""');
-    const cleanUbic = ubi.replace(/"/g, '""');
-    const cleanColor = (it.color || "").replace(/"/g, '""');
+  for (const it of activeItems) {
+    const ref = it.referencia.trim().toUpperCase();
+    if (!refMap.has(ref)) {
+      const ubi =
+        (it.ubicacion || "").trim() ||
+        resolveBodega1001Location(it.referencia, it.sku, options?.inventory) ||
+        "SIN UBICACION";
+
+      refMap.set(ref, {
+        referencia: it.referencia,
+        descripcion: it.descripcion || "PRENDA",
+        ubicacion: ubi,
+      });
+    } else {
+      const existing = refMap.get(ref)!;
+      if ((!existing.ubicacion || existing.ubicacion === "SIN UBICACION") && it.ubicacion) {
+        existing.ubicacion = it.ubicacion;
+      }
+    }
+  }
+
+  const headers = ["REFERENCIA", "DESCRIPCIÓN", "UBICACIÓN BODEGA 1001"];
+  const rows = Array.from(refMap.values()).map((entry) => {
+    const cleanDesc = (entry.descripcion || "").replace(/"/g, '""');
+    const cleanUbic = (entry.ubicacion || "").replace(/"/g, '""');
     return [
-      it.referencia,
-      it.sku || "",
+      entry.referencia,
       `"${cleanDesc}"`,
-      `"${cleanColor}"`,
-      it.talla || "",
-      it.cantidad ?? 1,
       `"${cleanUbic}"`,
-      "BODEGA 1001",
     ].join(",");
   });
 
