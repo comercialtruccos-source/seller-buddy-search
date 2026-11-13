@@ -1127,7 +1127,7 @@ function OrderModal({
             )}
           </div>
           <div className="flex flex-col gap-2.5">
-            {/* Fila 1: Vaciar y Pedido HGI */}
+            {/* Fila 1: Vaciar y Descargar Excel */}
             <div className="flex gap-2">
               <button
                 type="button"
@@ -1146,37 +1146,37 @@ function OrderModal({
                 onClick={handleDownloadOnly}
                 disabled={order.length === 0 || isSaving}
                 className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-accent/40 bg-accent/15 px-3.5 py-2.5 text-xs sm:text-sm font-bold text-primary transition-all hover:bg-accent/25 disabled:opacity-40"
-                title="Descargar archivo en formato HGI (.xls) para subir pedidos"
+                title="Descargar archivo en formato Excel (.xls) para subir pedidos"
               >
                 <Download className="h-4 w-4" />
-                <span>Pedido HGI (.xls)</span>
+                <span>Descargar Excel (.xls)</span>
               </button>
             </div>
 
-            {/* Fila 2: Botón destacado para Exportar Ubicaciones Bodega 1001 (Excel y CSV) */}
-            <div className="w-full flex rounded-xl shadow-xs overflow-hidden border-2 border-primary/40 bg-primary/10 text-primary">
+            {/* Fila 2: Botón ROJO arriba del botón verde para Exportar Ubicaciones del Pedido */}
+            <div className="w-full flex rounded-xl shadow-md overflow-hidden bg-red-600 text-white hover:bg-red-700 transition-all">
               <button
                 type="button"
                 onClick={() => handleExportUbicacionesOrder("xlsx")}
                 disabled={order.length === 0 || isSaving}
-                className="flex-1 inline-flex items-center justify-center gap-2 px-3.5 py-3 text-xs sm:text-sm font-extrabold text-primary hover:bg-primary/20 active:scale-98 transition-all disabled:opacity-40"
-                title="Exportar archivo Excel (.xlsx) con las referencias seleccionadas y su ubicación en Bodega 1001"
+                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 text-xs sm:text-sm font-extrabold text-white hover:bg-red-700 active:scale-98 transition-all disabled:opacity-40"
+                title="Exportar archivo Excel (.xlsx) con las referencias del pedido y su ubicación en Bodega 1001"
               >
-                <MapPin className="h-4 w-4 shrink-0 text-primary" />
-                <span>Exportar Ubicaciones Bodega 1001</span>
+                <MapPin className="h-4 w-4 shrink-0 text-white" />
+                <span>Exportar Ubicaciones del Pedido (Bodega 1001)</span>
               </button>
               <button
                 type="button"
                 onClick={() => handleExportUbicacionesOrder("csv")}
                 disabled={order.length === 0 || isSaving}
-                className="inline-flex items-center justify-center px-3.5 py-3 text-xs font-black text-primary border-l border-primary/30 hover:bg-primary/20 transition-all disabled:opacity-40"
+                className="inline-flex items-center justify-center px-3.5 py-3 text-xs font-black text-white border-l border-red-500 hover:bg-red-800 transition-all disabled:opacity-40"
                 title="Descargar archivo plano CSV con las referencias y su ubicación"
               >
                 .CSV
               </button>
             </div>
 
-            {/* Fila 3: Cotizador Completo (PDF o Excel) */}
+            {/* Fila 3: Cotizador Completo en color verde */}
             <button
               type="button"
               onClick={() => {
