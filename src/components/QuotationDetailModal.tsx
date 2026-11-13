@@ -100,11 +100,11 @@ export function QuotationDetailModal({
     }
   };
 
-  const handleDownloadUbicaciones = () => {
+  const handleDownloadUbicaciones = (format: "xlsx" | "csv" = "xlsx") => {
     try {
-      downloadQuotationUbicaciones(quotation, inventoryLookup, "xlsx");
+      downloadQuotationUbicaciones(quotation, inventoryLookup, format);
       toast.success(
-        `Ubicaciones de Bodega 1001 para la cotización ${quotation.quotationNumber} descargadas en Excel (.xlsx)`,
+        `Ubicaciones de Bodega 1001 para la cotización ${quotation.quotationNumber} descargadas en ${format === "xlsx" ? "Excel (.xlsx)" : "CSV"}`,
         { duration: 4000 }
       );
     } catch (err: any) {
@@ -324,15 +324,25 @@ export function QuotationDetailModal({
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
-            <button
-              type="button"
-              onClick={handleDownloadUbicaciones}
-              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 rounded-xl border border-primary/30 bg-primary/5 hover:bg-primary/10 px-3.5 py-2.5 text-xs font-bold text-primary transition-all shadow-xs"
-              title="Descargar archivo Excel con las referencias de esta cotización y su ubicación física en Bodega 1001 (.xlsx)"
-            >
-              <MapPin className="h-3.5 w-3.5" />
-              <span>Ubicaciones Bodega 1001</span>
-            </button>
+            <div className="w-full sm:w-auto inline-flex rounded-xl shadow-xs overflow-hidden border border-primary/40 bg-primary/10 text-primary">
+              <button
+                type="button"
+                onClick={() => handleDownloadUbicaciones("xlsx")}
+                className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 text-xs font-bold hover:bg-primary/20 transition-all cursor-pointer"
+                title="Descargar archivo Excel con las referencias de esta cotización y su ubicación física en Bodega 1001 (.xlsx)"
+              >
+                <MapPin className="h-3.5 w-3.5" />
+                <span>Ubicaciones Bodega 1001</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDownloadUbicaciones("csv")}
+                className="inline-flex items-center justify-center px-2.5 py-2.5 text-xs font-bold border-l border-primary/20 hover:bg-primary/20 transition-all cursor-pointer"
+                title="Descargar en formato plano CSV"
+              >
+                .CSV
+              </button>
+            </div>
 
             <button
               type="button"

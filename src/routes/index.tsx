@@ -437,31 +437,31 @@ function Index() {
 
       {/* Header */}
       <header className="border-b border-border bg-primary text-primary-foreground">
-        <div className="mx-auto flex max-w-4xl items-center gap-3 px-4 py-6">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-accent text-accent-foreground">
-            <PackageSearch className="h-6 w-6" />
+        <div className="mx-auto flex max-w-4xl flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-4 sm:py-6">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-xl bg-accent text-accent-foreground shrink-0">
+              <PackageSearch className="h-5 w-5 sm:h-6 sm:w-6" />
+            </div>
+            <div>
+              <h1 className="text-lg sm:text-xl font-bold leading-tight">
+                Buscador de Referencias
+              </h1>
+              <p className="text-xs sm:text-sm text-primary-foreground/70">
+                Consulta de precios detal y mayorista
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-bold leading-tight">
-              Buscador de Referencias
-            </h1>
-            <p className="text-sm text-primary-foreground/70">
-              Consulta de precios detal y mayorista
-            </p>
-          </div>
-          <div className="flex-1" />
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             {rows.length > 0 && (
-              <div className="inline-flex rounded-xl shadow-xs overflow-hidden border border-accent/40 bg-accent text-accent-foreground">
+              <div className="inline-flex rounded-xl shadow-xs overflow-hidden border border-accent/40 bg-accent text-accent-foreground w-full sm:w-auto">
                 <button
                   type="button"
                   onClick={() => handleExportUbicaciones1001("xlsx")}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-bold hover:bg-accent/90 transition-colors cursor-pointer"
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-bold hover:bg-accent/90 transition-colors cursor-pointer"
                   title="Exportar archivo Excel (.xlsx) con Referencias y Ubicaciones de Bodega 1001"
                 >
-                  <FileSpreadsheet className="h-4 w-4" />
-                  <span className="hidden sm:inline">Exportar Ubicaciones 1001</span>
-                  <span className="sm:hidden">Ubicaciones 1001</span>
+                  <MapPin className="h-4 w-4 shrink-0" />
+                  <span>Ubicaciones Bodega 1001</span>
                 </button>
                 <button
                   type="button"
@@ -476,10 +476,10 @@ function Index() {
             {deferredPrompt && (
               <button
                 onClick={handleInstallClick}
-                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-accent px-4 py-2 text-sm font-bold text-accent-foreground shadow-sm hover:bg-accent/90 transition-all"
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-accent px-3 py-2 text-xs sm:text-sm font-bold text-accent-foreground shadow-sm hover:bg-accent/90 transition-all shrink-0"
               >
                 <Download className="h-4 w-4" />
-                Instalar App
+                <span className="hidden sm:inline">Instalar App</span>
               </button>
             )}
           </div>
@@ -1126,39 +1126,57 @@ function OrderModal({
               </div>
             )}
           </div>
-          <div className="flex flex-col gap-2">
-            <div className="flex flex-wrap gap-2">
+          <div className="flex flex-col gap-2.5">
+            {/* Fila 1: Vaciar y Pedido HGI */}
+            <div className="flex gap-2">
               <button
+                type="button"
                 onClick={() => {
                   if (order.length === 0) return;
                   if (confirm("¿Vaciar el pedido?")) clearOrder();
                 }}
                 disabled={order.length === 0 || isSaving}
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-background px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-foreground transition-colors hover:bg-muted disabled:opacity-40"
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-border bg-background px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-foreground transition-colors hover:bg-muted disabled:opacity-40"
               >
                 <Trash2 className="h-4 w-4" />
                 Vaciar
               </button>
               <button
+                type="button"
                 onClick={handleDownloadOnly}
                 disabled={order.length === 0 || isSaving}
-                className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-accent/30 bg-accent/10 px-3.5 py-2.5 text-xs sm:text-sm font-bold text-primary transition-all hover:bg-accent/20 disabled:opacity-40"
+                className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-accent/40 bg-accent/15 px-3.5 py-2.5 text-xs sm:text-sm font-bold text-primary transition-all hover:bg-accent/25 disabled:opacity-40"
                 title="Descargar archivo en formato HGI (.xls) para subir pedidos"
               >
                 <Download className="h-4 w-4" />
-                Pedido HGI (.xls)
+                <span>Pedido HGI (.xls)</span>
               </button>
+            </div>
+
+            {/* Fila 2: Botón destacado para Exportar Ubicaciones Bodega 1001 (Excel y CSV) */}
+            <div className="w-full flex rounded-xl shadow-xs overflow-hidden border-2 border-primary/40 bg-primary/10 text-primary">
               <button
                 type="button"
                 onClick={() => handleExportUbicacionesOrder("xlsx")}
                 disabled={order.length === 0 || isSaving}
-                className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-primary/30 bg-primary/5 px-3 py-2.5 text-xs font-bold text-primary transition-all hover:bg-primary/10 disabled:opacity-40"
+                className="flex-1 inline-flex items-center justify-center gap-2 px-3.5 py-3 text-xs sm:text-sm font-extrabold text-primary hover:bg-primary/20 active:scale-98 transition-all disabled:opacity-40"
                 title="Exportar archivo Excel (.xlsx) con las referencias seleccionadas y su ubicación en Bodega 1001"
               >
-                <MapPin className="h-4 w-4" />
-                <span>Ubicaciones 1001</span>
+                <MapPin className="h-4 w-4 shrink-0 text-primary" />
+                <span>Exportar Ubicaciones Bodega 1001</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleExportUbicacionesOrder("csv")}
+                disabled={order.length === 0 || isSaving}
+                className="inline-flex items-center justify-center px-3.5 py-3 text-xs font-black text-primary border-l border-primary/30 hover:bg-primary/20 transition-all disabled:opacity-40"
+                title="Descargar archivo plano CSV con las referencias y su ubicación"
+              >
+                .CSV
               </button>
             </div>
+
+            {/* Fila 3: Cotizador Completo (PDF o Excel) */}
             <button
               type="button"
               onClick={() => {
@@ -1172,7 +1190,10 @@ function OrderModal({
               <Calculator className="h-4 w-4" />
               <span>Cotizador (Generar PDF o Excel en COP / USD)</span>
             </button>
+
+            {/* Fila 4: Guardar en Base de Datos */}
             <button
+              type="button"
               onClick={handleSaveToDb}
               disabled={order.length === 0 || isSaving}
               className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3 text-sm font-bold text-accent-foreground shadow-sm transition-transform hover:scale-[1.01] active:scale-95 disabled:opacity-40 disabled:hover:scale-100"

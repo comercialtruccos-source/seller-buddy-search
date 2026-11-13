@@ -718,23 +718,22 @@ export function CotizadorModal({
               <span>Imprimir</span>
             </button>
 
-            <div className="inline-flex rounded-xl shadow-xs overflow-hidden border border-primary/30 bg-primary/5 text-primary">
+            <div className="w-full sm:w-auto inline-flex rounded-xl shadow-xs overflow-hidden border border-primary/40 bg-primary/10 text-primary">
               <button
                 type="button"
                 onClick={() => handleExportUbicaciones1001("xlsx")}
                 disabled={quotation.items.length === 0}
-                className="inline-flex items-center gap-1.5 px-3 py-2.5 text-xs font-bold hover:bg-primary/10 transition-colors cursor-pointer disabled:opacity-40"
+                className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-bold hover:bg-primary/20 transition-colors cursor-pointer disabled:opacity-40"
                 title="Exportar archivo Excel (.xlsx) con las referencias cotizadas y su ubicación en Bodega 1001"
               >
-                <MapPin className="h-4 w-4" />
-                <span className="hidden sm:inline">Ubicaciones 1001</span>
-                <span className="sm:hidden">Ubicaciones</span>
+                <MapPin className="h-4 w-4 shrink-0" />
+                <span>Ubicaciones Bodega 1001</span>
               </button>
               <button
                 type="button"
                 onClick={() => handleExportUbicaciones1001("csv")}
                 disabled={quotation.items.length === 0}
-                className="inline-flex items-center px-2 py-2.5 text-xs font-bold border-l border-primary/20 hover:bg-primary/10 transition-colors cursor-pointer disabled:opacity-40"
+                className="inline-flex items-center justify-center px-2.5 py-2.5 text-xs font-bold border-l border-primary/20 hover:bg-primary/20 transition-colors cursor-pointer disabled:opacity-40"
                 title="Exportar en formato CSV"
               >
                 .CSV

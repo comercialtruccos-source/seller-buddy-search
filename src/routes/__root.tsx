@@ -148,6 +148,7 @@ function RootComponent() {
     // Register Service Worker
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/service-worker.js').then(registration => {
+        registration.update();
         console.log('ServiceWorker registration successful with scope: ', registration.scope);
       }).catch(error => {
         console.log('ServiceWorker registration failed: ', error);
