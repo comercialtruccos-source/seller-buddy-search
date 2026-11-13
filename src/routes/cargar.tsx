@@ -34,6 +34,10 @@ import {
   fetchBodegasFromDb,
   deleteBodegasFromDb,
   extractBodegasFromCsvText,
+  loadInventory,
+  groupByReferencia,
+  exportUbicacionesBodega1001,
+  exportUbicacionesBodega1001Csv,
 } from "@/lib/inventory";
 import { downloadCsvFromUrl } from "@/lib/shopify";
 
@@ -401,6 +405,27 @@ function Cargar() {
     link.click();
     document.body.removeChild(link);
     toast.success("Plantilla CSV descargada correctamente.");
+  };
+
+  const handleExportUbicaciones1001 = async (format: "xlsx" | "csv" = "xlsx") => {
+    try {
+      const inv = await loadInventory();
+      if (!inv.rows || inv.rows.length === 0) {
+        toast.error("No hay inventario cargado para exportar.");
+        return;
+      }
+      const groups = groupByReferencia(inv.rows);
+      if (format === "xlsx") {
+        exportUbicacionesBodega1001(groups);
+        toast.success(`Exportadas ${groups.length} referencias de Bodega 1001 en Excel (.xlsx)`);
+      } else {
+        exportUbicacionesBodega1001Csv(groups);
+        toast.success(`Exportadas ${groups.length} referencias de Bodega 1001 en CSV`);
+      }
+    } catch (err: any) {
+      console.error("Error al exportar ubicaciones:", err);
+      toast.error(err?.message || "Ocurrió un error al exportar las ubicaciones.");
+    }
   };
 
   const handleSyncFromUrl = async () => {
@@ -807,15 +832,36 @@ function Cargar() {
             </div>
           </div>
 
-          <div className="flex">
+          <div className="flex flex-wrap items-center gap-2">
             <button
+              type="button"
               onClick={downloadTemplateCsv}
-              className="inline-flex items-center gap-2 text-xs font-bold text-accent hover:text-accent/80 transition-all border border-accent/20 bg-accent/5 px-3 py-1.5 rounded-lg hover:scale-[1.02] active:scale-95 shadow-xs"
+              className="inline-flex items-center gap-2 text-xs font-bold text-accent hover:text-accent/80 transition-all border border-accent/20 bg-accent/5 px-3 py-1.5 rounded-lg hover:scale-[1.02] active:scale-95 shadow-xs cursor-pointer"
               title="Descargar archivo CSV de ejemplo con las columnas requeridas"
             >
               <Download className="h-3.5 w-3.5" />
               Descargar plantilla/formato CSV
             </button>
+
+            <div className="inline-flex rounded-lg shadow-xs overflow-hidden border border-primary/20 bg-primary/5 text-primary">
+              <button
+                type="button"
+                onClick={() => handleExportUbicaciones1001("xlsx")}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold hover:bg-primary/10 transition-colors cursor-pointer"
+                title="Exportar archivo Excel (.xlsx) con Referencias y Ubicaciones de Bodega 1001"
+              >
+                <FileSpreadsheet className="h-3.5 w-3.5" />
+                Exportar Ubicaciones Bodega 1001 (.xlsx)
+              </button>
+              <button
+                type="button"
+                onClick={() => handleExportUbicaciones1001("csv")}
+                className="inline-flex items-center px-2 py-1.5 text-xs font-bold border-l border-primary/20 hover:bg-primary/10 transition-colors cursor-pointer"
+                title="Exportar en formato CSV plano"
+              >
+                .CSV
+              </button>
+            </div>
           </div>
 
           {/* Drag & Drop Area */}

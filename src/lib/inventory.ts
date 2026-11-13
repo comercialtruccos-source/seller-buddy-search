@@ -1,3 +1,5 @@
+import * as XLSX from "xlsx";
+
 export interface InventoryRow {
   referencia: string;
   descripcion: string;
@@ -29,9 +31,80 @@ export interface ReferenceGroup {
   totalSaldo: number;
   saldosPorBodega: Record<string, number>;
   ubicacionesPorBodega: Record<string, string>;
-  ubicacion?: string; // Ubicación general o principal de la referencia
+  ubicacion?: string; // Ubicación general o principal de la referencia (Bodega 1001)
   variantes: VariantGroup[];
   imageUrl?: string;
+}
+
+/** Check if a bodega is the main warehouse (Bodega 1001 / 1004 / Principal) */
+export function isMainWarehouseBodega(bodegaName: string): boolean {
+  if (!bodegaName) return false;
+  const norm = bodegaName.toUpperCase().trim();
+  return (
+    norm.includes("1001") ||
+    norm.includes("1004") ||
+    norm.includes("PRINCIPAL")
+  );
+}
+
+/** Check if a bodega is a retail store or point of sale (Tienda 901, Mayorca, etc.) */
+export function isStoreBodega(bodegaName: string): boolean {
+  if (!bodegaName) return false;
+  const norm = bodegaName.toUpperCase().trim();
+  return (
+    norm.includes("901") ||
+    norm.includes("TIENDA") ||
+    norm.includes("PUNTO DE VENTA") ||
+    norm.includes("VENTA") ||
+    norm.includes("MAYORCA")
+  );
+}
+
+/**
+ * Returns the single location for the main warehouse (Bodega 1001 / 1004).
+ * Excludes retail stores like Tienda 901.
+ */
+export function getWarehouseLocation(group: ReferenceGroup): string {
+  if (!group) return "";
+
+  // 1. Check ubicacionesPorBodega for main warehouse
+  if (group.ubicacionesPorBodega) {
+    for (const [bName, uLoc] of Object.entries(group.ubicacionesPorBodega)) {
+      if (uLoc && isMainWarehouseBodega(bName) && !isStoreBodega(bName)) {
+        return uLoc.trim();
+      }
+    }
+  }
+
+  // 2. Check general group.ubicacion
+  if (group.ubicacion && group.ubicacion.trim()) {
+    return group.ubicacion.trim();
+  }
+
+  // 3. Check variants for main warehouse location
+  for (const v of group.variantes || []) {
+    if (v.ubicacionesPorBodega) {
+      for (const [bName, uLoc] of Object.entries(v.ubicacionesPorBodega)) {
+        if (uLoc && isMainWarehouseBodega(bName) && !isStoreBodega(bName)) {
+          return uLoc.trim();
+        }
+      }
+    }
+    if (v.ubicaciones && v.ubicaciones.trim() && isMainWarehouseBodega(v.bodega || "")) {
+      return v.ubicaciones.trim();
+    }
+  }
+
+  // 4. Any non-store entry in ubicacionesPorBodega
+  if (group.ubicacionesPorBodega) {
+    for (const [bName, uLoc] of Object.entries(group.ubicacionesPorBodega)) {
+      if (uLoc && !isStoreBodega(bName)) {
+        return uLoc.trim();
+      }
+    }
+  }
+
+  return "";
 }
 
 export const STORAGE_DATA_KEY = "inventario_data";
@@ -343,13 +416,14 @@ export function groupByReferencia(rows: InventoryRow[]): ReferenceGroup[] {
     const existing = map.get(row.referencia);
     const bodegaName = (row.bodega || "PRINCIPAL 1004").trim();
     const ubi = (row.ubicaciones || "").trim();
+    const isStore = isStoreBodega(bodegaName);
     
     if (existing) {
       const existingVariant = existing.variantes.find(v => v.sku === row.sku);
       if (existingVariant) {
         existingVariant.saldo += row.saldo;
         existingVariant.saldosPorBodega[bodegaName] = (existingVariant.saldosPorBodega[bodegaName] || 0) + row.saldo;
-        if (ubi) {
+        if (ubi && !isStore) {
           existingVariant.ubicacionesPorBodega[bodegaName] = ubi;
           if (!existingVariant.ubicaciones) existingVariant.ubicaciones = ubi;
         }
@@ -357,14 +431,16 @@ export function groupByReferencia(rows: InventoryRow[]): ReferenceGroup[] {
         existing.variantes.push({
           ...row,
           saldosPorBodega: { [bodegaName]: row.saldo },
-          ubicacionesPorBodega: ubi ? { [bodegaName]: ubi } : {},
+          ubicacionesPorBodega: ubi && !isStore ? { [bodegaName]: ubi } : {},
         });
       }
       existing.totalSaldo += row.saldo;
       existing.saldosPorBodega[bodegaName] = (existing.saldosPorBodega[bodegaName] || 0) + row.saldo;
       if (ubi) {
-        existing.ubicacionesPorBodega[bodegaName] = ubi;
-        if (!existing.ubicacion) existing.ubicacion = ubi;
+        if (!isStore) {
+          existing.ubicacionesPorBodega[bodegaName] = ubi;
+        }
+        if (!existing.ubicacion && !isStore) existing.ubicacion = ubi;
       }
       // Keep the max known prices in case of inconsistencies.
       existing.pvm = existing.pvm || row.pvm;
@@ -382,23 +458,25 @@ export function groupByReferencia(rows: InventoryRow[]): ReferenceGroup[] {
         precioUsd: row.precioUsd,
         totalSaldo: row.saldo,
         saldosPorBodega: { [bodegaName]: row.saldo },
-        ubicacionesPorBodega: ubi ? { [bodegaName]: ubi } : {},
-        ubicacion: ubi || undefined,
+        ubicacionesPorBodega: ubi && !isStore ? { [bodegaName]: ubi } : {},
+        ubicacion: !isStore && ubi ? ubi : undefined,
         variantes: [{
           ...row,
           saldosPorBodega: { [bodegaName]: row.saldo },
-          ubicacionesPorBodega: ubi ? { [bodegaName]: ubi } : {},
+          ubicacionesPorBodega: ubi && !isStore ? { [bodegaName]: ubi } : {},
         }],
         imageUrl: row.imageUrl,
       });
     }
   }
 
-  // Ensure that if a reference has a general location and bodegas have none, bodegas inherit it
+  // Ensure that if a reference has a general location and main warehouse has none, main warehouse inherits it
   for (const group of map.values()) {
-    if (group.ubicacion && Object.keys(group.ubicacionesPorBodega).length === 0) {
+    if (group.ubicacion) {
       for (const b of Object.keys(group.saldosPorBodega)) {
-        group.ubicacionesPorBodega[b] = group.ubicacion;
+        if (!isStoreBodega(b) && isMainWarehouseBodega(b)) {
+          group.ubicacionesPorBodega[b] = group.ubicacion;
+        }
       }
     }
   }
@@ -890,5 +968,139 @@ export async function deleteBodegasFromDb(bodegas: string[]): Promise<number> {
 
   if (error) throw error;
   return count ?? 0;
+}
+
+/**
+ * Exporta un archivo Excel (.xlsx) con la referencia y la ubicación física en la Bodega 1001.
+ * Incluye dos hojas: Resumen por Referencia y Detalle por SKU y Talla.
+ */
+export function exportUbicacionesBodega1001(groups: ReferenceGroup[]): void {
+  if (!groups || groups.length === 0) {
+    throw new Error("No hay referencias para exportar.");
+  }
+
+  // 1. Hoja 1: Resumen por Referencia
+  const refRows = groups.map((g) => {
+    const ubicacion = getWarehouseLocation(g);
+    let saldoBodega1001 = 0;
+    for (const [bName, s] of Object.entries(g.saldosPorBodega || {})) {
+      if (isMainWarehouseBodega(bName) && !isStoreBodega(bName)) {
+        saldoBodega1001 += s;
+      }
+    }
+
+    const mainBodega =
+      Object.keys(g.saldosPorBodega || {}).find((b) => isMainWarehouseBodega(b) && !isStoreBodega(b)) ||
+      "BODEGA 1001";
+
+    return {
+      "REFERENCIA": g.referencia,
+      "DESCRIPCIÓN": g.descripcion,
+      "UBICACIÓN": ubicacion || "SIN UBICACIÓN",
+      "BODEGA": mainBodega,
+      "SALDO BODEGA 1001": saldoBodega1001,
+      "SALDO TOTAL": g.totalSaldo,
+    };
+  });
+
+  // 2. Hoja 2: Detalle por SKU y Talla
+  const skuRows: any[] = [];
+  for (const g of groups) {
+    const refUbicacion = getWarehouseLocation(g);
+    for (const v of g.variantes || []) {
+      let saldoBodega1001 = 0;
+      for (const [bName, s] of Object.entries(v.saldosPorBodega || {})) {
+        if (isMainWarehouseBodega(bName) && !isStoreBodega(bName)) {
+          saldoBodega1001 += s;
+        }
+      }
+      skuRows.push({
+        "REFERENCIA": g.referencia,
+        "SKU": v.sku,
+        "DESCRIPCIÓN": g.descripcion,
+        "COLOR": v.color,
+        "TALLA": v.talla,
+        "UBICACIÓN": refUbicacion || v.ubicaciones || "SIN UBICACIÓN",
+        "BODEGA": "BODEGA 1001",
+        "SALDO BODEGA 1001": saldoBodega1001,
+        "SALDO TOTAL": v.saldo,
+      });
+    }
+  }
+
+  const wb = XLSX.utils.book_new();
+
+  // Hoja 1
+  const ws1 = XLSX.utils.json_to_sheet(refRows);
+  ws1["!cols"] = [
+    { wch: 16 }, // REFERENCIA
+    { wch: 35 }, // DESCRIPCIÓN
+    { wch: 22 }, // UBICACIÓN
+    { wch: 18 }, // BODEGA
+    { wch: 20 }, // SALDO BODEGA 1001
+    { wch: 15 }, // SALDO TOTAL
+  ];
+  XLSX.utils.book_append_sheet(wb, ws1, "Ubicaciones Referencias");
+
+  // Hoja 2
+  const ws2 = XLSX.utils.json_to_sheet(skuRows);
+  ws2["!cols"] = [
+    { wch: 16 }, // REFERENCIA
+    { wch: 18 }, // SKU
+    { wch: 30 }, // DESCRIPCIÓN
+    { wch: 18 }, // COLOR
+    { wch: 10 }, // TALLA
+    { wch: 22 }, // UBICACIÓN
+    { wch: 18 }, // BODEGA
+    { wch: 20 }, // SALDO BODEGA 1001
+    { wch: 15 }, // SALDO TOTAL
+  ];
+  XLSX.utils.book_append_sheet(wb, ws2, "Detalle SKUs");
+
+  const today = new Date().toISOString().slice(0, 10);
+  const filename = `UBICACIONES_BODEGA_1001_${today}.xlsx`;
+  XLSX.writeFile(wb, filename);
+}
+
+/**
+ * Exporta un archivo plano CSV con la referencia y la ubicación física en Bodega 1001.
+ */
+export function exportUbicacionesBodega1001Csv(groups: ReferenceGroup[]): void {
+  if (!groups || groups.length === 0) {
+    throw new Error("No hay referencias para exportar.");
+  }
+
+  const headers = ["REFERENCIA", "DESCRIPCION", "UBICACION", "BODEGA", "SALDO_BODEGA_1001", "SALDO_TOTAL"];
+  const rows = groups.map((g) => {
+    const ubicacion = getWarehouseLocation(g);
+    let saldoBodega1001 = 0;
+    for (const [bName, s] of Object.entries(g.saldosPorBodega || {})) {
+      if (isMainWarehouseBodega(bName) && !isStoreBodega(bName)) {
+        saldoBodega1001 += s;
+      }
+    }
+    const cleanDesc = (g.descripcion || "").replace(/"/g, '""');
+    const cleanUbic = (ubicacion || "SIN UBICACION").replace(/"/g, '""');
+    return [
+      g.referencia,
+      `"${cleanDesc}"`,
+      `"${cleanUbic}"`,
+      "BODEGA 1001",
+      saldoBodega1001,
+      g.totalSaldo,
+    ].join(",");
+  });
+
+  const csvContent = "\ufeff" + [headers.join(","), ...rows].join("\r\n");
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.setAttribute("href", url);
+  const today = new Date().toISOString().slice(0, 10);
+  link.setAttribute("download", `UBICACIONES_BODEGA_1001_${today}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
 

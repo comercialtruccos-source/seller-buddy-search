@@ -45,6 +45,11 @@ import {
   groupByReferencia,
   loadInventory,
   searchReferences,
+  exportUbicacionesBodega1001,
+  exportUbicacionesBodega1001Csv,
+  getWarehouseLocation,
+  isMainWarehouseBodega,
+  isStoreBodega,
   type InventoryRow,
   type VariantGroup,
   type ReferenceGroup,
@@ -359,6 +364,7 @@ function Index() {
 
       const newUbicacionesPorBodega: Record<string, string> = {};
       for (const b of Object.keys(newSaldosPorBodega)) {
+        if (isStoreBodega(b)) continue;
         if (g.ubicacionesPorBodega?.[b]) {
           newUbicacionesPorBodega[b] = g.ubicacionesPorBodega[b];
         } else {
@@ -366,9 +372,12 @@ function Index() {
           if (varUbi) newUbicacionesPorBodega[b] = varUbi;
         }
       }
-      if (g.ubicacion && Object.keys(newUbicacionesPorBodega).length === 0) {
+      const warehouseLoc = getWarehouseLocation(g);
+      if (warehouseLoc && Object.keys(newUbicacionesPorBodega).length === 0) {
         for (const b of Object.keys(newSaldosPorBodega)) {
-          newUbicacionesPorBodega[b] = g.ubicacion;
+          if (!isStoreBodega(b) && isMainWarehouseBodega(b)) {
+            newUbicacionesPorBodega[b] = warehouseLoc;
+          }
         }
       }
 
@@ -392,6 +401,26 @@ function Index() {
   const visibleResults = useMemo(() => {
     return filteredResults.slice(0, visibleCount);
   }, [filteredResults, visibleCount]);
+
+  const handleExportUbicaciones1001 = useCallback((format: "xlsx" | "csv" = "xlsx") => {
+    try {
+      const listToExport = filteredResults.length > 0 ? filteredResults : groups;
+      if (!listToExport || listToExport.length === 0) {
+        toast.error("No hay referencias para exportar.");
+        return;
+      }
+      if (format === "xlsx") {
+        exportUbicacionesBodega1001(listToExport);
+        toast.success(`Exportadas ${listToExport.length} referencias de Bodega 1001 en Excel (.xlsx)`);
+      } else {
+        exportUbicacionesBodega1001Csv(listToExport);
+        toast.success(`Exportadas ${listToExport.length} referencias de Bodega 1001 en CSV`);
+      }
+    } catch (err: any) {
+      console.error("Error al exportar ubicaciones:", err);
+      toast.error(err?.message || "Ocurrió un error al exportar el archivo de ubicaciones.");
+    }
+  }, [filteredResults, groups]);
 
   const toggle = (set: Set<string>, value: string) => {
     const next = new Set(set);
@@ -420,6 +449,28 @@ function Index() {
           </div>
           <div className="flex-1" />
           <div className="flex items-center gap-2">
+            {rows.length > 0 && (
+              <div className="inline-flex rounded-xl shadow-xs overflow-hidden border border-accent/40 bg-accent text-accent-foreground">
+                <button
+                  type="button"
+                  onClick={() => handleExportUbicaciones1001("xlsx")}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-bold hover:bg-accent/90 transition-colors cursor-pointer"
+                  title="Exportar archivo Excel (.xlsx) con Referencias y Ubicaciones de Bodega 1001"
+                >
+                  <FileSpreadsheet className="h-4 w-4" />
+                  <span className="hidden sm:inline">Exportar Ubicaciones 1001</span>
+                  <span className="sm:hidden">Ubicaciones 1001</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleExportUbicaciones1001("csv")}
+                  className="inline-flex items-center px-2.5 py-2 text-xs font-bold border-l border-accent-foreground/20 hover:bg-accent/90 transition-colors cursor-pointer"
+                  title="Exportar en formato CSV plano"
+                >
+                  .CSV
+                </button>
+              </div>
+            )}
             {deferredPrompt && (
               <button
                 onClick={handleInstallClick}
@@ -480,20 +531,35 @@ function Index() {
 
         {activeTab === "catalogo" && (
           <div className="space-y-6">
-            {/* Last updated indicator */}
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Clock className="h-4 w-4 shrink-0" />
-              {!hydrated ? (
-                <span>Cargando…</span>
-              ) : updatedAt ? (
-                <span>
-                  Inventario actualizado:{" "}
-                  <span className="font-semibold text-foreground">
-                    {formatDateTime(updatedAt)}
+            {/* Last updated indicator and action bar */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 shrink-0" />
+                {!hydrated ? (
+                  <span>Cargando…</span>
+                ) : updatedAt ? (
+                  <span>
+                    Inventario actualizado:{" "}
+                    <span className="font-semibold text-foreground">
+                      {formatDateTime(updatedAt)}
+                    </span>
                   </span>
-                </span>
-              ) : (
-                <span>Aún no has cargado inventario.</span>
+                ) : (
+                  <span>Aún no has cargado inventario.</span>
+                )}
+              </div>
+              {hydrated && rows.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleExportUbicaciones1001("xlsx")}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-accent/30 bg-accent/10 px-3 py-1.5 text-xs font-bold text-accent hover:bg-accent/20 transition-all cursor-pointer shadow-2xs"
+                    title="Descargar archivo Excel (.xlsx) con Referencias y Ubicaciones de Bodega 1001"
+                  >
+                    <FileSpreadsheet className="h-3.5 w-3.5" />
+                    <span>Descargar Ubicaciones Bodega 1001 (.xlsx)</span>
+                  </button>
+                </div>
               )}
             </div>
 
@@ -1456,10 +1522,13 @@ function ReferenceCard({
               </span>
               {Object.entries(group.saldosPorBodega).map(([bodega, saldo]) => {
                 const isSelected = localBodega === bodega;
-                const ubicacion =
-                  group.ubicacionesPorBodega?.[bodega] ||
-                  (bodega.toUpperCase().includes("PRINCIPAL") || bodega.includes("1004") ? group.ubicacion : undefined) ||
-                  (Object.keys(group.saldosPorBodega).length === 1 ? group.ubicacion : undefined);
+                const isStore = isStoreBodega(bodega);
+                const ubicacion = isStore
+                  ? undefined
+                  : (
+                      group.ubicacionesPorBodega?.[bodega] ||
+                      (isMainWarehouseBodega(bodega) ? getWarehouseLocation(group) : undefined)
+                    );
                 return (
                   <button 
                     key={bodega}
@@ -1480,41 +1549,21 @@ function ReferenceCard({
                 );
               })}
             </div>
-            {(group.ubicacion || (group.ubicacionesPorBodega && Object.keys(group.ubicacionesPorBodega).length > 0)) && (
-              <div className="flex flex-wrap items-center gap-1.5 mb-2 text-xs">
-                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-                  <MapPin className="h-3 w-3 text-primary" />
-                  <span>Ubicaciones:</span>
-                </span>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {Object.keys(group.ubicacionesPorBodega || {}).length > 0 ? (
-                    Object.entries(group.ubicacionesPorBodega).map(([bName, uLoc]) => {
-                      const isSelected = localBodega === bName;
-                      return (
-                        <span
-                          key={bName}
-                          onClick={() => setLocalBodega(isSelected ? null : bName)}
-                          className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10.5px] font-mono border transition-colors cursor-pointer ${
-                            isSelected
-                              ? "bg-accent text-accent-foreground border-accent font-bold shadow-xs"
-                              : "bg-muted/50 text-foreground border-border hover:bg-muted"
-                          }`}
-                          title={`Clic para filtrar stock en ${bName}`}
-                        >
-                          <strong className="text-muted-foreground font-semibold">{bName}:</strong>
-                          <span className="font-bold text-primary dark:text-primary">{uLoc}</span>
-                        </span>
-                      );
-                    })
-                  ) : group.ubicacion ? (
-                    <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10.5px] font-mono border bg-muted/50 text-foreground border-border">
-                      <strong className="text-muted-foreground font-semibold">General:</strong>
-                      <span className="font-bold text-primary dark:text-primary">{group.ubicacion}</span>
-                    </span>
-                  ) : null}
+            {(() => {
+              const warehouseUbi = getWarehouseLocation(group);
+              if (!warehouseUbi) return null;
+              return (
+                <div className="flex flex-wrap items-center gap-1.5 mb-2 text-xs">
+                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+                    <MapPin className="h-3.5 w-3.5 text-primary" />
+                    <span>Ubicación Bodega 1001:</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-md px-2.5 py-0.5 text-xs font-mono font-bold border bg-primary/10 text-primary border-primary/20 shadow-xs">
+                    <span>{warehouseUbi}</span>
+                  </span>
                 </div>
-              </div>
-            )}
+              );
+            })()}
             <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-1 mt-2">
               <h2 className="text-xl sm:text-2xl font-black text-foreground tracking-tight uppercase">
                 {group.descripcion}
@@ -1621,10 +1670,10 @@ function ReferenceCard({
                         title={
                           hasStock
                             ? `Click para copiar SKU: ${v.sku}${
-                                localBodega && v.ubicacionesPorBodega?.[localBodega]
-                                  ? ` | Ubicación en ${localBodega}: ${v.ubicacionesPorBodega[localBodega]}`
-                                  : v.ubicaciones
-                                  ? ` | Ubicación: ${v.ubicaciones}`
+                                getWarehouseLocation(group)
+                                  ? ` | Ubicación Bodega 1001: ${getWarehouseLocation(group)}`
+                                  : v.ubicaciones && !isStoreBodega(v.bodega || "")
+                                  ? ` | Ubicación Bodega 1001: ${v.ubicaciones}`
                                   : ""
                               }`
                             : "Sin stock disponible"
