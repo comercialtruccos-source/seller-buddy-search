@@ -16,6 +16,7 @@ import {
   AlertCircle,
   Building,
   User,
+  MapPin,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -25,6 +26,7 @@ import {
   downloadQuotationHgi,
   downloadSavedQuotationPdf,
   downloadSavedQuotationExcel,
+  downloadQuotationUbicaciones,
   deleteQuotation,
 } from "@/lib/quotationsStore";
 import { formatCurrency, formatUsd, type InventoryRow } from "@/lib/inventory";
@@ -138,6 +140,19 @@ export function QuotationsView({
     } catch (err: any) {
       console.error("Error downloading Excel:", err);
       toast.error("No se pudo generar el Excel.");
+    }
+  };
+
+  const handleDownloadUbicaciones = (quote: SavedQuotation) => {
+    try {
+      downloadQuotationUbicaciones(quote, inventoryLookup, "xlsx");
+      toast.success(
+        `Ubicaciones de Bodega 1001 para la cotización ${quote.quotationNumber} descargadas en Excel (.xlsx)`,
+        { duration: 4000 }
+      );
+    } catch (err: any) {
+      console.error("Error downloading quotation locations:", err);
+      toast.error(err?.message || "Error al descargar ubicaciones de la cotización.");
     }
   };
 
@@ -424,6 +439,15 @@ export function QuotationsView({
                     )}
 
                     {/* Quick Downloads */}
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadUbicaciones(quote)}
+                      className="p-2 text-primary hover:text-primary/80 rounded-xl border border-border bg-card hover:bg-muted transition-colors"
+                      title="Descargar archivo Excel con las referencias de esta cotización y su ubicación en Bodega 1001 (.xlsx)"
+                    >
+                      <MapPin className="h-4 w-4" />
+                    </button>
+
                     <button
                       type="button"
                       onClick={() => handleDownloadPdf(quote)}

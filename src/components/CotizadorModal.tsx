@@ -19,6 +19,7 @@ import {
   Save,
   Download,
   Clock,
+  MapPin,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -41,7 +42,13 @@ import {
   clearOrder,
   type OrderItem,
 } from "@/lib/order";
-import { formatCurrency, formatUsd, type InventoryRow } from "@/lib/inventory";
+import {
+  formatCurrency,
+  formatUsd,
+  type InventoryRow,
+  exportQuotationUbicacionesBodega1001,
+  exportQuotationUbicacionesBodega1001Csv,
+} from "@/lib/inventory";
 
 interface CotizadorModalProps {
   open: boolean;
@@ -200,6 +207,31 @@ export function CotizadorModal({
     } catch (err: any) {
       console.error("Error generating Excel:", err);
       toast.error("Error al exportar a Excel.");
+    }
+  };
+
+  const handleExportUbicaciones1001 = (format: "xlsx" | "csv" = "xlsx") => {
+    if (quotation.items.length === 0) {
+      toast.error("Debes seleccionar al menos una prenda en la cotización.");
+      return;
+    }
+    try {
+      const options = {
+        quotationNumber: quotation.quotationNumber,
+        customerName: quotation.customerName,
+        advisorName: quotation.advisorName,
+        inventory: inventoryLookup,
+      };
+      if (format === "xlsx") {
+        exportQuotationUbicacionesBodega1001(quotation.items, options);
+        toast.success(`Ubicaciones de ${quotation.totalReferences} referencias cotizadas exportadas en Excel (.xlsx)`);
+      } else {
+        exportQuotationUbicacionesBodega1001Csv(quotation.items, options);
+        toast.success(`Ubicaciones de ${quotation.totalReferences} referencias cotizadas exportadas en CSV`);
+      }
+    } catch (err: any) {
+      console.error("Error exporting quotation locations:", err);
+      toast.error(err?.message || "Error al exportar ubicaciones de la cotización.");
     }
   };
 
@@ -536,6 +568,12 @@ export function CotizadorModal({
                                 {it.descripcion}
                               </span>
                             </div>
+                            {it.ubicacion && it.ubicacion !== "SIN UBICACIÓN" && (
+                              <div className="text-[10.5px] text-muted-foreground mt-0.5 flex items-center gap-1 font-mono">
+                                <span className="font-semibold text-primary">📍 Ubic. 1001:</span>
+                                <span className="font-bold text-foreground">{it.ubicacion}</span>
+                              </div>
+                            )}
                           </td>
                           <td className="py-2.5 px-3 text-muted-foreground">
                             <span className="capitalize">{it.color}</span> · Talla {it.talla}
@@ -679,6 +717,29 @@ export function CotizadorModal({
               <Printer className="h-3.5 w-3.5 text-muted-foreground" />
               <span>Imprimir</span>
             </button>
+
+            <div className="inline-flex rounded-xl shadow-xs overflow-hidden border border-primary/30 bg-primary/5 text-primary">
+              <button
+                type="button"
+                onClick={() => handleExportUbicaciones1001("xlsx")}
+                disabled={quotation.items.length === 0}
+                className="inline-flex items-center gap-1.5 px-3 py-2.5 text-xs font-bold hover:bg-primary/10 transition-colors cursor-pointer disabled:opacity-40"
+                title="Exportar archivo Excel (.xlsx) con las referencias cotizadas y su ubicación en Bodega 1001"
+              >
+                <MapPin className="h-4 w-4" />
+                <span className="hidden sm:inline">Ubicaciones 1001</span>
+                <span className="sm:hidden">Ubicaciones</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleExportUbicaciones1001("csv")}
+                disabled={quotation.items.length === 0}
+                className="inline-flex items-center px-2 py-2.5 text-xs font-bold border-l border-primary/20 hover:bg-primary/10 transition-colors cursor-pointer disabled:opacity-40"
+                title="Exportar en formato CSV"
+              >
+                .CSV
+              </button>
+            </div>
 
             <button
               type="button"

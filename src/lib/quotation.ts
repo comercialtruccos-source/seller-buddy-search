@@ -1,5 +1,5 @@
 import * as XLSX from "xlsx";
-import { formatCurrency, formatUsd, type InventoryRow } from "./inventory";
+import { formatCurrency, formatUsd, type InventoryRow, resolveBodega1001Location } from "./inventory";
 import type { OrderItem } from "./order";
 import {
   TRUCCOS_BRAND_INFO,
@@ -103,6 +103,7 @@ export interface QuotationItemSummary {
   codColor?: string; // Código de color para integración HGI
   talla: string;
   cantidad: number;
+  ubicacion?: string; // Ubicación física en Bodega 1001
   basePvp?: number;
   basePvm?: number;
   unitDiscount?: number;
@@ -380,6 +381,10 @@ export function buildQuotationData(
     const formattedTotalLineIva = isUsd ? formatUsd(totalLineIva) : formatCurrency(totalLineIva);
     const formattedTotalPrice = isUsd ? formatUsd(totalPrice) : formatCurrency(totalPrice);
 
+    const ubicacion =
+      (it.ubicacion || "").trim() ||
+      resolveBodega1001Location(it.referencia, it.sku, inventoryLookup);
+
     return {
       sku: it.sku,
       referencia: it.referencia,
@@ -388,6 +393,7 @@ export function buildQuotationData(
       codColor: it.codColor || invRow?.codColor || "",
       talla: it.talla,
       cantidad: it.cantidad,
+      ubicacion: ubicacion || "SIN UBICACIÓN",
       basePvp,
       basePvm,
       unitDiscount,
@@ -511,6 +517,7 @@ export function downloadQuotationExcel(quotation: QuotationData): void {
       "#",
       "REF",
       "DESCRIPCION",
+      "UBICACION (BODEGA 1001)",
       "COLOR",
       "TALLA",
       "CANTIDAD",
@@ -527,6 +534,7 @@ export function downloadQuotationExcel(quotation: QuotationData): void {
       idx + 1,
       it.referencia,
       it.descripcion,
+      it.ubicacion || "BODEGA 1001",
       it.color,
       it.talla,
       it.cantidad,
@@ -551,8 +559,10 @@ export function downloadQuotationExcel(quotation: QuotationData): void {
     "",
     "",
     "",
+    "",
   ]);
   aoa.push([
+    "",
     "",
     "",
     "",
@@ -573,6 +583,7 @@ export function downloadQuotationExcel(quotation: QuotationData): void {
       "",
       "",
       "",
+      "",
       `Descuento aplicado (${quotation.tierInfo.badge}):`,
       "",
       "",
@@ -581,6 +592,7 @@ export function downloadQuotationExcel(quotation: QuotationData): void {
     ]);
   }
   aoa.push([
+    "",
     "",
     "",
     "",
@@ -600,6 +612,7 @@ export function downloadQuotationExcel(quotation: QuotationData): void {
     "",
     "",
     "",
+    "",
     "TOTAL IVA (19%):",
     "",
     "",
@@ -607,6 +620,7 @@ export function downloadQuotationExcel(quotation: QuotationData): void {
     quotation.totalIva,
   ]);
   aoa.push([
+    "",
     "",
     "",
     "",
@@ -631,6 +645,7 @@ export function downloadQuotationExcel(quotation: QuotationData): void {
     { wch: 5 },  // #
     { wch: 16 }, // REF
     { wch: 32 }, // DESCRIPCION
+    { wch: 22 }, // UBICACION (BODEGA 1001)
     { wch: 16 }, // COLOR
     { wch: 10 }, // TALLA
     { wch: 12 }, // CANTIDAD
@@ -645,12 +660,67 @@ export function downloadQuotationExcel(quotation: QuotationData): void {
   for (let r = 9; r < 9 + quotation.items.length; r++) {
     const cellRef = ws[XLSX.utils.encode_cell({ r, c: 1 })];
     if (cellRef) cellRef.t = "s";
-    const cellTalla = ws[XLSX.utils.encode_cell({ r, c: 4 })];
+    const cellTalla = ws[XLSX.utils.encode_cell({ r, c: 5 })];
     if (cellTalla) cellTalla.t = "s";
   }
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Cotización");
+
+  // Hoja 2: Ubicaciones Bodega 1001 de las prendas cotizadas
+  const refMap = new Map<string, { ref: string; desc: string; ubic: string; cant: number; tallas: Record<string, number> }>();
+  for (const it of quotation.items) {
+    const rKey = it.referencia.trim().toUpperCase();
+    let entry = refMap.get(rKey);
+    if (!entry) {
+      entry = {
+        ref: it.referencia,
+        desc: it.descripcion,
+        ubic: it.ubicacion || "SIN UBICACIÓN",
+        cant: 0,
+        tallas: {},
+      };
+      refMap.set(rKey, entry);
+    }
+    entry.cant += it.cantidad;
+    if (it.talla) {
+      entry.tallas[it.talla] = (entry.tallas[it.talla] || 0) + it.cantidad;
+    }
+    if ((!entry.ubic || entry.ubic === "SIN UBICACIÓN") && it.ubicacion) {
+      entry.ubic = it.ubicacion;
+    }
+  }
+
+  const ubiAoa: (string | number)[][] = [
+    ["UBICACIONES BODEGA 1001 - PRENDAS COTIZADAS"],
+    [`Cotización: ${quotation.quotationNumber} | Cliente: ${quotation.customerName} | Fecha: ${quotation.dateFormatted}`],
+    [],
+    ["#", "REFERENCIA", "DESCRIPCIÓN", "UBICACIÓN BODEGA 1001", "CANTIDAD COTIZADA", "TALLAS / CANTIDADES", "BODEGA"],
+  ];
+  let uIdx = 1;
+  for (const item of refMap.values()) {
+    const tallasStr = Object.entries(item.tallas).map(([t, q]) => `T${t}: ${q}u`).join(", ");
+    ubiAoa.push([
+      uIdx++,
+      item.ref,
+      item.desc,
+      item.ubic,
+      item.cant,
+      tallasStr,
+      "BODEGA 1001",
+    ]);
+  }
+  const wsUbi = XLSX.utils.aoa_to_sheet(ubiAoa);
+  wsUbi["!cols"] = [
+    { wch: 6 },
+    { wch: 16 },
+    { wch: 32 },
+    { wch: 24 },
+    { wch: 18 },
+    { wch: 28 },
+    { wch: 16 },
+  ];
+  XLSX.utils.book_append_sheet(wb, wsUbi, "Ubicaciones Bodega 1001");
 
   const cleanName = quotation.customerName.replace(/[^A-Za-z0-9]/g, "_").toUpperCase();
   const filename = `COTIZACION_${cleanName}_${quotation.currency}_${quotation.quotationNumber}.xlsx`;

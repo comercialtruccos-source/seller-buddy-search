@@ -10,7 +10,11 @@ import {
   downloadQuotationExcel,
 } from "./quotation";
 import { downloadOrderXls, saveOrderToDb, type OrderItem } from "./order";
-import type { InventoryRow } from "./inventory";
+import {
+  type InventoryRow,
+  exportQuotationUbicacionesBodega1001,
+  exportQuotationUbicacionesBodega1001Csv,
+} from "./inventory";
 
 export type QuotationStatus = "pendiente" | "aprobada" | "rechazada";
 
@@ -22,6 +26,7 @@ export interface SavedQuotationItem {
   codColor: string;
   talla: string;
   cantidad: number;
+  ubicacion?: string;
   unitPrice: number;
   precioDetal: number;
   precioMayorista: number;
@@ -189,6 +194,7 @@ function mapQuotationItems(items: QuotationData["items"]): SavedQuotationItem[] 
     codColor: it.codColor || "",
     talla: it.talla,
     cantidad: it.cantidad,
+    ubicacion: it.ubicacion || "",
     unitPrice: it.precioUnitConIva,
     precioDetal: it.precioDetal,
     precioMayorista: it.precioMayorista,
@@ -488,6 +494,32 @@ export function downloadSavedQuotationExcel(
 ): void {
   const qData = savedQuotationToQuotationData(saved, inventoryLookup);
   downloadQuotationExcel(qData);
+}
+
+/**
+ * Downloads warehouse locations file in Bodega 1001 for references in a SavedQuotation or QuotationData.
+ */
+export function downloadQuotationUbicaciones(
+  quotation: SavedQuotation | QuotationData,
+  inventoryLookup?: Record<string, InventoryRow> | InventoryRow[],
+  format: "xlsx" | "csv" = "xlsx"
+): void {
+  const items = quotation.items || [];
+  if (items.length === 0) {
+    throw new Error("La cotización no tiene prendas para exportar ubicaciones.");
+  }
+  const options = {
+    quotationNumber: quotation.quotationNumber,
+    customerName: quotation.customerName,
+    advisorName: quotation.advisorName,
+    inventory: inventoryLookup,
+  };
+
+  if (format === "xlsx") {
+    exportQuotationUbicacionesBodega1001(items, options);
+  } else {
+    exportQuotationUbicacionesBodega1001Csv(items, options);
+  }
 }
 
 /** Deletes a quotation from the system */

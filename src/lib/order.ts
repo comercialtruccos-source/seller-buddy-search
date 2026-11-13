@@ -17,6 +17,7 @@ export interface OrderItem {
   saldo: number;
   cantidad: number;
   unitPrice?: number;
+  ubicacion?: string;
 }
 
 const STORAGE_KEY = "pedido_actual_v1";
@@ -88,6 +89,7 @@ export function addOrderItem(
       pvm: item.pvm || items[idx].pvm,
       pvp: item.pvp ?? items[idx].pvp,
       precioUsd: item.precioUsd ?? items[idx].precioUsd,
+      ubicacion: item.ubicacion || items[idx].ubicacion,
       cantidad: nextQty,
     };
     items = [...items.slice(0, idx), next, ...items.slice(idx + 1)];

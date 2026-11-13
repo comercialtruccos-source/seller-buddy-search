@@ -47,6 +47,8 @@ import {
   searchReferences,
   exportUbicacionesBodega1001,
   exportUbicacionesBodega1001Csv,
+  exportQuotationUbicacionesBodega1001,
+  exportQuotationUbicacionesBodega1001Csv,
   getWarehouseLocation,
   isMainWarehouseBodega,
   isStoreBodega,
@@ -734,6 +736,7 @@ function Index() {
       {orderOpen && (
         <OrderModal
           order={order}
+          inventory={rows}
           onClose={() => setOrderOpen(false)}
           onOrderSaved={reloadInventory}
           onOpenCotizador={(custName) => {
@@ -806,11 +809,13 @@ function Index() {
 
 function OrderModal({
   order,
+  inventory = [],
   onClose,
   onOrderSaved,
   onOpenCotizador,
 }: {
   order: ReturnType<typeof useOrder>;
+  inventory?: InventoryRow[];
   onClose: () => void;
   onOrderSaved?: () => void;
   onOpenCotizador?: (customerName?: string) => void;
@@ -819,6 +824,29 @@ function OrderModal({
   const [isSaving, setIsSaving] = useState(false);
   const summary = useMemo(() => calculateQuotationSummary(order), [order]);
   const { totalUnits: unidades, tierInfo, subtotalDetal, totalAmount, totalSavings, totalUsd } = summary;
+
+  const handleExportUbicacionesOrder = (format: "xlsx" | "csv" = "xlsx") => {
+    if (order.length === 0) {
+      toast.error("El pedido está vacío.");
+      return;
+    }
+    try {
+      const options = {
+        customerName: customerName.trim() || undefined,
+        inventory,
+      };
+      if (format === "xlsx") {
+        exportQuotationUbicacionesBodega1001(order, options);
+        toast.success("Ubicaciones de Bodega 1001 exportadas en Excel (.xlsx)");
+      } else {
+        exportQuotationUbicacionesBodega1001Csv(order, options);
+        toast.success("Ubicaciones de Bodega 1001 exportadas en CSV");
+      }
+    } catch (err: any) {
+      console.error("Error exporting order locations:", err);
+      toast.error(err?.message || "Error al exportar ubicaciones.");
+    }
+  };
 
   const handleDownloadOnly = () => {
     if (order.length === 0) {
@@ -965,6 +993,11 @@ function OrderModal({
                       <p className="mt-0.5 truncate text-xs text-muted-foreground">
                         {it.descripcion}
                       </p>
+                      {it.ubicacion && it.ubicacion !== "SIN UBICACIÓN" && (
+                        <p className="mt-0.5 text-[10.5px] font-mono text-primary font-bold">
+                          📍 Ubic. 1001: {it.ubicacion}
+                        </p>
+                      )}
                       <div className="mt-1 flex flex-wrap items-baseline gap-1.5">
                         <span className="text-xs font-bold text-primary">
                           {formatCurrency(itemPrice)}{" "}
@@ -1094,14 +1127,14 @@ function OrderModal({
             )}
           </div>
           <div className="flex flex-col gap-2">
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => {
                   if (order.length === 0) return;
                   if (confirm("¿Vaciar el pedido?")) clearOrder();
                 }}
                 disabled={order.length === 0 || isSaving}
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted disabled:opacity-40"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-background px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-foreground transition-colors hover:bg-muted disabled:opacity-40"
               >
                 <Trash2 className="h-4 w-4" />
                 Vaciar
@@ -1109,10 +1142,21 @@ function OrderModal({
               <button
                 onClick={handleDownloadOnly}
                 disabled={order.length === 0 || isSaving}
-                className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-accent/30 bg-accent/10 px-4 py-2.5 text-sm font-bold text-primary transition-all hover:bg-accent/20 disabled:opacity-40"
+                className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-accent/30 bg-accent/10 px-3.5 py-2.5 text-xs sm:text-sm font-bold text-primary transition-all hover:bg-accent/20 disabled:opacity-40"
+                title="Descargar archivo en formato HGI (.xls) para subir pedidos"
               >
                 <Download className="h-4 w-4" />
-                Descargar Excel (.xls)
+                Pedido HGI (.xls)
+              </button>
+              <button
+                type="button"
+                onClick={() => handleExportUbicacionesOrder("xlsx")}
+                disabled={order.length === 0 || isSaving}
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-primary/30 bg-primary/5 px-3 py-2.5 text-xs font-bold text-primary transition-all hover:bg-primary/10 disabled:opacity-40"
+                title="Exportar archivo Excel (.xlsx) con las referencias seleccionadas y su ubicación en Bodega 1001"
+              >
+                <MapPin className="h-4 w-4" />
+                <span>Ubicaciones 1001</span>
               </button>
             </div>
             <button
@@ -1306,6 +1350,7 @@ function ReferenceCard({
             pvp: group.pvp || v.pvp || 0,
             precioUsd: group.precioUsd || v.precioUsd || 0,
             saldo: v.saldo,
+            ubicacion: getWarehouseLocation(group) || v.ubicaciones || "",
           },
           1
         );
@@ -1703,6 +1748,7 @@ function ReferenceCard({
                               pvp: group.pvp || v.pvp || 0,
                               precioUsd: group.precioUsd || v.precioUsd || 0,
                               saldo: v.saldo,
+                              ubicacion: getWarehouseLocation(group) || v.ubicaciones || "",
                             });
                             if (result.success) {
                               if (result.isLimit) {

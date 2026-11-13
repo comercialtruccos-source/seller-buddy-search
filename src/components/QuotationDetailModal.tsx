@@ -12,6 +12,7 @@ import {
   AlertCircle,
   ShoppingCart,
   Boxes,
+  MapPin,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -20,6 +21,7 @@ import {
   downloadQuotationHgi,
   downloadSavedQuotationPdf,
   downloadSavedQuotationExcel,
+  downloadQuotationUbicaciones,
 } from "@/lib/quotationsStore";
 import { formatCurrency, formatUsd, type InventoryRow } from "@/lib/inventory";
 import { addOrderItem, clearOrder } from "@/lib/order";
@@ -95,6 +97,19 @@ export function QuotationDetailModal({
     } catch (err: any) {
       console.error("Error downloading Excel:", err);
       toast.error(`Error al generar Excel: ${err?.message || "error desconocido"}`);
+    }
+  };
+
+  const handleDownloadUbicaciones = () => {
+    try {
+      downloadQuotationUbicaciones(quotation, inventoryLookup, "xlsx");
+      toast.success(
+        `Ubicaciones de Bodega 1001 para la cotización ${quotation.quotationNumber} descargadas en Excel (.xlsx)`,
+        { duration: 4000 }
+      );
+    } catch (err: any) {
+      console.error("Error downloading quotation locations:", err);
+      toast.error(err?.message || "Error al descargar ubicaciones de la cotización.");
     }
   };
 
@@ -244,7 +259,14 @@ export function QuotationDetailModal({
                     <tr key={`${it.sku}-${idx}`} className="hover:bg-muted/30 transition-colors">
                       <td className="py-2 px-3 text-muted-foreground">{idx + 1}</td>
                       <td className="py-2 px-3 font-mono font-bold text-foreground">{it.referencia}</td>
-                      <td className="py-2 px-3 text-muted-foreground max-w-[180px] truncate">{it.descripcion}</td>
+                      <td className="py-2 px-3 text-muted-foreground max-w-[180px]">
+                        <span className="truncate block">{it.descripcion}</span>
+                        {it.ubicacion && it.ubicacion !== "SIN UBICACIÓN" && (
+                          <span className="text-[10px] font-mono font-bold text-primary block mt-0.5">
+                            📍 Ubic. 1001: {it.ubicacion}
+                          </span>
+                        )}
+                      </td>
                       <td className="py-2 px-3 text-muted-foreground">{it.color} {it.codColor ? `(${it.codColor})` : ""}</td>
                       <td className="py-2 px-3 text-center font-bold text-foreground">{it.talla}</td>
                       <td className="py-2 px-3 text-center font-bold text-foreground">{it.cantidad}</td>
@@ -302,6 +324,16 @@ export function QuotationDetailModal({
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+            <button
+              type="button"
+              onClick={handleDownloadUbicaciones}
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 rounded-xl border border-primary/30 bg-primary/5 hover:bg-primary/10 px-3.5 py-2.5 text-xs font-bold text-primary transition-all shadow-xs"
+              title="Descargar archivo Excel con las referencias de esta cotización y su ubicación física en Bodega 1001 (.xlsx)"
+            >
+              <MapPin className="h-3.5 w-3.5" />
+              <span>Ubicaciones Bodega 1001</span>
+            </button>
+
             <button
               type="button"
               onClick={handleDownloadPdf}
