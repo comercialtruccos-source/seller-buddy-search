@@ -38,6 +38,7 @@ import {
   loadInventory,
   groupByReferencia,
   isMainWarehouseBodega,
+  normalizeBodegaName,
   exportUbicacionesBodega1001,
   exportUbicacionesBodega1001Csv,
 } from "@/lib/inventory";
@@ -88,15 +89,6 @@ function Cargar() {
   // Bodegas state management
   const [disabledBodegas, setDisabledBodegas] = useState<Set<string>>(() => {
     if (typeof window !== "undefined") {
-      // Clean any legacy mock bodegas from previous versions
-      if (!localStorage.getItem("clean_mock_bodegas_v2")) {
-        localStorage.removeItem("custom_bodegas");
-        localStorage.removeItem("disabled_bodegas");
-        localStorage.removeItem("detected_document_bodegas");
-        localStorage.setItem("clean_mock_bodegas_v2", "true");
-        window.dispatchEvent(new CustomEvent("disabled_bodegas_changed", { detail: [] }));
-        return new Set();
-      }
       const saved = localStorage.getItem("disabled_bodegas");
       if (saved) {
         try {
@@ -108,6 +100,39 @@ function Cargar() {
     }
     return new Set();
   });
+
+  const disabledBodegasUpper = useMemo(() => {
+    const set = new Set<string>();
+    for (const b of Array.from(disabledBodegas)) {
+      const norm = normalizeBodegaName(b);
+      if (norm) set.add(norm);
+    }
+    return set;
+  }, [disabledBodegas]);
+
+  useEffect(() => {
+    const handleStorageChange = () => {
+      if (typeof window !== "undefined") {
+        const saved = localStorage.getItem("disabled_bodegas");
+        if (saved) {
+          try {
+            setDisabledBodegas(new Set(JSON.parse(saved)));
+          } catch {
+            setDisabledBodegas(new Set());
+          }
+        } else {
+          setDisabledBodegas(new Set());
+        }
+      }
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    window.addEventListener("disabled_bodegas_changed", handleStorageChange);
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("disabled_bodegas_changed", handleStorageChange);
+    };
+  }, []);
 
   const [knownBodegas, setKnownBodegas] = useState<string[]>(() => {
     if (typeof window !== "undefined") {
@@ -190,11 +215,15 @@ function Cargar() {
 
   const handleToggleBodega = (bodegaName: string, enabled: boolean) => {
     setDisabledBodegas((prev) => {
-      const next = new Set(prev);
-      if (enabled) {
-        next.delete(bodegaName);
-      } else {
-        next.add(bodegaName);
+      const next = new Set<string>();
+      const normTarget = normalizeBodegaName(bodegaName);
+      for (const b of Array.from(prev)) {
+        if (normalizeBodegaName(b) !== normTarget) {
+          next.add(b);
+        }
+      }
+      if (!enabled) {
+        next.add(bodegaName.trim());
       }
       persistDisabledBodegas(next);
       return next;
@@ -278,27 +307,17 @@ function Cargar() {
     // 1. Auto-discover ONLY the bodegas present in the parsed document
     const fileBodegas = Array.from(new Set(parsed.map((r) => (r.bodega || "").trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, "es"));
     if (fileBodegas.length > 0) {
-      setKnownBodegas(fileBodegas);
-      persistDocumentBodegas(fileBodegas);
-      // Auto-enable all bodegas from the file so none are accidentally omitted
-      setDisabledBodegas((prev) => {
-        const next = new Set(prev);
-        let changed = false;
-        for (const b of fileBodegas) {
-          if (next.has(b)) {
-            next.delete(b);
-            changed = true;
-          }
-        }
-        if (changed) persistDisabledBodegas(next);
-        return next;
+      setKnownBodegas((prev) => {
+        const merged = Array.from(new Set([...prev, ...fileBodegas])).sort((a, b) => a.localeCompare(b, "es"));
+        persistDocumentBodegas(merged);
+        return merged;
       });
     }
 
     // 2. Filter rows according to active/disabled bodegas selection
     const activeRows = parsed.filter((r) => {
-      const bName = (r.bodega || "PRINCIPAL 1004").trim();
-      return !disabledBodegas.has(bName);
+      const bNorm = normalizeBodegaName(r.bodega || "PRINCIPAL 1004");
+      return !disabledBodegasUpper.has(bNorm);
     });
 
     if (activeRows.length === 0) {
@@ -605,7 +624,7 @@ function Cargar() {
     e.target.value = "";
   };
 
-  const activeBodegasCount = knownBodegas.filter((b) => !disabledBodegas.has(b)).length;
+  const activeBodegasCount = knownBodegas.filter((b) => !disabledBodegasUpper.has(normalizeBodegaName(b))).length;
   const filteredKnownBodegas = knownBodegas.filter((b) =>
     b.toLowerCase().includes(bodegaSearch.toLowerCase().trim())
   );
@@ -741,7 +760,7 @@ function Cargar() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[380px] overflow-y-auto pr-1">
                   {filteredKnownBodegas.length > 0 ? (
                     filteredKnownBodegas.map((bodegaName) => {
-                      const isActive = !disabledBodegas.has(bodegaName);
+                      const isActive = !disabledBodegasUpper.has(normalizeBodegaName(bodegaName));
                       return (
                         <div
                           key={bodegaName}

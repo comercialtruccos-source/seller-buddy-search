@@ -19,7 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
-import { loadInventory, type InventoryRow, formatCurrency } from "@/lib/inventory";
+import { loadInventory, type InventoryRow, formatCurrency, normalizeBodegaName } from "@/lib/inventory";
 import {
   computeInventoryAnalytics,
   applyFilters,
@@ -61,11 +61,6 @@ function AnaliticasPage() {
   const [disabledBodegas, setDisabledBodegas] = useState<Set<string>>(() => {
     if (typeof window !== "undefined") {
       try {
-        if (!localStorage.getItem("bodegas_all_reactivated_v3")) {
-          localStorage.removeItem("disabled_bodegas");
-          localStorage.setItem("bodegas_all_reactivated_v3", "true");
-          return new Set();
-        }
         const saved = localStorage.getItem("disabled_bodegas");
         if (saved) return new Set(JSON.parse(saved));
       } catch {}
@@ -110,11 +105,11 @@ function AnaliticasPage() {
   const activeRows = useMemo(() => {
     if (disabledBodegas.size === 0) return rows;
     const disabledUpper = new Set(
-      Array.from(disabledBodegas).map((b) => b.trim().toUpperCase())
+      Array.from(disabledBodegas).map((b) => normalizeBodegaName(b))
     );
     return rows.filter((r) => {
-      const bName = (r.bodega || "PRINCIPAL 1004").trim().toUpperCase();
-      return !disabledUpper.has(bName);
+      const bNorm = normalizeBodegaName(r.bodega || "PRINCIPAL 1004");
+      return !disabledUpper.has(bNorm);
     });
   }, [rows, disabledBodegas]);
 

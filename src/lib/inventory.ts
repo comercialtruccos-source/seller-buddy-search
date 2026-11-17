@@ -47,6 +47,16 @@ export function isMainWarehouseBodega(bodegaName: string): boolean {
   );
 }
 
+/** Normalize bodega name for robust case- and whitespace-insensitive matching */
+export function normalizeBodegaName(name?: string | null): string {
+  if (!name) return "";
+  return name
+    .trim()
+    .replace(/^["']|["']$/g, "")
+    .replace(/\s+/g, " ")
+    .toUpperCase();
+}
+
 /** Check if a bodega is a retail store or point of sale (Tienda 901, Mayorca, etc.) */
 export function isStoreBodega(bodegaName: string): boolean {
   if (!bodegaName) return false;
@@ -1010,6 +1020,7 @@ export async function fetchBodegasFromDb(): Promise<string[]> {
     const { data, error } = await supabase
       .from("inventory")
       .select("bodega")
+      .order("referencia", { ascending: true })
       .range(from, from + pageSize - 1);
 
     if (error || !data) break;

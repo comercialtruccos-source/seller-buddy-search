@@ -52,6 +52,7 @@ import {
   getWarehouseLocation,
   isMainWarehouseBodega,
   isStoreBodega,
+  normalizeBodegaName,
   type InventoryRow,
   type VariantGroup,
   type ReferenceGroup,
@@ -160,14 +161,6 @@ function Index() {
 
   const [disabledBodegas, setDisabledBodegas] = useState<Set<string>>(() => {
     if (typeof window !== "undefined") {
-      // Clean legacy mock bodegas
-      if (!localStorage.getItem("clean_mock_bodegas_v2")) {
-        localStorage.removeItem("custom_bodegas");
-        localStorage.removeItem("disabled_bodegas");
-        localStorage.removeItem("detected_document_bodegas");
-        localStorage.setItem("clean_mock_bodegas_v2", "true");
-        return new Set();
-      }
       const saved = localStorage.getItem("disabled_bodegas");
       if (saved) {
         try {
@@ -209,7 +202,8 @@ function Index() {
   const disabledBodegasUpper = useMemo(() => {
     const set = new Set<string>();
     for (const b of Array.from(disabledBodegas)) {
-      if (b) set.add(b.trim().toUpperCase());
+      const norm = normalizeBodegaName(b);
+      if (norm) set.add(norm);
     }
     return set;
   }, [disabledBodegas]);
@@ -217,8 +211,8 @@ function Index() {
   const activeRows = useMemo(() => {
     if (disabledBodegasUpper.size === 0) return rows;
     return rows.filter((r) => {
-      const bName = (r.bodega || "PRINCIPAL 1004").trim().toUpperCase();
-      return !disabledBodegasUpper.has(bName);
+      const bNorm = normalizeBodegaName(r.bodega || "PRINCIPAL 1004");
+      return !disabledBodegasUpper.has(bNorm);
     });
   }, [rows, disabledBodegasUpper]);
 
@@ -288,7 +282,10 @@ function Index() {
         if (v.color) cSet.add(v.color);
         if (v.saldosPorBodega) {
           for (const [b, s] of Object.entries(v.saldosPorBodega)) {
-            if (s > 0) bSet.add(b);
+            const bNorm = normalizeBodegaName(b);
+            if (s > 0 && !disabledBodegasUpper.has(bNorm)) {
+              bSet.add(b);
+            }
           }
         }
       }
@@ -300,9 +297,11 @@ function Index() {
       return a.localeCompare(b, "es");
     });
     const colores = Array.from(cSet).sort((a, b) => a.localeCompare(b, "es"));
-    const bodegas = Array.from(bSet).sort((a, b) => a.localeCompare(b, "es"));
+    const bodegas = Array.from(bSet)
+      .filter((b) => !disabledBodegasUpper.has(normalizeBodegaName(b)))
+      .sort((a, b) => a.localeCompare(b, "es"));
     return { tallasOptions: tallas, coloresOptions: colores, bodegasOptions: bodegas };
-  }, [groups]);
+  }, [groups, disabledBodegasUpper]);
 
   // Clear filters that are no longer available
   useEffect(() => {
@@ -363,10 +362,14 @@ function Index() {
       for (const v of variantes) {
         if (selectedBodegas.size === 0) {
           for (const [b, s] of Object.entries(v.saldosPorBodega)) {
+            const bNorm = normalizeBodegaName(b);
+            if (disabledBodegasUpper.has(bNorm)) continue;
             newSaldosPorBodega[b] = (newSaldosPorBodega[b] || 0) + s;
           }
         } else {
           for (const b of Array.from(selectedBodegas)) {
+            const bNorm = normalizeBodegaName(b);
+            if (disabledBodegasUpper.has(bNorm)) continue;
             newSaldosPorBodega[b] = (newSaldosPorBodega[b] || 0) + (v.saldosPorBodega[b] || 0);
           }
         }
@@ -677,6 +680,7 @@ function Index() {
                   key={group.referencia}
                   group={group}
                   allGroups={groups}
+                  disabledBodegasUpper={disabledBodegasUpper}
                   onPreviewImage={setPreviewImage}
                   onPreviewProduct={setPreviewProduct}
                   onOpenCotizador={() => setCotizadorOpen(true)}
@@ -803,6 +807,7 @@ function Index() {
         <ProductModal
           product={previewProduct}
           allGroups={groups}
+          disabledBodegasUpper={disabledBodegasUpper}
           onPreviewImage={setPreviewImage}
           onPreviewProduct={setPreviewProduct}
           onOpenCotizador={() => setCotizadorOpen(true)}
@@ -1358,12 +1363,14 @@ function EmptyState({
 function ReferenceCard({
   group,
   allGroups,
+  disabledBodegasUpper,
   onPreviewImage,
   onPreviewProduct,
   onOpenCotizador,
 }: {
   group: ReferenceGroup;
   allGroups?: ReferenceGroup[];
+  disabledBodegasUpper?: Set<string>;
   onPreviewImage?: (img: {
     src: string;
     alt: string;
@@ -1617,7 +1624,9 @@ function ReferenceCard({
                 <Boxes className="h-3.5 w-3.5" />
                 {localBodega ? (group.saldosPorBodega[localBodega] || 0) : group.totalSaldo} uds.
               </span>
-              {Object.entries(group.saldosPorBodega).map(([bodega, saldo]) => {
+              {Object.entries(group.saldosPorBodega)
+                .filter(([bodega]) => !disabledBodegasUpper?.has(normalizeBodegaName(bodega)))
+                .map(([bodega, saldo]) => {
                 const isSelected = localBodega === bodega;
                 const ubicacion =
                   group.ubicacionesPorBodega?.[bodega] ||
@@ -2223,6 +2232,7 @@ function ImageModal({
 function ProductModal({
   product,
   allGroups,
+  disabledBodegasUpper,
   onPreviewImage,
   onPreviewProduct,
   onOpenCotizador,
@@ -2230,6 +2240,7 @@ function ProductModal({
 }: {
   product: ReferenceGroup;
   allGroups?: ReferenceGroup[];
+  disabledBodegasUpper?: Set<string>;
   onPreviewImage?: (img: any) => void;
   onPreviewProduct?: (product: ReferenceGroup) => void;
   onOpenCotizador?: () => void;
@@ -2257,6 +2268,7 @@ function ProductModal({
             <ReferenceCard 
               group={product} 
               allGroups={allGroups} 
+              disabledBodegasUpper={disabledBodegasUpper}
               onPreviewImage={onPreviewImage} 
               onPreviewProduct={onPreviewProduct} 
               onOpenCotizador={onOpenCotizador}
