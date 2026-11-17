@@ -229,17 +229,20 @@ export function parseInventoryCsv(text: string, trm?: number): InventoryRow[] {
 
   if (lines.length === 0) return [];
 
-  // Dynamically detect separator: count commas vs semicolons vs tabs on the header line
+  // Dynamically detect separator: count commas vs semicolons vs tabs vs pipes on the header line
   const firstLine = lines[0];
   const commaCount = (firstLine.match(/,/g) || []).length;
   const semicolonCount = (firstLine.match(/;/g) || []).length;
   const tabCount = (firstLine.match(/\t/g) || []).length;
+  const pipeCount = (firstLine.match(/\|/g) || []).length;
   
   let separator = ",";
-  if (tabCount > commaCount && tabCount > semicolonCount) {
+  if (tabCount > commaCount && tabCount > semicolonCount && tabCount > pipeCount) {
     separator = "\t";
-  } else if (semicolonCount > commaCount) {
+  } else if (semicolonCount > commaCount && semicolonCount > pipeCount) {
     separator = ";";
+  } else if (pipeCount > commaCount && pipeCount > semicolonCount) {
+    separator = "|";
   }
 
   const firstLineCols = parseLine(lines[0], separator);

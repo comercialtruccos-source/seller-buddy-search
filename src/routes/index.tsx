@@ -160,10 +160,12 @@ function Index() {
 
   const [disabledBodegas, setDisabledBodegas] = useState<Set<string>>(() => {
     if (typeof window !== "undefined") {
-      // Auto-reactivate all bodegas on first load after this update
-      if (!localStorage.getItem("bodegas_all_reactivated_v3")) {
+      // Clean legacy mock bodegas
+      if (!localStorage.getItem("clean_mock_bodegas_v2")) {
+        localStorage.removeItem("custom_bodegas");
         localStorage.removeItem("disabled_bodegas");
-        localStorage.setItem("bodegas_all_reactivated_v3", "true");
+        localStorage.removeItem("detected_document_bodegas");
+        localStorage.setItem("clean_mock_bodegas_v2", "true");
         return new Set();
       }
       const saved = localStorage.getItem("disabled_bodegas");

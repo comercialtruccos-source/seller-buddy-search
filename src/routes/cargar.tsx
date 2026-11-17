@@ -46,28 +46,6 @@ export const Route = createFileRoute("/cargar")({
   component: Cargar,
 });
 
-const DEFAULT_BODEGAS = [
-  "PRINCIPAL 1004",
-  "BODEGA 1001",
-  "PUNTO DE VENTA 901",
-  "TIENDA MAYORCA",
-  "OUTLET MAYORCA",
-  "SEGUNDAS BODEGA 1005",
-  "BODEGA ARREGLOS",
-  "BODEGA COBROS",
-  "BODEGA MUESTRAS VENDEDORES",
-  "MUESTRAS MERCADEO",
-  "BODEGA FERIAS",
-  "TIENDA UNICENTRO",
-  "TIENDA SAN DIEGO",
-  "TIENDA TESORO",
-  "TIENDA VIVA ENVIGADO",
-  "TIENDA MOLINOS",
-  "TIENDA ARKADIA",
-  "TIENDA PUERTA DEL NORTE",
-  "MAYORISTA DIGITAL",
-];
-
 function Cargar() {
   const [dragActive, setDragActive] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -108,10 +86,12 @@ function Cargar() {
   // Bodegas state management
   const [disabledBodegas, setDisabledBodegas] = useState<Set<string>>(() => {
     if (typeof window !== "undefined") {
-      // Auto-reactivate all bodegas on first load after this update
-      if (!localStorage.getItem("bodegas_all_reactivated_v3")) {
+      // Clean any legacy mock bodegas from previous versions
+      if (!localStorage.getItem("clean_mock_bodegas_v2")) {
+        localStorage.removeItem("custom_bodegas");
         localStorage.removeItem("disabled_bodegas");
-        localStorage.setItem("bodegas_all_reactivated_v3", "true");
+        localStorage.removeItem("detected_document_bodegas");
+        localStorage.setItem("clean_mock_bodegas_v2", "true");
         window.dispatchEvent(new CustomEvent("disabled_bodegas_changed", { detail: [] }));
         return new Set();
       }
@@ -130,54 +110,29 @@ function Cargar() {
   const [knownBodegas, setKnownBodegas] = useState<string[]>(() => {
     if (typeof window !== "undefined") {
       try {
-        const saved = localStorage.getItem("custom_bodegas");
+        const saved = localStorage.getItem("detected_document_bodegas");
         if (saved) {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) {
-            return Array.from(new Set([...DEFAULT_BODEGAS, ...parsed])).sort((a, b) => a.localeCompare(b, "es"));
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed;
           }
         }
       } catch (e) {
-        console.error("Error parsing custom_bodegas", e);
+        console.error("Error parsing detected_document_bodegas", e);
       }
     }
-    return DEFAULT_BODEGAS;
+    return [];
   });
   const [bodegaSearch, setBodegaSearch] = useState<string>("");
   const [isPurgingBodegas, setIsPurgingBodegas] = useState(false);
 
-  const persistCustomBodegas = (list: string[]) => {
+  const persistDocumentBodegas = (list: string[]) => {
     if (typeof window !== "undefined") {
-      localStorage.setItem("custom_bodegas", JSON.stringify(list));
+      localStorage.setItem("detected_document_bodegas", JSON.stringify(list));
     }
   };
 
-  const handleAddCustomBodega = (rawName: string) => {
-    const name = rawName.trim().toUpperCase();
-    if (!name) return;
-
-    setKnownBodegas((prev) => {
-      const merged = Array.from(new Set([...prev, name])).sort((a, b) => a.localeCompare(b, "es"));
-      persistCustomBodegas(merged);
-      return merged;
-    });
-
-    // Make sure it is activated (not disabled)
-    setDisabledBodegas((prev) => {
-      if (prev.has(name)) {
-        const next = new Set(prev);
-        next.delete(name);
-        persistDisabledBodegas(next);
-        return next;
-      }
-      return prev;
-    });
-
-    setBodegaSearch("");
-    toast.success(`Bodega "${name}" agregada y activada con éxito.`);
-  };
-
-  // Fetch all existing bodegas from Supabase on mount
+  // Fetch all existing real bodegas from Supabase on mount
   useEffect(() => {
     setVoiceSearchEnabled(readVoiceFlag("voice_search_enabled"));
     setVoiceOrderEnabled(readVoiceFlag("voice_order_assistant_enabled"));
@@ -187,7 +142,7 @@ function Cargar() {
         if (dbBodegas && dbBodegas.length > 0) {
           setKnownBodegas((prev) => {
             const merged = Array.from(new Set([...prev, ...dbBodegas])).sort((a, b) => a.localeCompare(b, "es"));
-            persistCustomBodegas(merged);
+            persistDocumentBodegas(merged);
             return merged;
           });
         }
@@ -312,23 +267,17 @@ function Cargar() {
   const registerNewBodegasFromText = (text: string) => {
     const detected = extractBodegasFromCsvText(text);
     if (detected.length > 0) {
-      setKnownBodegas((prev) => {
-        const merged = Array.from(new Set([...prev, ...detected])).sort((a, b) => a.localeCompare(b, "es"));
-        persistCustomBodegas(merged);
-        return merged;
-      });
+      setKnownBodegas(detected);
+      persistDocumentBodegas(detected);
     }
   };
 
   const processAndSaveRows = async (parsed: ReturnType<typeof parseInventoryCsv>, sourceName: string) => {
-    // 1. Auto-discover any new bodegas present in the parsed rows
-    const fileBodegas = Array.from(new Set(parsed.map((r) => (r.bodega || "PRINCIPAL 1004").trim())));
+    // 1. Auto-discover ONLY the bodegas present in the parsed document
+    const fileBodegas = Array.from(new Set(parsed.map((r) => (r.bodega || "").trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, "es"));
     if (fileBodegas.length > 0) {
-      setKnownBodegas((prev) => {
-        const merged = Array.from(new Set([...prev, ...fileBodegas])).sort((a, b) => a.localeCompare(b, "es"));
-        persistCustomBodegas(merged);
-        return merged;
-      });
+      setKnownBodegas(fileBodegas);
+      persistDocumentBodegas(fileBodegas);
     }
 
     // 2. Filter rows according to active/disabled bodegas selection
@@ -698,132 +647,127 @@ function Cargar() {
               <div>
                 <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
                   <Warehouse className="h-4 w-4 text-accent" />
-                  Control de Bodegas Activas ({activeBodegasCount} de {knownBodegas.length} activadas)
+                  Bodegas del Documento ({activeBodegasCount} de {knownBodegas.length} activadas)
                 </h3>
                 <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
-                  Activa o desactiva las bodegas que deseas procesar. Al cargar un archivo, <strong>las bodegas desactivadas serán ignoradas automáticamente</strong> sin necesidad de editar tu Excel.
+                  Las tiendas y bodegas se extraen directamente del archivo que subas. Puedes desactivar las que no desees procesar.
                 </p>
               </div>
 
-              <div className="flex flex-wrap items-center gap-1.5 shrink-0">
-                <button
-                  type="button"
-                  onClick={handleEnableAllBodegas}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-all cursor-pointer shadow-xs active:scale-95"
-                >
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                  <span>Activar todas</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDisableAllExceptPrincipal}
-                  className="px-2.5 py-1 text-[11px] font-bold rounded-md bg-background text-muted-foreground hover:text-foreground border border-border transition-all cursor-pointer"
-                >
-                  Solo Principal
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDisableAllBodegas}
-                  className="px-2.5 py-1 text-[11px] font-bold rounded-md bg-muted text-muted-foreground hover:bg-muted/80 border border-border transition-all cursor-pointer"
-                >
-                  Desactivar todas
-                </button>
-              </div>
-            </div>
-
-            {/* Buscador de Bodegas y Agregar Nueva Bodega */}
-            <div className="flex flex-col sm:flex-row gap-2">
-              <div className="relative flex-1">
-                <Search className="h-3.5 w-3.5 absolute left-3 top-2.5 text-muted-foreground" />
-                <input
-                  type="text"
-                  value={bodegaSearch}
-                  onChange={(e) => setBodegaSearch(e.target.value)}
-                  placeholder={`Buscar entre las ${knownBodegas.length} bodegas o ingresar una nueva…`}
-                  className="w-full pl-9 pr-8 py-1.5 text-xs rounded-lg border border-border bg-background text-foreground focus:border-accent focus:ring-1 focus:ring-accent outline-none"
-                />
-                {bodegaSearch && (
+              {knownBodegas.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5 shrink-0">
                   <button
                     type="button"
-                    onClick={() => setBodegaSearch("")}
-                    className="absolute right-2.5 top-2 text-muted-foreground hover:text-foreground cursor-pointer"
+                    onClick={handleEnableAllBodegas}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-all cursor-pointer shadow-xs active:scale-95"
                   >
-                    <X className="h-3.5 w-3.5" />
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    <span>Activar todas</span>
                   </button>
-                )}
-              </div>
-              {bodegaSearch.trim() && !knownBodegas.some(b => b.toLowerCase() === bodegaSearch.trim().toLowerCase()) && (
-                <button
-                  type="button"
-                  onClick={() => handleAddCustomBodega(bodegaSearch)}
-                  className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-accent text-accent-foreground hover:bg-accent/90 transition-all cursor-pointer shrink-0 shadow-xs active:scale-95"
-                >
-                  <Building2 className="h-3.5 w-3.5" />
-                  <span>+ Agregar "{bodegaSearch.trim().toUpperCase()}"</span>
-                </button>
-              )}
-            </div>
-
-            {/* Grid de Bodegas */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[380px] overflow-y-auto pr-1">
-              {filteredKnownBodegas.length > 0 ? (
-                filteredKnownBodegas.map((bodegaName) => {
-                  const isActive = !disabledBodegas.has(bodegaName);
-                  return (
-                    <div
-                      key={bodegaName}
-                      className={`flex items-center justify-between p-3 rounded-lg border transition-all ${
-                        isActive
-                          ? "bg-background border-accent/40 shadow-2xs"
-                          : "bg-muted/60 border-border/60 opacity-65"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                        <Building2
-                          className={`h-4 w-4 shrink-0 ${
-                            isActive ? "text-accent" : "text-muted-foreground"
-                          }`}
-                        />
-                        <span className={`text-xs font-semibold truncate ${isActive ? "text-foreground" : "text-muted-foreground"}`} title={bodegaName}>
-                          {bodegaName}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span
-                          className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                            isActive
-                              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
-                              : "bg-muted text-muted-foreground border border-border"
-                          }`}
-                        >
-                          {isActive ? "Activa" : "Inactiva"}
-                        </span>
-                        <Switch
-                          checked={isActive}
-                          onCheckedChange={(checked) => handleToggleBodega(bodegaName, checked)}
-                        />
-                      </div>
-                    </div>
-                  );
-                })
-              ) : (
-                <div className="col-span-2 text-center py-6 px-4 bg-background/50 rounded-lg border border-dashed border-border flex flex-col items-center justify-center gap-3">
-                  <Building2 className="h-8 w-8 text-muted-foreground/60" />
-                  <div className="text-xs text-muted-foreground">
-                    No se encontraron bodegas que coincidan con <strong className="text-foreground font-semibold">"{bodegaSearch}"</strong>.
-                  </div>
                   <button
                     type="button"
-                    onClick={() => handleAddCustomBodega(bodegaSearch)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-accent text-accent-foreground hover:bg-accent/90 transition-all cursor-pointer shadow-xs active:scale-95"
+                    onClick={handleDisableAllExceptPrincipal}
+                    className="px-2.5 py-1 text-[11px] font-bold rounded-md bg-background text-muted-foreground hover:text-foreground border border-border transition-all cursor-pointer"
                   >
-                    <Check className="h-3.5 w-3.5" />
-                    <span>Agregar y Activar "{bodegaSearch.trim().toUpperCase()}"</span>
+                    Solo Principal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDisableAllBodegas}
+                    className="px-2.5 py-1 text-[11px] font-bold rounded-md bg-muted text-muted-foreground hover:bg-muted/80 border border-border transition-all cursor-pointer"
+                  >
+                    Desactivar todas
                   </button>
                 </div>
               )}
             </div>
+
+            {knownBodegas.length === 0 ? (
+              <div className="py-8 px-4 bg-background/50 rounded-lg border border-dashed border-border flex flex-col items-center justify-center gap-2 text-center">
+                <Warehouse className="h-7 w-7 text-muted-foreground/60" />
+                <span className="text-xs font-semibold text-foreground">
+                  No hay bodegas detectadas aún
+                </span>
+                <span className="text-[11px] text-muted-foreground max-w-sm">
+                  Las tiendas y bodegas se extraerán y activarán automáticamente al cargar o pegar tu archivo de inventario.
+                </span>
+              </div>
+            ) : (
+              <>
+                {/* Buscador de Bodegas dentro del documento */}
+                {knownBodegas.length > 4 && (
+                  <div className="relative">
+                    <Search className="h-3.5 w-3.5 absolute left-3 top-2.5 text-muted-foreground" />
+                    <input
+                      type="text"
+                      value={bodegaSearch}
+                      onChange={(e) => setBodegaSearch(e.target.value)}
+                      placeholder={`Buscar entre las ${knownBodegas.length} bodegas del documento…`}
+                      className="w-full pl-9 pr-8 py-1.5 text-xs rounded-lg border border-border bg-background text-foreground focus:border-accent focus:ring-1 focus:ring-accent outline-none"
+                    />
+                    {bodegaSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setBodegaSearch("")}
+                        className="absolute right-2.5 top-2 text-muted-foreground hover:text-foreground cursor-pointer"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Grid de Bodegas del documento */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[380px] overflow-y-auto pr-1">
+                  {filteredKnownBodegas.length > 0 ? (
+                    filteredKnownBodegas.map((bodegaName) => {
+                      const isActive = !disabledBodegas.has(bodegaName);
+                      return (
+                        <div
+                          key={bodegaName}
+                          className={`flex items-center justify-between p-3 rounded-lg border transition-all ${
+                            isActive
+                              ? "bg-background border-accent/40 shadow-2xs"
+                              : "bg-muted/60 border-border/60 opacity-65"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                            <Building2
+                              className={`h-4 w-4 shrink-0 ${
+                                isActive ? "text-accent" : "text-muted-foreground"
+                              }`}
+                            />
+                            <span className={`text-xs font-semibold truncate ${isActive ? "text-foreground" : "text-muted-foreground"}`} title={bodegaName}>
+                              {bodegaName}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span
+                              className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                                isActive
+                                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                                  : "bg-muted text-muted-foreground border border-border"
+                              }`}
+                            >
+                              {isActive ? "Activa" : "Inactiva"}
+                            </span>
+                            <Switch
+                              checked={isActive}
+                              onCheckedChange={(checked) => handleToggleBodega(bodegaName, checked)}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="col-span-2 text-center py-4 text-xs text-muted-foreground">
+                      No se encontraron bodegas que coincidan con "{bodegaSearch}".
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
 
             {/* Opción de Limpieza en Supabase */}
             {disabledBodegas.size > 0 && (
