@@ -29,6 +29,7 @@ import { Switch } from "@/components/ui/switch";
 import {
   parseInventoryCsv,
   readCsvFileText,
+  readUploadedFileText,
   saveInventory,
   updateAllPricesWithTrm,
   fetchBodegasFromDb,
@@ -60,6 +61,7 @@ function Cargar() {
     count: number;
     filename: string;
     skippedCount?: number;
+    bodegas?: string[];
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -278,6 +280,19 @@ function Cargar() {
     if (fileBodegas.length > 0) {
       setKnownBodegas(fileBodegas);
       persistDocumentBodegas(fileBodegas);
+      // Auto-enable all bodegas from the file so none are accidentally omitted
+      setDisabledBodegas((prev) => {
+        const next = new Set(prev);
+        let changed = false;
+        for (const b of fileBodegas) {
+          if (next.has(b)) {
+            next.delete(b);
+            changed = true;
+          }
+        }
+        if (changed) persistDisabledBodegas(next);
+        return next;
+      });
     }
 
     // 2. Filter rows according to active/disabled bodegas selection
@@ -302,14 +317,15 @@ function Cargar() {
       count: activeRows.length,
       filename: sourceName,
       skippedCount,
+      bodegas: fileBodegas,
     });
 
-    let successMsg = `¡Éxito! Se cargaron e integraron ${activeRows.length} registros de bodegas activas.`;
+    let successMsg = `¡Éxito! Se cargaron ${activeRows.length} registros de ${fileBodegas.length} bodega(s): ${fileBodegas.join(", ")}.`;
     if (skippedCount > 0) {
       successMsg += ` (Se omitieron ${skippedCount} registros de bodegas desactivadas).`;
     }
 
-    toast.success(successMsg, { id: "save-inventory", duration: 5000 });
+    toast.success(successMsg, { id: "save-inventory", duration: 7000 });
     return true;
   };
 
@@ -521,8 +537,12 @@ function Cargar() {
   };
 
   const handleFile = async (file: File) => {
-    if (!file.name.endsWith(".csv")) {
-      toast.error("Por favor, sube solo archivos en formato CSV.");
+    const lowerName = file.name.toLowerCase();
+    const isCsv = lowerName.endsWith(".csv");
+    const isExcel = lowerName.endsWith(".xlsx") || lowerName.endsWith(".xls") || lowerName.endsWith(".xlsm");
+
+    if (!isCsv && !isExcel) {
+      toast.error("Por favor, sube un archivo en formato Excel (.xlsx, .xls) o CSV (.csv).");
       return;
     }
 
@@ -536,7 +556,7 @@ function Cargar() {
       setIsUploading(true);
       setUploadedInfo(null);
 
-      const text = await readCsvFileText(file);
+      const text = await readUploadedFileText(file);
       registerNewBodegasFromText(text);
 
       const parsed = parseInventoryCsv(text, trmNum);
@@ -551,7 +571,7 @@ function Cargar() {
     } catch (error: any) {
       console.error(error);
       const errMsg = error.message || error.details || error.hint || "error desconocido";
-      toast.error(`Ocurrió un error al guardar: ${errMsg}`, {
+      toast.error(`Ocurrió un error al procesar el archivo: ${errMsg}`, {
         id: "save-inventory",
       });
     } finally {
@@ -905,7 +925,7 @@ function Cargar() {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".csv,text/csv"
+              accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xls,application/vnd.ms-excel"
               className="hidden"
               onChange={onInputChange}
               disabled={isUploading || isUpdatingPrices}
@@ -927,10 +947,10 @@ function Cargar() {
             ) : (
               <div>
                 <p className="font-semibold text-foreground">
-                  Arrastra tu archivo CSV aquí, o <span className="text-accent underline">búscalo</span>
+                  Arrastra tu archivo Excel o CSV aquí, o <span className="text-accent underline">búscalo</span>
                 </p>
                 <p className="text-xs text-muted-foreground mt-1.5">
-                  Solo se permiten archivos en formato .csv
+                  Soporta archivos en formato Excel (.xlsx, .xls) y CSV (.csv)
                 </p>
               </div>
             )}
@@ -1020,6 +1040,11 @@ function Cargar() {
                 <h4 className="font-semibold text-sm">Carga completada con éxito</h4>
                 <p className="text-xs mt-1">
                   Se ha actualizado la base de datos con <strong>{uploadedInfo.count}</strong> registros cargados desde <strong>{uploadedInfo.filename}</strong>.
+                  {uploadedInfo.bodegas && uploadedInfo.bodegas.length > 0 && (
+                    <span className="block mt-1.5 font-bold text-emerald-900 dark:text-emerald-200">
+                      Bodegas detectadas en este documento ({uploadedInfo.bodegas.length}): {uploadedInfo.bodegas.join(", ")}
+                    </span>
+                  )}
                   {uploadedInfo.skippedCount && uploadedInfo.skippedCount > 0 ? (
                     <span className="block mt-1 text-emerald-700/80 font-medium">
                       (Se omitieron {uploadedInfo.skippedCount} registros de bodegas desactivadas).

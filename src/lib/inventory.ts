@@ -190,6 +190,33 @@ export async function readCsvFileText(file: File): Promise<string> {
 }
 
 /**
+ * Reads any uploaded inventory file: Excel (.xlsx, .xls, .xlsm) or CSV.
+ * Converts Excel workbooks to CSV text automatically using the inventory sheet.
+ */
+export async function readUploadedFileText(file: File): Promise<string> {
+  const name = file.name.toLowerCase();
+  if (name.endsWith(".xlsx") || name.endsWith(".xls") || name.endsWith(".xlsm")) {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(new Uint8Array(buf), { type: "array" });
+    if (!wb.SheetNames || wb.SheetNames.length === 0) {
+      throw new Error("El archivo de Excel no contiene hojas de cálculo.");
+    }
+    let selectedSheet = wb.SheetNames[0];
+    for (const sName of wb.SheetNames) {
+      const sheet = wb.Sheets[sName];
+      const csvSnippet = XLSX.utils.sheet_to_csv(sheet, { blankrows: false }).slice(0, 1000).toLowerCase();
+      if (csvSnippet.includes("referencia")) {
+        selectedSheet = sName;
+        break;
+      }
+    }
+    return XLSX.utils.sheet_to_csv(wb.Sheets[selectedSheet], { blankrows: false });
+  }
+
+  return readCsvFileText(file);
+}
+
+/**
  * Parse the inventory CSV. Expected headers:
  * Referencia, Descripción, Talla - Lote, Color, Saldo, Talla, CodColor, SKU, PVM UNIT, PVP UNIT
  */
@@ -229,12 +256,31 @@ export function parseInventoryCsv(text: string, trm?: number): InventoryRow[] {
 
   if (lines.length === 0) return [];
 
+  // Search for the header row within the first 25 lines (in case there are report titles or banners above it)
+  let headerLineIndex = -1;
+  for (let i = 0; i < Math.min(lines.length, 25); i++) {
+    const rawLine = normalizeText(lines[i]);
+    if (rawLine.includes("referencia") && (rawLine.includes("bodega") || rawLine.includes("almacen") || rawLine.includes("saldo") || rawLine.includes("descrip"))) {
+      headerLineIndex = i;
+      break;
+    }
+  }
+  if (headerLineIndex === -1) {
+    for (let i = 0; i < Math.min(lines.length, 25); i++) {
+      if (normalizeText(lines[i]).includes("referencia")) {
+        headerLineIndex = i;
+        break;
+      }
+    }
+  }
+
+  const headerLine = headerLineIndex !== -1 ? lines[headerLineIndex] : lines[0];
+
   // Dynamically detect separator: count commas vs semicolons vs tabs vs pipes on the header line
-  const firstLine = lines[0];
-  const commaCount = (firstLine.match(/,/g) || []).length;
-  const semicolonCount = (firstLine.match(/;/g) || []).length;
-  const tabCount = (firstLine.match(/\t/g) || []).length;
-  const pipeCount = (firstLine.match(/\|/g) || []).length;
+  const commaCount = (headerLine.match(/,/g) || []).length;
+  const semicolonCount = (headerLine.match(/;/g) || []).length;
+  const tabCount = (headerLine.match(/\t/g) || []).length;
+  const pipeCount = (headerLine.match(/\|/g) || []).length;
   
   let separator = ",";
   if (tabCount > commaCount && tabCount > semicolonCount && tabCount > pipeCount) {
@@ -245,24 +291,21 @@ export function parseInventoryCsv(text: string, trm?: number): InventoryRow[] {
     separator = "|";
   }
 
-  const firstLineCols = parseLine(lines[0], separator);
-  let headers = firstLineCols.map((h) => h.toLowerCase().trim());
+  const firstLineCols = parseLine(headerLine, separator);
+  let headers = firstLineCols.map((h) => normalizeText(h));
   
-  // Detect if the first line is actually a header row
-  const isHeaderRow = headers.some(h => 
-    h.includes("referencia") || h.includes("bodega") || h.includes("descripci") || h.includes("saldo")
-  );
-
-  const dataLines = isHeaderRow ? lines.slice(1) : lines;
+  const isHeaderRow = headerLineIndex !== -1;
+  const dataLines = isHeaderRow ? lines.slice(headerLineIndex + 1) : lines;
   const colCount = firstLineCols.length;
 
   const photoIdx = isHeaderRow ? headers.findIndex((h) => h.includes("foto") || h.includes("imagen") || h.includes("image") || h === "img") : (colCount >= 12 ? 11 : 10);
-  const usdIdx = isHeaderRow ? headers.findIndex((h) => h.includes("usd") || h.includes("dolar") || h.includes("dólar") || h.includes("dol")) : -1;
+  const usdIdx = isHeaderRow ? headers.findIndex((h) => h.includes("usd") || h.includes("dolar") || h.includes("dol")) : -1;
 
-  // Dynamic index detection with smart fallbacks
+  // Dynamic index detection with normalized matchers
   const getIdx = (matchers: string[], exact = false) => {
     if (isHeaderRow) {
-      return headers.findIndex(h => matchers.some(m => exact ? h === m : h.includes(m)));
+      const normMatchers = matchers.map(m => normalizeText(m));
+      return headers.findIndex(h => normMatchers.some(m => exact ? h === m : h.includes(m)));
     }
     return -1; // If no headers, rely on layout-based fallbacks below
   };
@@ -271,7 +314,6 @@ export function parseInventoryCsv(text: string, trm?: number): InventoryRow[] {
   let iBodega = getIdx([
     "bodega",
     "almacen",
-    "almacén",
     "sucursal",
     "tienda",
     "punto de venta",
@@ -292,7 +334,7 @@ export function parseInventoryCsv(text: string, trm?: number): InventoryRow[] {
   let iSaldo = getIdx(["saldo", "cantidad"]);
   let iTalla = getIdx(["talla"], true);
   let iCodColor = getIdx(["codcolor", "cod_color"]);
-  let iUbicaciones = getIdx(["ubicaciones", "ubicacion", "ubicación", "ubic", "localizacion", "localización", "pasillo", "estante"]);
+  let iUbicaciones = getIdx(["ubicaciones", "ubicacion", "ubic", "localizacion", "pasillo", "estante"]);
   let iSku = getIdx(["sku"], true);
   let iPvm = getIdx(["pvm"]);
   let iPvp = getIdx(["pvp"]);
@@ -345,13 +387,21 @@ export function parseInventoryCsv(text: string, trm?: number): InventoryRow[] {
     if (iPvp === -1) iPvp = 9;
   }
 
+  // If bodega was not detected by name and the layout has at least 12 columns with ref at 0, default bodega to col 1
+  if (iBodega === -1 && iRef === 0 && colCount >= 12) {
+    iBodega = 1;
+  }
+
   const rows: InventoryRow[] = [];
 
   for (const line of dataLines) {
     const cols = parseLine(line, separator);
-    const referencia = cols[iRef];
-    if (!referencia) continue;
+    const rawRef = cols[iRef]?.trim();
+    if (!rawRef) continue;
+    // Skip if it is a repeated header row inside the data
+    if (normalizeText(rawRef) === "referencia") continue;
 
+    const referencia = rawRef;
     const rawTalla = (cols[iTalla] ?? "").trim();
     let talla = /^\d+$/.test(rawTalla) ? rawTalla.padStart(2, "0") : rawTalla;
     if (!talla && cols[iTallaLote]) {
@@ -392,6 +442,16 @@ export function parseInventoryCsv(text: string, trm?: number): InventoryRow[] {
         ? ""
         : rawUbicacion;
 
+    const rawBodega = iBodega !== -1 && cols[iBodega] ? cols[iBodega].trim() : "";
+    const cleanBodega =
+      !rawBodega ||
+      rawBodega.toLowerCase() === "#n/d" ||
+      rawBodega.toLowerCase() === "#n/a" ||
+      rawBodega.toLowerCase() === "null" ||
+      rawBodega.toLowerCase() === "undefined"
+        ? "PRINCIPAL 1004"
+        : rawBodega;
+
     const row: InventoryRow = {
       referencia,
       descripcion: cols[iDesc] ?? "",
@@ -404,7 +464,7 @@ export function parseInventoryCsv(text: string, trm?: number): InventoryRow[] {
       pvm,
       pvp: toNumber(cols[iPvp]),
       precioUsd,
-      bodega: iBodega !== -1 ? (cols[iBodega] || "PRINCIPAL 1004").trim() : "PRINCIPAL 1004",
+      bodega: cleanBodega,
       ubicaciones,
     };
 
@@ -750,7 +810,6 @@ function toDb(row: InventoryRow): InventoryDbRow {
     precio_usd: row.precioUsd,
     image_url: row.imageUrl ?? "",
     bodega: row.bodega ?? "PRINCIPAL 1004",
-    ubicaciones: ubic,
   };
 }
 
