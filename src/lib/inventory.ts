@@ -264,8 +264,25 @@ export function parseInventoryCsv(text: string, trm?: number): InventoryRow[] {
     return -1; // If no headers, rely on layout-based fallbacks below
   };
 
-  let iRef = getIdx(["referencia"], true);
-  let iBodega = getIdx(["bodega", "almacen", "almacén"], true);
+  let iRef = getIdx(["referencia"]);
+  let iBodega = getIdx([
+    "bodega",
+    "almacen",
+    "almacén",
+    "sucursal",
+    "tienda",
+    "punto de venta",
+    "punto venta",
+    "nombodega",
+    "intbodega",
+    "codbodega",
+    "cod_bodega",
+    "pto_vta",
+    "pto venta",
+    "centro",
+    "agencia",
+    "local",
+  ]);
   let iDesc = getIdx(["descripci"]);
   let iTallaLote = getIdx(["lote", "talla -"]);
   let iColor = getIdx(["color"], true);
@@ -299,7 +316,7 @@ export function parseInventoryCsv(text: string, trm?: number): InventoryRow[] {
     if (iSku === -1) iSku = 9;
     if (iPvm === -1) iPvm = 10;
     if (iPvp === -1) iPvp = 11;
-  } else if (is12ColFormat && iBodega === -1 && iRef === -1) {
+  } else if (is12ColFormat) {
     if (iRef === -1) iRef = 0;
     if (iBodega === -1) iBodega = 1;
     if (iDesc === -1) iDesc = 2;
@@ -311,7 +328,7 @@ export function parseInventoryCsv(text: string, trm?: number): InventoryRow[] {
     if (iSku === -1) iSku = 8;
     if (iPvm === -1) iPvm = 9;
     if (iPvp === -1) iPvp = 10;
-  } else if (!is13ColFormat && !is12ColFormat && iBodega === -1 && iRef === -1) {
+  } else if (iBodega === -1 && iRef === -1) {
     // Old format without Bodega (10 or 11 columns)
     if (iRef === -1) iRef = 0;
     if (iDesc === -1) iDesc = 1;
@@ -576,6 +593,16 @@ export function searchReferences(
           normalizeText(v.ubicaciones || "").includes(word)
         );
       if (matchesUbicacion) return true;
+
+      // Word matches Bodega name in saldosPorBodega or ubicacionesPorBodega
+      const matchesBodega =
+        Object.keys(group.saldosPorBodega || {}).some((b) =>
+          normalizeText(b).includes(word)
+        ) ||
+        Object.keys(group.ubicacionesPorBodega || {}).some((b) =>
+          normalizeText(b).includes(word)
+        );
+      if (matchesBodega) return true;
 
       return false;
     });

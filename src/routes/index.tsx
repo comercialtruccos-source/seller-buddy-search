@@ -161,9 +161,9 @@ function Index() {
   const [disabledBodegas, setDisabledBodegas] = useState<Set<string>>(() => {
     if (typeof window !== "undefined") {
       // Auto-reactivate all bodegas on first load after this update
-      if (!localStorage.getItem("bodegas_all_reactivated_v2")) {
+      if (!localStorage.getItem("bodegas_all_reactivated_v3")) {
         localStorage.removeItem("disabled_bodegas");
-        localStorage.setItem("bodegas_all_reactivated_v2", "true");
+        localStorage.setItem("bodegas_all_reactivated_v3", "true");
         return new Set();
       }
       const saved = localStorage.getItem("disabled_bodegas");
@@ -1229,6 +1229,7 @@ function FilterDropdown({
   renderOption?: (value: string) => string;
 }) {
   const [open, setOpen] = useState(false);
+  const [filterSearch, setFilterSearch] = useState("");
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -1243,6 +1244,12 @@ function FilterDropdown({
   }, [open]);
 
   const count = selected.size;
+  const filteredOptions = filterSearch.trim()
+    ? options.filter((o) => {
+        const text = renderOption ? renderOption(o) : o;
+        return text.toLowerCase().includes(filterSearch.toLowerCase().trim());
+      })
+    : options;
 
   return (
     <div className="relative" ref={ref}>
@@ -1280,26 +1287,43 @@ function FilterDropdown({
               </button>
             )}
           </div>
+          {options.length > 5 && (
+            <div className="px-2 pb-1.5 pt-0.5">
+              <input
+                type="text"
+                value={filterSearch}
+                onChange={(e) => setFilterSearch(e.target.value)}
+                placeholder={`Buscar ${label.toLowerCase()}...`}
+                className="w-full px-2 py-1 text-xs rounded-md border border-border bg-background text-foreground outline-none focus:border-accent"
+              />
+            </div>
+          )}
           <div className="max-h-60 overflow-y-auto pr-1">
-            {options.map((option) => {
-              const active = selected.has(option);
-              return (
-                <label
-                  key={option}
-                  className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-foreground transition-colors hover:bg-muted"
-                >
-                  <input
-                    type="checkbox"
-                    checked={active}
-                    onChange={() => onToggle(option)}
-                    className="h-4 w-4 rounded border-border accent-primary"
-                  />
-                  <span className="capitalize">
-                    {renderOption ? renderOption(option) : option}
-                  </span>
-                </label>
-              );
-            })}
+            {filteredOptions.length > 0 ? (
+              filteredOptions.map((option) => {
+                const active = selected.has(option);
+                return (
+                  <label
+                    key={option}
+                    className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-foreground transition-colors hover:bg-muted"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={active}
+                      onChange={() => onToggle(option)}
+                      className="h-4 w-4 rounded border-border accent-primary"
+                    />
+                    <span className="capitalize">
+                      {renderOption ? renderOption(option) : option}
+                    </span>
+                  </label>
+                );
+              })
+            ) : (
+              <div className="py-2 text-center text-xs text-muted-foreground">
+                No hay resultados
+              </div>
+            )}
           </div>
         </div>
       )}

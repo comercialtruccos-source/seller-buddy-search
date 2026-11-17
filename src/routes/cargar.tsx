@@ -48,13 +48,24 @@ export const Route = createFileRoute("/cargar")({
 
 const DEFAULT_BODEGAS = [
   "PRINCIPAL 1004",
+  "BODEGA 1001",
   "PUNTO DE VENTA 901",
   "TIENDA MAYORCA",
+  "OUTLET MAYORCA",
   "SEGUNDAS BODEGA 1005",
   "BODEGA ARREGLOS",
   "BODEGA COBROS",
   "BODEGA MUESTRAS VENDEDORES",
   "MUESTRAS MERCADEO",
+  "BODEGA FERIAS",
+  "TIENDA UNICENTRO",
+  "TIENDA SAN DIEGO",
+  "TIENDA TESORO",
+  "TIENDA VIVA ENVIGADO",
+  "TIENDA MOLINOS",
+  "TIENDA ARKADIA",
+  "TIENDA PUERTA DEL NORTE",
+  "MAYORISTA DIGITAL",
 ];
 
 function Cargar() {
@@ -98,9 +109,9 @@ function Cargar() {
   const [disabledBodegas, setDisabledBodegas] = useState<Set<string>>(() => {
     if (typeof window !== "undefined") {
       // Auto-reactivate all bodegas on first load after this update
-      if (!localStorage.getItem("bodegas_all_reactivated_v2")) {
+      if (!localStorage.getItem("bodegas_all_reactivated_v3")) {
         localStorage.removeItem("disabled_bodegas");
-        localStorage.setItem("bodegas_all_reactivated_v2", "true");
+        localStorage.setItem("bodegas_all_reactivated_v3", "true");
         window.dispatchEvent(new CustomEvent("disabled_bodegas_changed", { detail: [] }));
         return new Set();
       }
@@ -116,9 +127,55 @@ function Cargar() {
     return new Set();
   });
 
-  const [knownBodegas, setKnownBodegas] = useState<string[]>(DEFAULT_BODEGAS);
+  const [knownBodegas, setKnownBodegas] = useState<string[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("custom_bodegas");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            return Array.from(new Set([...DEFAULT_BODEGAS, ...parsed])).sort((a, b) => a.localeCompare(b, "es"));
+          }
+        }
+      } catch (e) {
+        console.error("Error parsing custom_bodegas", e);
+      }
+    }
+    return DEFAULT_BODEGAS;
+  });
   const [bodegaSearch, setBodegaSearch] = useState<string>("");
   const [isPurgingBodegas, setIsPurgingBodegas] = useState(false);
+
+  const persistCustomBodegas = (list: string[]) => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("custom_bodegas", JSON.stringify(list));
+    }
+  };
+
+  const handleAddCustomBodega = (rawName: string) => {
+    const name = rawName.trim().toUpperCase();
+    if (!name) return;
+
+    setKnownBodegas((prev) => {
+      const merged = Array.from(new Set([...prev, name])).sort((a, b) => a.localeCompare(b, "es"));
+      persistCustomBodegas(merged);
+      return merged;
+    });
+
+    // Make sure it is activated (not disabled)
+    setDisabledBodegas((prev) => {
+      if (prev.has(name)) {
+        const next = new Set(prev);
+        next.delete(name);
+        persistDisabledBodegas(next);
+        return next;
+      }
+      return prev;
+    });
+
+    setBodegaSearch("");
+    toast.success(`Bodega "${name}" agregada y activada con éxito.`);
+  };
 
   // Fetch all existing bodegas from Supabase on mount
   useEffect(() => {
@@ -129,8 +186,9 @@ function Cargar() {
       .then((dbBodegas) => {
         if (dbBodegas && dbBodegas.length > 0) {
           setKnownBodegas((prev) => {
-            const merged = new Set([...prev, ...dbBodegas]);
-            return Array.from(merged).sort((a, b) => a.localeCompare(b, "es"));
+            const merged = Array.from(new Set([...prev, ...dbBodegas])).sort((a, b) => a.localeCompare(b, "es"));
+            persistCustomBodegas(merged);
+            return merged;
           });
         }
       })
@@ -255,8 +313,9 @@ function Cargar() {
     const detected = extractBodegasFromCsvText(text);
     if (detected.length > 0) {
       setKnownBodegas((prev) => {
-        const merged = new Set([...prev, ...detected]);
-        return Array.from(merged).sort((a, b) => a.localeCompare(b, "es"));
+        const merged = Array.from(new Set([...prev, ...detected])).sort((a, b) => a.localeCompare(b, "es"));
+        persistCustomBodegas(merged);
+        return merged;
       });
     }
   };
@@ -266,8 +325,9 @@ function Cargar() {
     const fileBodegas = Array.from(new Set(parsed.map((r) => (r.bodega || "PRINCIPAL 1004").trim())));
     if (fileBodegas.length > 0) {
       setKnownBodegas((prev) => {
-        const merged = new Set([...prev, ...fileBodegas]);
-        return Array.from(merged).sort((a, b) => a.localeCompare(b, "es"));
+        const merged = Array.from(new Set([...prev, ...fileBodegas])).sort((a, b) => a.localeCompare(b, "es"));
+        persistCustomBodegas(merged);
+        return merged;
       });
     }
 
@@ -671,19 +731,38 @@ function Cargar() {
               </div>
             </div>
 
-            {/* Buscador de Bodegas dentro del Control Panel */}
-            {knownBodegas.length > 5 && (
-              <div className="relative">
+            {/* Buscador de Bodegas y Agregar Nueva Bodega */}
+            <div className="flex flex-col sm:flex-row gap-2">
+              <div className="relative flex-1">
                 <Search className="h-3.5 w-3.5 absolute left-3 top-2.5 text-muted-foreground" />
                 <input
                   type="text"
                   value={bodegaSearch}
                   onChange={(e) => setBodegaSearch(e.target.value)}
-                  placeholder={`Buscar entre las ${knownBodegas.length} bodegas…`}
-                  className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-border bg-background text-foreground focus:border-accent focus:ring-1 focus:ring-accent outline-none"
+                  placeholder={`Buscar entre las ${knownBodegas.length} bodegas o ingresar una nueva…`}
+                  className="w-full pl-9 pr-8 py-1.5 text-xs rounded-lg border border-border bg-background text-foreground focus:border-accent focus:ring-1 focus:ring-accent outline-none"
                 />
+                {bodegaSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setBodegaSearch("")}
+                    className="absolute right-2.5 top-2 text-muted-foreground hover:text-foreground cursor-pointer"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
               </div>
-            )}
+              {bodegaSearch.trim() && !knownBodegas.some(b => b.toLowerCase() === bodegaSearch.trim().toLowerCase()) && (
+                <button
+                  type="button"
+                  onClick={() => handleAddCustomBodega(bodegaSearch)}
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-accent text-accent-foreground hover:bg-accent/90 transition-all cursor-pointer shrink-0 shadow-xs active:scale-95"
+                >
+                  <Building2 className="h-3.5 w-3.5" />
+                  <span>+ Agregar "{bodegaSearch.trim().toUpperCase()}"</span>
+                </button>
+              )}
+            </div>
 
             {/* Grid de Bodegas */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[380px] overflow-y-auto pr-1">
@@ -729,8 +808,19 @@ function Cargar() {
                   );
                 })
               ) : (
-                <div className="col-span-2 text-center py-4 text-xs text-muted-foreground">
-                  No se encontraron bodegas que coincidan con "{bodegaSearch}".
+                <div className="col-span-2 text-center py-6 px-4 bg-background/50 rounded-lg border border-dashed border-border flex flex-col items-center justify-center gap-3">
+                  <Building2 className="h-8 w-8 text-muted-foreground/60" />
+                  <div className="text-xs text-muted-foreground">
+                    No se encontraron bodegas que coincidan con <strong className="text-foreground font-semibold">"{bodegaSearch}"</strong>.
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleAddCustomBodega(bodegaSearch)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-accent text-accent-foreground hover:bg-accent/90 transition-all cursor-pointer shadow-xs active:scale-95"
+                  >
+                    <Check className="h-3.5 w-3.5" />
+                    <span>Agregar y Activar "{bodegaSearch.trim().toUpperCase()}"</span>
+                  </button>
                 </div>
               )}
             </div>
