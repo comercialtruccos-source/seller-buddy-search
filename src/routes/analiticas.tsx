@@ -61,6 +61,10 @@ function AnaliticasPage() {
   const [disabledBodegas, setDisabledBodegas] = useState<Set<string>>(() => {
     if (typeof window !== "undefined") {
       try {
+        if (!localStorage.getItem("bodegas_all_reactivated_v2")) {
+          localStorage.removeItem("disabled_bodegas");
+          return new Set();
+        }
         const saved = localStorage.getItem("disabled_bodegas");
         if (saved) return new Set(JSON.parse(saved));
       } catch {}

@@ -416,14 +416,13 @@ export function groupByReferencia(rows: InventoryRow[]): ReferenceGroup[] {
     const existing = map.get(row.referencia);
     const bodegaName = (row.bodega || "PRINCIPAL 1004").trim();
     const ubi = (row.ubicaciones || "").trim();
-    const isStore = isStoreBodega(bodegaName);
     
     if (existing) {
       const existingVariant = existing.variantes.find(v => v.sku === row.sku);
       if (existingVariant) {
         existingVariant.saldo += row.saldo;
         existingVariant.saldosPorBodega[bodegaName] = (existingVariant.saldosPorBodega[bodegaName] || 0) + row.saldo;
-        if (ubi && !isStore) {
+        if (ubi) {
           existingVariant.ubicacionesPorBodega[bodegaName] = ubi;
           if (!existingVariant.ubicaciones) existingVariant.ubicaciones = ubi;
         }
@@ -431,16 +430,14 @@ export function groupByReferencia(rows: InventoryRow[]): ReferenceGroup[] {
         existing.variantes.push({
           ...row,
           saldosPorBodega: { [bodegaName]: row.saldo },
-          ubicacionesPorBodega: ubi && !isStore ? { [bodegaName]: ubi } : {},
+          ubicacionesPorBodega: ubi ? { [bodegaName]: ubi } : {},
         });
       }
       existing.totalSaldo += row.saldo;
       existing.saldosPorBodega[bodegaName] = (existing.saldosPorBodega[bodegaName] || 0) + row.saldo;
       if (ubi) {
-        if (!isStore) {
-          existing.ubicacionesPorBodega[bodegaName] = ubi;
-        }
-        if (!existing.ubicacion && !isStore) existing.ubicacion = ubi;
+        existing.ubicacionesPorBodega[bodegaName] = ubi;
+        if (!existing.ubicacion) existing.ubicacion = ubi;
       }
       // Keep the max known prices in case of inconsistencies.
       existing.pvm = existing.pvm || row.pvm;
@@ -458,12 +455,12 @@ export function groupByReferencia(rows: InventoryRow[]): ReferenceGroup[] {
         precioUsd: row.precioUsd,
         totalSaldo: row.saldo,
         saldosPorBodega: { [bodegaName]: row.saldo },
-        ubicacionesPorBodega: ubi && !isStore ? { [bodegaName]: ubi } : {},
-        ubicacion: !isStore && ubi ? ubi : undefined,
+        ubicacionesPorBodega: ubi ? { [bodegaName]: ubi } : {},
+        ubicacion: ubi || undefined,
         variantes: [{
           ...row,
           saldosPorBodega: { [bodegaName]: row.saldo },
-          ubicacionesPorBodega: ubi && !isStore ? { [bodegaName]: ubi } : {},
+          ubicacionesPorBodega: ubi ? { [bodegaName]: ubi } : {},
         }],
         imageUrl: row.imageUrl,
       });
@@ -800,10 +797,9 @@ export async function loadInventory(): Promise<{
 }
 
 /** Replace the shared inventory. Replaces data only for the bodegas present in the payload. */
-export async function saveInventory(rows: InventoryRow[], disabledBodegas: string[] = []): Promise<string> {
+export async function saveInventory(rows: InventoryRow[], _disabledBodegas: string[] = []): Promise<string> {
   const bodegasToReplace = Array.from(new Set([
     ...rows.map(r => r.bodega || "PRINCIPAL 1004"),
-    ...disabledBodegas,
     "Principal" // Limpiar la data corrupta que se guardó con el fallback antiguo
   ]));
 

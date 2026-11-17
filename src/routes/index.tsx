@@ -160,6 +160,12 @@ function Index() {
 
   const [disabledBodegas, setDisabledBodegas] = useState<Set<string>>(() => {
     if (typeof window !== "undefined") {
+      // Auto-reactivate all bodegas on first load after this update
+      if (!localStorage.getItem("bodegas_all_reactivated_v2")) {
+        localStorage.removeItem("disabled_bodegas");
+        localStorage.setItem("bodegas_all_reactivated_v2", "true");
+        return new Set();
+      }
       const saved = localStorage.getItem("disabled_bodegas");
       if (saved) {
         try {
@@ -366,7 +372,6 @@ function Index() {
 
       const newUbicacionesPorBodega: Record<string, string> = {};
       for (const b of Object.keys(newSaldosPorBodega)) {
-        if (isStoreBodega(b)) continue;
         if (g.ubicacionesPorBodega?.[b]) {
           newUbicacionesPorBodega[b] = g.ubicacionesPorBodega[b];
         } else {
@@ -377,7 +382,7 @@ function Index() {
       const warehouseLoc = getWarehouseLocation(g);
       if (warehouseLoc && Object.keys(newUbicacionesPorBodega).length === 0) {
         for (const b of Object.keys(newSaldosPorBodega)) {
-          if (!isStoreBodega(b) && isMainWarehouseBodega(b)) {
+          if (isMainWarehouseBodega(b)) {
             newUbicacionesPorBodega[b] = warehouseLoc;
           }
         }
@@ -1588,13 +1593,9 @@ function ReferenceCard({
               </span>
               {Object.entries(group.saldosPorBodega).map(([bodega, saldo]) => {
                 const isSelected = localBodega === bodega;
-                const isStore = isStoreBodega(bodega);
-                const ubicacion = isStore
-                  ? undefined
-                  : (
-                      group.ubicacionesPorBodega?.[bodega] ||
-                      (isMainWarehouseBodega(bodega) ? getWarehouseLocation(group) : undefined)
-                    );
+                const ubicacion =
+                  group.ubicacionesPorBodega?.[bodega] ||
+                  (isMainWarehouseBodega(bodega) ? getWarehouseLocation(group) : undefined);
                 return (
                   <button 
                     key={bodega}
@@ -1615,14 +1616,41 @@ function ReferenceCard({
                 );
               })}
             </div>
-            {(() => {
+            {group.ubicacionesPorBodega && Object.keys(group.ubicacionesPorBodega).length > 0 ? (
+              <div className="flex flex-wrap items-center gap-1.5 mb-2 text-xs">
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+                  <MapPin className="h-3.5 w-3.5 text-primary" />
+                  <span>Ubicaciones:</span>
+                </span>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {Object.entries(group.ubicacionesPorBodega).map(([bName, uLoc]) => {
+                    const isSelected = localBodega === bName;
+                    return (
+                      <span
+                        key={bName}
+                        onClick={() => setLocalBodega(isSelected ? null : bName)}
+                        className={`inline-flex items-center gap-1 rounded-md px-2.5 py-0.5 text-xs font-mono border transition-colors cursor-pointer ${
+                          isSelected
+                            ? "bg-accent text-accent-foreground border-accent font-bold shadow-xs"
+                            : "bg-primary/10 text-primary border-primary/20 hover:bg-primary/20"
+                        }`}
+                        title={`Filtrar inventario por ${bName}`}
+                      >
+                        <strong className="text-foreground/80 font-semibold">{bName}:</strong>
+                        <span className="font-bold">{uLoc}</span>
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (() => {
               const warehouseUbi = getWarehouseLocation(group);
               if (!warehouseUbi) return null;
               return (
                 <div className="flex flex-wrap items-center gap-1.5 mb-2 text-xs">
                   <span className="inline-flex items-center gap-1 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
                     <MapPin className="h-3.5 w-3.5 text-primary" />
-                    <span>Ubicación Bodega 1001:</span>
+                    <span>Ubicación:</span>
                   </span>
                   <span className="inline-flex items-center gap-1 rounded-md px-2.5 py-0.5 text-xs font-mono font-bold border bg-primary/10 text-primary border-primary/20 shadow-xs">
                     <span>{warehouseUbi}</span>
@@ -1736,10 +1764,12 @@ function ReferenceCard({
                         title={
                           hasStock
                             ? `Click para copiar SKU: ${v.sku}${
-                                getWarehouseLocation(group)
+                                localBodega && v.ubicacionesPorBodega?.[localBodega]
+                                  ? ` | Ubicación en ${localBodega}: ${v.ubicacionesPorBodega[localBodega]}`
+                                  : v.ubicaciones
+                                  ? ` | Ubicación: ${v.ubicaciones}`
+                                  : getWarehouseLocation(group)
                                   ? ` | Ubicación Bodega 1001: ${getWarehouseLocation(group)}`
-                                  : v.ubicaciones && !isStoreBodega(v.bodega || "")
-                                  ? ` | Ubicación Bodega 1001: ${v.ubicaciones}`
                                   : ""
                               }`
                             : "Sin stock disponible"

@@ -36,6 +36,7 @@ import {
   extractBodegasFromCsvText,
   loadInventory,
   groupByReferencia,
+  isMainWarehouseBodega,
   exportUbicacionesBodega1001,
   exportUbicacionesBodega1001Csv,
 } from "@/lib/inventory";
@@ -47,12 +48,13 @@ export const Route = createFileRoute("/cargar")({
 
 const DEFAULT_BODEGAS = [
   "PRINCIPAL 1004",
+  "PUNTO DE VENTA 901",
+  "TIENDA MAYORCA",
   "SEGUNDAS BODEGA 1005",
   "BODEGA ARREGLOS",
   "BODEGA COBROS",
   "BODEGA MUESTRAS VENDEDORES",
   "MUESTRAS MERCADEO",
-  "TIENDA MAYORCA",
 ];
 
 function Cargar() {
@@ -95,6 +97,13 @@ function Cargar() {
   // Bodegas state management
   const [disabledBodegas, setDisabledBodegas] = useState<Set<string>>(() => {
     if (typeof window !== "undefined") {
+      // Auto-reactivate all bodegas on first load after this update
+      if (!localStorage.getItem("bodegas_all_reactivated_v2")) {
+        localStorage.removeItem("disabled_bodegas");
+        localStorage.setItem("bodegas_all_reactivated_v2", "true");
+        window.dispatchEvent(new CustomEvent("disabled_bodegas_changed", { detail: [] }));
+        return new Set();
+      }
       const saved = localStorage.getItem("disabled_bodegas");
       if (saved) {
         try {
@@ -164,7 +173,7 @@ function Cargar() {
     }
   };
 
-  const handleToggleBodega = async (bodegaName: string, enabled: boolean) => {
+  const handleToggleBodega = (bodegaName: string, enabled: boolean) => {
     setDisabledBodegas((prev) => {
       const next = new Set(prev);
       if (enabled) {
@@ -176,15 +185,6 @@ function Cargar() {
       return next;
     });
 
-    if (!enabled) {
-      // Automatically purge records of this newly disabled bodega from Supabase
-      try {
-        await deleteBodegasFromDb([bodegaName]);
-      } catch (e) {
-        console.error("Error purging disabled bodega from DB:", e);
-      }
-    }
-
     toast.success(`Bodega "${bodegaName}" ${enabled ? "ACTIVADA" : "DESACTIVADA"}.`);
   };
 
@@ -195,32 +195,22 @@ function Cargar() {
       window.dispatchEvent(new CustomEvent("disabled_bodegas_changed", { detail: [] }));
       window.dispatchEvent(new Event("storage"));
     }
-    toast.success("Todas las bodegas han sido activadas.");
+    toast.success("Todas las bodegas han sido activadas exitosamente.");
   };
 
-  const handleDisableAllBodegas = async () => {
+  const handleDisableAllBodegas = () => {
     const next = new Set(knownBodegas);
     setDisabledBodegas(next);
     persistDisabledBodegas(next);
-    try {
-      await deleteBodegasFromDb(knownBodegas);
-    } catch (e) {
-      console.error("Error purging disabled bodegas from DB:", e);
-    }
-    toast.success("Todas las bodegas han sido desactivadas.");
+    toast.success("Todas las bodegas han sido desactivadas para la vista/carga.");
   };
 
-  const handleDisableAllExceptPrincipal = async () => {
-    const toDisable = knownBodegas.filter((b) => b !== "PRINCIPAL 1004");
+  const handleDisableAllExceptPrincipal = () => {
+    const toDisable = knownBodegas.filter((b) => !isMainWarehouseBodega(b));
     const next = new Set(toDisable);
     setDisabledBodegas(next);
     persistDisabledBodegas(next);
-    try {
-      await deleteBodegasFromDb(toDisable);
-    } catch (e) {
-      console.error("Error purging disabled bodegas from DB:", e);
-    }
-    toast.success("Se activó únicamente la bodega PRINCIPAL 1004.");
+    toast.success("Se activó únicamente la bodega Principal.");
   };
 
   const handlePurgeDisabledBodegasInDb = async () => {
@@ -659,9 +649,10 @@ function Cargar() {
                 <button
                   type="button"
                   onClick={handleEnableAllBodegas}
-                  className="px-2.5 py-1 text-[11px] font-bold rounded-md bg-accent/10 text-accent hover:bg-accent/20 border border-accent/20 transition-all cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-all cursor-pointer shadow-xs active:scale-95"
                 >
-                  Activar todas
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  <span>Activar todas</span>
                 </button>
                 <button
                   type="button"
