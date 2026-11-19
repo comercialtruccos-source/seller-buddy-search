@@ -25,7 +25,7 @@ import {
   OrderItem,
 } from "../lib/order";
 import { InventoryRow, formatCurrency, formatUsd } from "../lib/inventory";
-import { calculateQuotationSummary, calculateItemUnitPrice } from "../lib/quotation";
+import { calculateQuotationSummary, calculateItemUnitPrice, useTipoDescuento } from "../lib/quotation";
 
 interface VoiceOrderAssistantModalProps {
   open: boolean;
@@ -219,7 +219,8 @@ export const VoiceOrderAssistantModal: React.FC<VoiceOrderAssistantModalProps> =
 
   if (!open) return null;
 
-  const quotationSummary = React.useMemo(() => calculateQuotationSummary(order), [order]);
+  const tipoDescuento = useTipoDescuento();
+  const quotationSummary = React.useMemo(() => calculateQuotationSummary(order, tipoDescuento), [order, tipoDescuento]);
   const totalItems = quotationSummary.totalUnits;
   const totalPrice = quotationSummary.totalAmount;
 

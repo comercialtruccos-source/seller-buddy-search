@@ -1,4 +1,5 @@
 import * as XLSX from "xlsx";
+import { useSyncExternalStore } from "react";
 import { formatCurrency, formatUsd, type InventoryRow, resolveBodega1001Location } from "./inventory";
 import type { OrderItem } from "./order";
 import {
@@ -25,48 +26,91 @@ export interface QuotationTierInfo {
   progressPercent: number;
 }
 
-export function getQuotationTier(totalUnits: number): QuotationTierInfo {
-  if (totalUnits < 12) {
-    const unitsToNextTier = 12 - totalUnits;
-    return {
-      tier: "detal",
-      label: "Precio Detal (Sin Descuento)",
-      badge: "Detal",
-      discountPercentage: 0,
-      description: "Menos de 12 unidades: aplica precio detal sin descuento.",
-      unitsToNextTier,
-      nextTierPrompt: `Agrega ${unitsToNextTier} ${
-        unitsToNextTier === 1 ? "unidad más" : "unidades más"
-      } para activar 30% de descuento sobre detal.`,
-      progressPercent: Math.max(0, Math.min(100, Math.round((totalUnits / 12) * 100))),
-    };
-  }
+/**
+ * Tipo de descuento elegido por el asesor con las casillas del cotizador.
+ * Ya NO depende de la cantidad de unidades:
+ * - "ninguno": precio detal (PVP) sin descuento
+ * - "descuento_30": 30% de descuento sobre el precio detal
+ * - "mayorista": precio mayorista (PVM)
+ */
+export type TipoDescuento = "ninguno" | "descuento_30" | "mayorista";
 
-  if (totalUnits <= 23) {
-    const unitsToNextTier = 24 - totalUnits;
+const CLAVE_TIPO_DESCUENTO = "cotizador_tipo_descuento_v1";
+let tipoDescuentoActual: TipoDescuento = (() => {
+  try {
+    const v = typeof window !== "undefined" ? window.localStorage.getItem(CLAVE_TIPO_DESCUENTO) : null;
+    return v === "descuento_30" || v === "mayorista" || v === "ninguno" ? v : "ninguno";
+  } catch {
+    return "ninguno";
+  }
+})();
+const oyentesTipoDescuento = new Set<() => void>();
+
+export function getTipoDescuento(): TipoDescuento {
+  return tipoDescuentoActual;
+}
+
+export function setTipoDescuento(tipo: TipoDescuento): void {
+  tipoDescuentoActual = tipo;
+  try {
+    if (typeof window !== "undefined") window.localStorage.setItem(CLAVE_TIPO_DESCUENTO, tipo);
+  } catch {
+    // sin almacenamiento: queda solo en memoria
+  }
+  oyentesTipoDescuento.forEach((fn) => fn());
+}
+
+/** Hook para que la UI se actualice cuando el asesor marca o desmarca una casilla */
+export function useTipoDescuento(): TipoDescuento {
+  return useSyncExternalStore(
+    (fn) => {
+      oyentesTipoDescuento.add(fn);
+      return () => oyentesTipoDescuento.delete(fn);
+    },
+    () => tipoDescuentoActual,
+    () => "ninguno" as TipoDescuento
+  );
+}
+
+/** Recupera el tipo de descuento de una cotización guardada a partir de su etiqueta */
+export function tipoDescuentoDesdeBadge(badge?: string | null): TipoDescuento {
+  const b = (badge || "").toLowerCase();
+  if (b.includes("30")) return "descuento_30";
+  if (b.includes("mayorista")) return "mayorista";
+  return "ninguno";
+}
+
+export function getQuotationTier(_totalUnits: number, tipo: TipoDescuento = getTipoDescuento()): QuotationTierInfo {
+  if (tipo === "descuento_30") {
     return {
       tier: "descuento_30",
       label: "30% Descuento sobre Detal",
       badge: "-30% Dto",
       discountPercentage: 30,
-      description: "De 12 a 23 unidades: 30% de descuento sobre el precio detal.",
-      unitsToNextTier,
-      nextTierPrompt: `Agrega ${unitsToNextTier} ${
-        unitsToNextTier === 1 ? "unidad más" : "unidades más"
-      } para alcanzar Precio Mayorista.`,
-      progressPercent: Math.max(
-        0,
-        Math.min(100, Math.round(((totalUnits - 12) / (24 - 12)) * 100))
-      ),
+      description: "Descuento del 30% sobre el precio detal (seleccionado por el asesor).",
+      unitsToNextTier: 0,
+      nextTierPrompt: undefined,
+      progressPercent: 100,
     };
   }
-
+  if (tipo === "mayorista") {
+    return {
+      tier: "mayorista",
+      label: "Precio Mayorista (PVM)",
+      badge: "Mayorista",
+      discountPercentage: 0,
+      description: "Descuento mayorista: las prendas quedan con precio mayorista (seleccionado por el asesor).",
+      unitsToNextTier: 0,
+      nextTierPrompt: undefined,
+      progressPercent: 100,
+    };
+  }
   return {
-    tier: "mayorista",
-    label: "Precio Mayorista (PVM)",
-    badge: "Mayorista",
+    tier: "detal",
+    label: "Precio Detal (Sin Descuento)",
+    badge: "Detal",
     discountPercentage: 0,
-    description: "24 o más unidades: las prendas quedan con precio mayorista.",
+    description: "Sin descuento: aplica precio detal.",
     unitsToNextTier: 0,
     nextTierPrompt: undefined,
     progressPercent: 100,
@@ -75,20 +119,21 @@ export function getQuotationTier(totalUnits: number): QuotationTierInfo {
 
 export function calculateItemUnitPrice(
   item: { pvm: number; pvp?: number; precioUsd?: number },
-  totalUnits: number
+  _totalUnits: number,
+  tipo: TipoDescuento = getTipoDescuento()
 ): number {
   const pvm = Number(item.pvm) || 0;
   const pvp = Number(item.pvp) || pvm;
+  const baseDetal = pvp > 0 ? pvp : pvm;
 
-  if (totalUnits < 12) {
-    return pvp > 0 ? pvp : pvm;
-  }
-  if (totalUnits <= 23) {
-    const baseDetal = pvp > 0 ? pvp : pvm;
+  if (tipo === "descuento_30") {
     const discount = Math.round(baseDetal * 0.3);
     return Math.max(0, baseDetal - discount);
   }
-  return pvm > 0 ? pvm : pvp;
+  if (tipo === "mayorista") {
+    return pvm > 0 ? pvm : pvp;
+  }
+  return baseDetal;
 }
 
 export function getItemUsdPrice(item: { precioUsd?: number }): number {
@@ -144,6 +189,8 @@ export interface QuotationItemSummary {
 export interface QuotationConfig {
   currency: QuotationCurrency;
   copPriceType?: CopPriceType;
+  /** Descuento elegido con las casillas del cotizador (por defecto, la selección actual) */
+  tipoDescuento?: TipoDescuento;
   customerName?: string;
   advisorName?: string;
   notes?: string;
@@ -167,7 +214,7 @@ export interface QuotationData {
   items: QuotationItemSummary[];
   totalUnits: number;
   totalReferences: number;
-  isMayorista: boolean; // true si totalUnits >= 24
+  isMayorista: boolean; // true si se marcó la casilla de descuento mayorista
   basePriceColumnLabel: string; // "P. MAYORISTA" o "P. DETAL"
   basePriceExcelLabel: string; // "PRECIO MAYORISTA" o "PRECIO DETAL"
   subtotalDetal: number; // Suma de todos los precios detal * cantidad
@@ -200,11 +247,12 @@ export function calculateQuotationSummary(
     cantidad: number;
     sku?: string;
     referencia?: string;
-  }>
+  }>,
+  tipo: TipoDescuento = getTipoDescuento()
 ) {
   const activeItems = items.filter((it) => (Number(it.cantidad) || 0) > 0);
   const totalUnits = activeItems.reduce((s, it) => s + (Number(it.cantidad) || 0), 0);
-  const tierInfo = getQuotationTier(totalUnits);
+  const tierInfo = getQuotationTier(totalUnits, tipo);
 
   let subtotalDetal = 0;
   let subtotalMayorista = 0;
@@ -222,7 +270,7 @@ export function calculateQuotationSummary(
 
     if (usd > 0) hasUsdPrices = true;
 
-    const unitPriceCop = calculateItemUnitPrice(item, totalUnits);
+    const unitPriceCop = calculateItemUnitPrice(item, totalUnits, tipo);
     const unitDiscountCop = Math.max(0, pvp - unitPriceCop);
     const lineTotalCop = unitPriceCop * qty;
     const lineTotalUsd = usd * qty;
@@ -276,10 +324,11 @@ export function calculateQuotationSummary(
 }
 
 /**
- * Calculates item and total prices based on the commercial quotation rules:
- * - < 12 units: Detal price (PVP) without discount.
- * - 12 - 23 units: 30% discount applied solely to retail price (PVP).
- * - >= 24 units: Wholesale price (PVM).
+ * Calculates item and total prices based on the discount chosen by the advisor
+ * (checkboxes in the quotation tool), no longer on the number of units:
+ * - none: Detal price (PVP) without discount.
+ * - "Descuento 30%": 30% discount applied to retail price (PVP).
+ * - "Descuento mayorista": Wholesale price (PVM).
  * - USD currency: completely untouched, no discounts applied.
  */
 export function buildQuotationData(
@@ -298,7 +347,8 @@ export function buildQuotationData(
 
   const activeItems = items.filter((it) => it.cantidad > 0);
   const totalUnits = activeItems.reduce((sum, it) => sum + it.cantidad, 0);
-  const tierInfo = getQuotationTier(totalUnits);
+  const tipoDescuento = config.tipoDescuento ?? getTipoDescuento();
+  const tierInfo = getQuotationTier(totalUnits, tipoDescuento);
   const isMayorista = tierInfo.tier === "mayorista";
   const basePriceColumnLabel = isMayorista ? "P. MAYORISTA" : "P. DETAL";
   const basePriceExcelLabel = isMayorista ? "PRECIO MAYORISTA" : "PRECIO DETAL";
@@ -327,15 +377,16 @@ export function buildQuotationData(
         precioUnitConIva = Math.ceil(((basePvm / 1.19 + 1000) / trmFallback) * 100) / 100;
       }
     } else {
-      // En COP aplican las condiciones de cotización sobre el precio con IVA incluido:
-      // - < 12 unidades: sin descuento (PVP detal)
-      // - 12 a 23 unidades: 30% descuento sobre detal
-      // - >= 24 unidades: precio mayorista (PVM)
-      if (totalUnits < 12) {
+      // En COP el descuento lo define el asesor con las casillas del cotizador
+      // (ya no depende de la cantidad de unidades), sobre el precio con IVA incluido:
+      // - sin casilla: precio detal (PVP)
+      // - "Descuento 30%": 30% de descuento sobre detal
+      // - "Descuento mayorista": precio mayorista (PVM)
+      if (tipoDescuento === "ninguno") {
         precioUnitConIva = precioDetal;
         unitDiscount = 0;
         discountPercentage = 0;
-      } else if (totalUnits <= 23) {
+      } else if (tipoDescuento === "descuento_30") {
         unitDiscount = Math.round(precioDetal * 0.3);
         precioUnitConIva = Math.max(0, precioDetal - unitDiscount);
         discountPercentage = 30;

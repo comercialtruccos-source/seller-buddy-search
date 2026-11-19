@@ -6,6 +6,7 @@ import {
   type CopPriceType,
   type QuotationData,
   buildQuotationData,
+  tipoDescuentoDesdeBadge,
   downloadQuotationPdf,
   downloadQuotationExcel,
 } from "./quotation";
@@ -459,6 +460,8 @@ export function savedQuotationToQuotationData(
     {
       currency: saved.currency,
       copPriceType: saved.copPriceType,
+      // Conserva el descuento con el que se guardó la cotización
+      tipoDescuento: tipoDescuentoDesdeBadge(saved.tierBadge),
       customerName: saved.customerName,
       advisorName: saved.advisorName,
       notes: saved.notes,

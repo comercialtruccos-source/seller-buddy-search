@@ -73,6 +73,8 @@ import {
 import {
   calculateItemUnitPrice,
   calculateQuotationSummary,
+  useTipoDescuento,
+  setTipoDescuento,
 } from "@/lib/quotation";
 
 const colorToHex = (colorStr: string) => {
@@ -834,7 +836,8 @@ function OrderModal({
 }) {
   const [customerName, setCustomerName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-  const summary = useMemo(() => calculateQuotationSummary(order), [order]);
+  const tipoDescuento = useTipoDescuento();
+  const summary = useMemo(() => calculateQuotationSummary(order, tipoDescuento), [order, tipoDescuento]);
   const { totalUnits: unidades, tierInfo, subtotalDetal, totalAmount, totalSavings, totalUsd } = summary;
 
   const handleExportUbicacionesOrder = (format: "xlsx" | "csv" = "xlsx") => {
@@ -954,19 +957,31 @@ function OrderModal({
               </span>
             </div>
 
-            {tierInfo.unitsToNextTier !== undefined && tierInfo.unitsToNextTier > 0 && (
-              <div className="mt-2 space-y-1">
-                <div className="h-1.5 w-full overflow-hidden rounded-full bg-border">
-                  <div
-                    className="h-full bg-primary transition-all duration-300"
-                    style={{ width: `${tierInfo.progressPercent}%` }}
-                  />
-                </div>
-                <p className="text-[11px] font-medium text-primary">
-                  {tierInfo.nextTierPrompt}
-                </p>
-              </div>
-            )}
+            {/* El descuento lo elige el asesor (ya no depende de la cantidad de unidades) */}
+            <div className="mt-2.5 grid grid-cols-2 gap-2">
+              <label className={`flex cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-2 text-xs font-semibold transition-colors ${
+                tipoDescuento === "descuento_30" ? "border-emerald-500 bg-emerald-500/10 text-foreground" : "border-border bg-card text-muted-foreground"
+              }`}>
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 accent-emerald-600"
+                  checked={tipoDescuento === "descuento_30"}
+                  onChange={(e) => setTipoDescuento(e.target.checked ? "descuento_30" : "ninguno")}
+                />
+                Descuento del 30%
+              </label>
+              <label className={`flex cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-2 text-xs font-semibold transition-colors ${
+                tipoDescuento === "mayorista" ? "border-primary bg-primary/10 text-foreground" : "border-border bg-card text-muted-foreground"
+              }`}>
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 accent-slate-800"
+                  checked={tipoDescuento === "mayorista"}
+                  onChange={(e) => setTipoDescuento(e.target.checked ? "mayorista" : "ninguno")}
+                />
+                Descuento mayorista
+              </label>
+            </div>
           </div>
         )}
 

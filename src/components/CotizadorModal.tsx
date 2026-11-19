@@ -26,6 +26,8 @@ import {
   type QuotationCurrency,
   type CopPriceType,
   buildQuotationData,
+  useTipoDescuento,
+  setTipoDescuento,
   downloadQuotationExcel,
   downloadQuotationPdf,
   openQuotationPrintView,
@@ -67,6 +69,7 @@ export function CotizadorModal({
 
   // Currency & calculation state
   const [currency, setCurrency] = useState<QuotationCurrency>("COP");
+  const tipoDescuento = useTipoDescuento();
   const [copPriceType, setCopPriceType] = useState<CopPriceType>("PVM");
 
   // Metadata state
@@ -102,13 +105,14 @@ export function CotizadorModal({
       {
         currency,
         copPriceType,
+        tipoDescuento,
         customerName,
         advisorName,
         notes,
       },
       inventoryLookup
     );
-  }, [order, currency, copPriceType, customerName, advisorName, notes, inventoryLookup]);
+  }, [order, currency, copPriceType, tipoDescuento, customerName, advisorName, notes, inventoryLookup]);
 
   if (!open) return null;
 
@@ -387,52 +391,60 @@ export function CotizadorModal({
             </div>
           </div>
 
-          {/* Commercial Volume Scale Banner */}
-          {currency === "COP" && quotation.items.length > 0 && (
-            <div className={`rounded-2xl border p-4 transition-colors ${
-              quotation.tierInfo.tier === "detal"
-                ? "bg-amber-500/10 border-amber-500/25 text-amber-950 dark:text-amber-200"
-                : quotation.tierInfo.tier === "descuento_30"
-                ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-950 dark:text-emerald-200"
-                : "bg-primary/10 border-primary/20 text-primary"
-            }`}>
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-black uppercase tracking-wide ${
-                    quotation.tierInfo.tier === "detal"
-                      ? "bg-amber-500/20 text-amber-900 dark:text-amber-300"
-                      : quotation.tierInfo.tier === "descuento_30"
-                      ? "bg-emerald-500/20 text-emerald-800 dark:text-emerald-300"
-                      : "bg-primary/20 text-primary"
-                  }`}>
-                    {quotation.tierInfo.badge}
-                  </span>
-                  <span className="text-xs font-semibold">
-                    {quotation.tierInfo.tier === "detal" && "Escala Detal (Menos de 12 uds: sin descuento)"}
-                    {quotation.tierInfo.tier === "descuento_30" && "30% Descuento Detal aplicado (12 a 23 unidades)"}
-                    {quotation.tierInfo.tier === "mayorista" && "Tarifa Mayorista Plena activada (24 o más unidades)"}
-                  </span>
-                </div>
-                <span className="text-xs font-bold whitespace-nowrap">
+          {/* Descuento: lo elige el asesor con dos casillas (ya no depende de la cantidad de unidades) */}
+          {currency === "COP" && (
+            <div className="rounded-2xl border-2 border-slate-300/80 dark:border-slate-700/80 bg-card p-4 sm:p-5">
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <h3 className="text-xs sm:text-sm font-black uppercase tracking-wider text-foreground">
+                  2. ¿Qué descuento aplicas?
+                </h3>
+                <span className="text-[11px] font-medium text-muted-foreground">
                   {quotation.totalUnits} uds totales
                 </span>
               </div>
-
-              {quotation.tierInfo.nextTierPrompt && (
-                <div className="mt-2 text-xs">
-                  <p className="font-medium text-foreground/90">
-                    💡 {quotation.tierInfo.nextTierPrompt}
-                  </p>
-                  <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
-                    <div
-                      className={`h-full transition-all duration-300 ${
-                        quotation.tierInfo.tier === "detal" ? "bg-amber-500" : "bg-emerald-500"
-                      }`}
-                      style={{ width: `${quotation.tierInfo.progressPercent}%` }}
-                    />
-                  </div>
-                </div>
-              )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label
+                  className={`flex cursor-pointer items-start gap-3 rounded-xl border-2 p-3.5 transition-all ${
+                    tipoDescuento === "descuento_30"
+                      ? "border-emerald-500 bg-emerald-500/10"
+                      : "border-border bg-card/60 hover:border-slate-400/50"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 h-4 w-4 accent-emerald-600"
+                    checked={tipoDescuento === "descuento_30"}
+                    onChange={(e) => setTipoDescuento(e.target.checked ? "descuento_30" : "ninguno")}
+                  />
+                  <span>
+                    <span className="block text-sm font-bold text-foreground">Descuento del 30%</span>
+                    <span className="block text-[11px] text-muted-foreground">30% de descuento sobre el precio detal</span>
+                  </span>
+                </label>
+                <label
+                  className={`flex cursor-pointer items-start gap-3 rounded-xl border-2 p-3.5 transition-all ${
+                    tipoDescuento === "mayorista"
+                      ? "border-slate-800 dark:border-slate-200 bg-slate-500/10"
+                      : "border-border bg-card/60 hover:border-slate-400/50"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 h-4 w-4 accent-slate-800"
+                    checked={tipoDescuento === "mayorista"}
+                    onChange={(e) => setTipoDescuento(e.target.checked ? "mayorista" : "ninguno")}
+                  />
+                  <span>
+                    <span className="block text-sm font-bold text-foreground">Descuento mayorista</span>
+                    <span className="block text-[11px] text-muted-foreground">Las prendas quedan con precio mayorista</span>
+                  </span>
+                </label>
+              </div>
+              <p className="mt-3 text-[11px] text-muted-foreground">
+                {tipoDescuento === "ninguno"
+                  ? "Sin casilla marcada se cotiza a precio detal, sin descuento."
+                  : `Aplicado: ${quotation.tierInfo.label}.`}
+              </p>
             </div>
           )}
 
