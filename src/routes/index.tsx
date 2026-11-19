@@ -1728,25 +1728,40 @@ function ReferenceCard({
         </div>
 
         {/* Pricing Cards */}
-        <div className={`px-5 pb-4 grid grid-cols-1 ${group.precioUsd && group.precioUsd > 0 ? "sm:grid-cols-3" : "sm:grid-cols-2"} gap-3`}>
-          <PriceBlock
-            label="Precio Detal (PVP)"
-            value={formatCurrency(group.pvp)}
-          />
-          <PriceBlock
-            label="Precio Mayorista (PVM) - IVA incluido"
-            value={formatCurrency(group.pvm)}
-            badge="Mayorista"
-            highlight
-          />
-          {group.precioUsd !== undefined && group.precioUsd > 0 && (
-            <PriceBlock
-              label="Precio Dólares (USD)"
-              value={formatUsd(group.precioUsd)}
-              badge="USD"
-            />
-          )}
-        </div>
+        {(() => {
+          const precioDetalUsd = calcularPrecioDetalUsd(group.pvp, group.pvm, group.precioUsd);
+          const tieneUsd = !!group.precioUsd && group.precioUsd > 0;
+          return (
+            <div className={`px-5 pb-4 grid grid-cols-1 ${tieneUsd ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-2"} gap-3`}>
+              {/* Izquierda: precios detal */}
+              <PriceBlock
+                label="Precio Detal (PVP)"
+                value={formatCurrency(group.pvp)}
+              />
+              {tieneUsd && precioDetalUsd > 0 && (
+                <PriceBlock
+                  label="Precio Detal Dólares (USD)"
+                  value={formatUsd(precioDetalUsd)}
+                  badge="Minorista USD"
+                />
+              )}
+              {/* Derecha: precios mayoristas */}
+              <PriceBlock
+                label="Precio Mayorista (PVM) - IVA incluido"
+                value={formatCurrency(group.pvm)}
+                badge="Mayorista"
+                highlight
+              />
+              {tieneUsd && (
+                <PriceBlock
+                  label="Precio Mayorista Dólares (USD)"
+                  value={formatUsd(group.precioUsd!)}
+                  badge="Mayorista USD"
+                />
+              )}
+            </div>
+          );
+        })()}
 
         {/* Quotation Tiers Helper Banner */}
         <div className="mx-5 mb-4 rounded-xl border border-border/70 bg-muted/25 p-3 text-xs">
@@ -1965,6 +1980,19 @@ function ReferenceCard({
       </div>
     </article>
   );
+}
+
+/**
+ * Precio detal en USD. La TRM no se guarda en la base: el precio USD mayorista se
+ * calcula al cargar como (PVM / 1.19 + 1000) / TRM. Se usa esa misma TRM implícita
+ * y la misma fórmula sobre el PVP para obtener el detal en dólares.
+ */
+function calcularPrecioDetalUsd(pvp: number, pvm: number, precioUsdMayorista?: number): number {
+  if (!precioUsdMayorista || precioUsdMayorista <= 0 || !pvp || !pvm) return 0;
+  const baseMayorista = pvm / 1.19 + 1000;
+  if (baseMayorista <= 0) return 0;
+  const trm = baseMayorista / precioUsdMayorista;
+  return Math.ceil(((pvp / 1.19 + 1000) / trm) * 100) / 100;
 }
 
 function PriceBlock({
