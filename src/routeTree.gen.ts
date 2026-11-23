@@ -9,19 +9,14 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as MetricasRouteImport } from './routes/metricas'
-import { Route as CargarRouteImport } from './routes/cargar'
-import { Route as AnaliticasRouteImport } from './routes/analiticas'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AnaliticasRouteImport } from './routes/analiticas'
+import { Route as CargarRouteImport } from './routes/cargar'
+import { Route as MetricasRouteImport } from './routes/metricas'
 
-const MetricasRoute = MetricasRouteImport.update({
-  id: '/metricas',
-  path: '/metricas',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CargarRoute = CargarRouteImport.update({
-  id: '/cargar',
-  path: '/cargar',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AnaliticasRoute = AnaliticasRouteImport.update({
@@ -29,9 +24,14 @@ const AnaliticasRoute = AnaliticasRouteImport.update({
   path: '/analiticas',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const CargarRoute = CargarRouteImport.update({
+  id: '/cargar',
+  path: '/cargar',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MetricasRoute = MetricasRouteImport.update({
+  id: '/metricas',
+  path: '/metricas',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -71,18 +71,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/metricas': {
-      id: '/metricas'
-      path: '/metricas'
-      fullPath: '/metricas'
-      preLoaderRoute: typeof MetricasRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/cargar': {
-      id: '/cargar'
-      path: '/cargar'
-      fullPath: '/cargar'
-      preLoaderRoute: typeof CargarRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/analiticas': {
@@ -92,11 +85,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AnaliticasRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/cargar': {
+      id: '/cargar'
+      path: '/cargar'
+      fullPath: '/cargar'
+      preLoaderRoute: typeof CargarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/metricas': {
+      id: '/metricas'
+      path: '/metricas'
+      fullPath: '/metricas'
+      preLoaderRoute: typeof MetricasRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
