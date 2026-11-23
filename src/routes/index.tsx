@@ -51,6 +51,7 @@ import {
   exportQuotationUbicacionesBodega1001Csv,
   getWarehouseLocation,
   isMainWarehouseBodega,
+  isDefaultViewBodega,
   isStoreBodega,
   normalizeBodegaName,
   type InventoryRow,
@@ -332,49 +333,65 @@ function Index() {
   }, [query, results, groups]);
 
   const filteredResults = useMemo(() => {
-    if (!hasActiveFilters) return baseList;
+    const isCustomBodegaSelected = selectedBodegas.size > 0;
     const out: ReferenceGroup[] = [];
+
     for (const g of baseList) {
       const firstChar = g.referencia.trim().charAt(0).toUpperCase();
       const okL = selectedLineas.size === 0 || selectedLineas.has(firstChar);
       if (!okL) continue;
 
       const newSaldosPorBodega: Record<string, number> = {};
-      const variantes = g.variantes.map(v => {
-        // Calcular saldo activo de la variante basado en bodegas seleccionadas
-        let activeSaldo = 0;
-        if (selectedBodegas.size === 0) {
-          activeSaldo = v.saldo;
-        } else {
-          for (const b of Array.from(selectedBodegas)) {
-            activeSaldo += (v.saldosPorBodega[b] || 0);
+      const variantes = g.variantes
+        .map((v) => {
+          // Calcular saldo activo de la variante basado en bodegas seleccionadas
+          let activeSaldo = 0;
+          if (isCustomBodegaSelected) {
+            // Usuario activó filtro de bodegas: solo sumar las seleccionadas
+            for (const b of Array.from(selectedBodegas)) {
+              const bNorm = normalizeBodegaName(b);
+              if (disabledBodegasUpper.has(bNorm)) continue;
+              activeSaldo += (v.saldosPorBodega?.[b] || 0);
+            }
+          } else {
+            // Vista principal del inicio por defecto: SOLO bodegas 901 y 1004
+            for (const [b, s] of Object.entries(v.saldosPorBodega || {})) {
+              const bNorm = normalizeBodegaName(b);
+              if (disabledBodegasUpper.has(bNorm)) continue;
+              if (isDefaultViewBodega(b)) {
+                activeSaldo += s;
+              }
+            }
           }
-        }
-        return { ...v, saldo: activeSaldo };
-      }).filter((v) => {
-        if (v.saldo <= 0) return false;
-        const okT = selectedTallas.size === 0 || selectedTallas.has(v.talla);
-        const okC = selectedColores.size === 0 || selectedColores.has(v.color);
-        return okT && okC;
-      });
+          return { ...v, saldo: activeSaldo };
+        })
+        .filter((v) => {
+          if (v.saldo <= 0) return false;
+          const okT = selectedTallas.size === 0 || selectedTallas.has(v.talla);
+          const okC = selectedColores.size === 0 || selectedColores.has(v.color);
+          return okT && okC;
+        });
 
       if (variantes.length === 0) continue;
-      
+
       const newTotalSaldo = variantes.reduce((s, v) => s + v.saldo, 0);
-      
-      // Rebuild bodegas summary for the filtered group
+
+      // Reconstruir saldos por bodega según el alcance activo
       for (const v of variantes) {
-        if (selectedBodegas.size === 0) {
-          for (const [b, s] of Object.entries(v.saldosPorBodega)) {
-            const bNorm = normalizeBodegaName(b);
-            if (disabledBodegasUpper.has(bNorm)) continue;
-            newSaldosPorBodega[b] = (newSaldosPorBodega[b] || 0) + s;
-          }
-        } else {
+        if (isCustomBodegaSelected) {
           for (const b of Array.from(selectedBodegas)) {
             const bNorm = normalizeBodegaName(b);
             if (disabledBodegasUpper.has(bNorm)) continue;
-            newSaldosPorBodega[b] = (newSaldosPorBodega[b] || 0) + (v.saldosPorBodega[b] || 0);
+            newSaldosPorBodega[b] = (newSaldosPorBodega[b] || 0) + (v.saldosPorBodega?.[b] || 0);
+          }
+        } else {
+          // Vista principal por defecto: SOLO bodegas 901 y 1004
+          for (const [b, s] of Object.entries(v.saldosPorBodega || {})) {
+            const bNorm = normalizeBodegaName(b);
+            if (disabledBodegasUpper.has(bNorm)) continue;
+            if (isDefaultViewBodega(b)) {
+              newSaldosPorBodega[b] = (newSaldosPorBodega[b] || 0) + s;
+            }
           }
         }
       }
@@ -406,7 +423,7 @@ function Index() {
       });
     }
     return out;
-  }, [baseList, selectedTallas, selectedColores, selectedLineas, selectedBodegas, hasActiveFilters]);
+  }, [baseList, selectedTallas, selectedColores, selectedLineas, selectedBodegas, disabledBodegasUpper]);
 
   const [visibleCount, setVisibleCount] = useState<number>(30);
 
@@ -620,6 +637,8 @@ function Index() {
                   label="Bodega"
                   options={bodegasOptions}
                   selected={selectedBodegas}
+                  defaultBadge="901 y 1004"
+                  hint="Por defecto se muestran las bodegas 901 y 1004. Marca casillas para ver solo las que selecciones."
                   onToggle={(b) => setSelectedBodegas((prev) => toggle(prev, b))}
                   onClear={() => setSelectedBodegas(new Set())}
                   renderOption={(b) => b.toUpperCase()}
@@ -673,8 +692,8 @@ function Index() {
                     title="No se encontraron referencias"
                     description={
                       query.trim()
-                        ? `No hay ninguna referencia que coincida con «${query}».`
-                        : "No hay referencias que coincidan con los filtros seleccionados."
+                        ? `No hay ninguna referencia con «${query}» en las bodegas ${selectedBodegas.size > 0 ? "seleccionadas" : "901 y 1004"}. Si la prenda está en otra bodega, selecciónala en el filtro de Bodega.`
+                        : `No hay referencias en las bodegas ${selectedBodegas.size > 0 ? "seleccionadas" : "901 y 1004"} que coincidan con los filtros seleccionados.`
                     }
                   />
                 )}
@@ -683,7 +702,7 @@ function Index() {
                 <ReferenceCard
                   key={group.referencia}
                   group={group}
-                  allGroups={groups}
+                  allGroups={filteredResults}
                   disabledBodegasUpper={disabledBodegasUpper}
                   onPreviewImage={setPreviewImage}
                   onPreviewProduct={setPreviewProduct}
@@ -1280,6 +1299,8 @@ function FilterDropdown({
   onToggle,
   onClear,
   renderOption,
+  defaultBadge,
+  hint,
 }: {
   label: string;
   options: string[];
@@ -1287,6 +1308,8 @@ function FilterDropdown({
   onToggle: (value: string) => void;
   onClear: () => void;
   renderOption?: (value: string) => string;
+  defaultBadge?: string;
+  hint?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [filterSearch, setFilterSearch] = useState("");
@@ -1319,11 +1342,15 @@ function FilterDropdown({
       >
         <span>
           {label}
-          {count > 0 && (
+          {count > 0 ? (
             <span className="ml-1.5 rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-bold text-primary-foreground">
               {count}
             </span>
-          )}
+          ) : defaultBadge ? (
+            <span className="ml-1.5 rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground border border-border/60">
+              {defaultBadge}
+            </span>
+          ) : null}
         </span>
         <ChevronDown
           className={`h-4 w-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
@@ -1331,7 +1358,7 @@ function FilterDropdown({
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full z-20 mt-1 w-56 rounded-xl border border-border bg-card p-2 shadow-md">
+        <div className="absolute left-0 top-full z-20 mt-1 w-64 rounded-xl border border-border bg-card p-2 shadow-md">
           <div className="mb-1 flex items-center justify-between px-2 py-1">
             <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
               {label}
@@ -1347,6 +1374,11 @@ function FilterDropdown({
               </button>
             )}
           </div>
+          {hint && (
+            <p className="px-2 pb-1.5 text-[10.5px] leading-tight text-muted-foreground">
+              {hint}
+            </p>
+          )}
           {options.length > 5 && (
             <div className="px-2 pb-1.5 pt-0.5">
               <input

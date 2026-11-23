@@ -47,6 +47,20 @@ export function isMainWarehouseBodega(bodegaName: string): boolean {
   );
 }
 
+/**
+ * Check if a bodega is one of the default warehouses shown on the initial home view
+ * (Bodegas 901 and 1004, including Punto de Venta 901, Principal 1004, and Bodega 1001).
+ */
+export function isDefaultViewBodega(bodegaName?: string | null): boolean {
+  if (!bodegaName) return false;
+  const norm = normalizeBodegaName(bodegaName);
+  return (
+    norm.includes("901") ||
+    norm.includes("1004") ||
+    norm.includes("1001")
+  );
+}
+
 /** Normalize bodega name for robust case- and whitespace-insensitive matching */
 export function normalizeBodegaName(name?: string | null): string {
   if (!name) return "";
