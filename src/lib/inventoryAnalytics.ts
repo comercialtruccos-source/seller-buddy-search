@@ -1,12 +1,24 @@
 import type { InventoryRow } from "./inventory";
+import { extractTallaFromContext, isInvalidTalla } from "./inventory";
 
 // ─── Size Extraction & Normalization ───────────────────────────────
 export function extractNormalizedSize(row: {
   talla?: string;
   tallaLote?: string;
   sku?: string;
+  referencia?: string;
+  codColor?: string;
 }): string {
-  let raw = (row.talla || "").trim().toUpperCase();
+  const decoded = extractTallaFromContext({
+    rawTalla: row.talla,
+    tallaLote: row.tallaLote,
+    sku: row.sku,
+    referencia: row.referencia,
+    codColor: row.codColor,
+  });
+
+  let raw = (decoded || row.talla || "").trim().toUpperCase();
+  if (isInvalidTalla(raw)) raw = "";
 
   // If talla is empty or single dash/generic placeholder, try tallaLote
   if (!raw || raw === "-" || raw === "--" || raw === "0" || raw === "00") {

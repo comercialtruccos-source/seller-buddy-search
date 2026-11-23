@@ -1,4 +1,4 @@
-const CACHE_NAME = 'truccos-cache-v12';
+const CACHE_NAME = 'truccos-cache-v13';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();

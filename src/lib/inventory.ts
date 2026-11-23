@@ -131,6 +131,94 @@ export function getWarehouseLocation(group: ReferenceGroup): string {
   return "";
 }
 
+/**
+ * Detect if a talla value is empty or an Excel error / placeholder (e.g. #N/D, #N/A, #REF!, etc.)
+ */
+export function isInvalidTalla(t?: string | null): boolean {
+  if (!t) return true;
+  const s = String(t).trim().toLowerCase();
+  return (
+    s === "" ||
+    s.startsWith("#") ||
+    s === "n/d" ||
+    s === "n/a" ||
+    s === "null" ||
+    s === "undefined" ||
+    s === "nd"
+  );
+}
+
+/**
+ * Robust multi-tier talla decoder:
+ * 1. Valid raw talla (not #N/D): padded to 2 digits if numeric.
+ * 2. Extracted from tallaLote (e.g. "6[UBIC]AF1C4" -> "06", "7[UBIC]BAZAR" -> "07", "9316" -> "16").
+ * 3. Extracted from SKU and Referencia / CodColor (e.g. SKU "B0102006106586" with ref "B01020061" and col "586" -> "06").
+ */
+export function extractTallaFromContext({
+  rawTalla,
+  tallaLote,
+  sku,
+  referencia,
+  codColor,
+}: {
+  rawTalla?: string | null;
+  tallaLote?: string | null;
+  sku?: string | null;
+  referencia?: string | null;
+  codColor?: string | null;
+}): string {
+  // If rawTalla is valid and not an Excel formula error (#N/D, #N/A)
+  if (!isInvalidTalla(rawTalla)) {
+    const trimmed = String(rawTalla).trim();
+    return /^\d+$/.test(trimmed) ? trimmed.padStart(2, "0") : trimmed.toUpperCase();
+  }
+
+  // 1. Try from tallaLote
+  if (tallaLote) {
+    let cleanLote = String(tallaLote).trim();
+    if (cleanLote.includes("[UBIC]")) {
+      cleanLote = cleanLote.split("[UBIC]")[0].trim();
+    }
+    const parts = cleanLote.split(/[-_\s/]+/);
+    const candidate = parts[0]?.trim();
+    if (!isInvalidTalla(candidate)) {
+      if (/^\d{4}$/.test(candidate)) {
+        const lastTwo = candidate.slice(2);
+        const lastTwoNum = parseInt(lastTwo, 10);
+        if (lastTwoNum >= 4 && lastTwoNum <= 50) {
+          return lastTwo;
+        }
+      }
+      return /^\d+$/.test(candidate) ? candidate.padStart(2, "0") : candidate.toUpperCase();
+    }
+  }
+
+  // 2. Try from SKU and Referencia / CodColor
+  if (sku && referencia && sku.startsWith(referencia)) {
+    const remainder = sku.slice(referencia.length);
+    if (codColor && remainder.endsWith(codColor)) {
+      let extracted = remainder.slice(0, remainder.length - codColor.length);
+      if (/^\d{4,}$/.test(extracted)) {
+        const lastTwo = extracted.slice(-2);
+        const num = parseInt(lastTwo, 10);
+        if (num >= 4 && num <= 50) {
+          extracted = lastTwo;
+        }
+      }
+      if (!isInvalidTalla(extracted)) {
+        return /^\d+$/.test(extracted) ? extracted.padStart(2, "0") : extracted.toUpperCase();
+      }
+    }
+    const m = remainder.match(/^(\d{1,2}|3XL|3XXL|2XL|XXXL|XXL|XL|XS|SM|ML|S|M|L|U|UN)/i);
+    if (m && m[1]) {
+      const extracted = m[1];
+      return /^\d+$/.test(extracted) ? extracted.padStart(2, "0") : extracted.toUpperCase();
+    }
+  }
+
+  return "";
+}
+
 export const STORAGE_DATA_KEY = "inventario_data";
 export const STORAGE_UPDATED_KEY = "inventario_actualizado";
 
@@ -427,17 +515,18 @@ export function parseInventoryCsv(text: string, trm?: number): InventoryRow[] {
 
     const referencia = rawRef;
     const rawTalla = (cols[iTalla] ?? "").trim();
-    let talla = /^\d+$/.test(rawTalla) ? rawTalla.padStart(2, "0") : rawTalla;
-    if (!talla && cols[iTallaLote]) {
-      const parts = (cols[iTallaLote] ?? "").trim().split(/[-_\s/]+/);
-      const ext = parts[0]?.trim();
-      if (ext) {
-        talla = /^\d+$/.test(ext) ? ext.padStart(2, "0") : ext;
-      }
-    }
-
+    const rawTallaLote = cols[iTallaLote] ?? "";
     const rawCodColor = (cols[iCodColor] ?? "").trim();
     const codColor = /^\d+$/.test(rawCodColor) ? rawCodColor.padStart(2, "0") : rawCodColor;
+    const rawSku = (cols[iSku] ?? "").trim();
+
+    const talla = extractTallaFromContext({
+      rawTalla,
+      tallaLote: rawTallaLote,
+      sku: rawSku,
+      referencia,
+      codColor,
+    });
 
     const pvm = toNumber(cols[iPvm]);
     let precioUsd = 0;
@@ -796,13 +885,21 @@ function fromDb(row: InventoryDbRow): InventoryRow {
     ubicaciones = (parts[1] || "").trim();
   }
 
+  const talla = extractTallaFromContext({
+    rawTalla: row.talla,
+    tallaLote: row.talla_lote,
+    sku: row.sku,
+    referencia: row.referencia,
+    codColor: row.cod_color,
+  });
+
   return {
     referencia: row.referencia,
     descripcion: fixMojibake(row.descripcion),
     tallaLote,
     color: fixMojibake(row.color),
     saldo: row.saldo,
-    talla: row.talla,
+    talla,
     codColor: row.cod_color,
     sku: row.sku,
     pvm: row.pvm,
@@ -820,13 +917,21 @@ function toDb(row: InventoryRow): InventoryDbRow {
   // Dual-layer encoding fallback: encode in talla_lote in case remote DB lacks the 'ubicaciones' column
   const encodedTallaLote = ubic ? `${rawTallaLote}[UBIC]${ubic}` : rawTallaLote;
 
+  const talla = extractTallaFromContext({
+    rawTalla: row.talla,
+    tallaLote: row.tallaLote,
+    sku: row.sku,
+    referencia: row.referencia,
+    codColor: row.codColor,
+  });
+
   return {
     referencia: row.referencia,
     descripcion: row.descripcion,
     talla_lote: encodedTallaLote,
     color: row.color,
     saldo: row.saldo,
-    talla: row.talla,
+    talla,
     cod_color: row.codColor,
     sku: row.sku,
     pvm: row.pvm,
