@@ -28,6 +28,8 @@ import {
   buildQuotationData,
   useTipoDescuento,
   setTipoDescuento,
+  useDescuentoFinanciero,
+  setDescuentoFinanciero,
   downloadQuotationExcel,
   downloadQuotationPdf,
   openQuotationPrintView,
@@ -70,6 +72,7 @@ export function CotizadorModal({
   // Currency & calculation state
   const [currency, setCurrency] = useState<QuotationCurrency>("COP");
   const tipoDescuento = useTipoDescuento();
+  const descuentoFinanciero = useDescuentoFinanciero();
   const [copPriceType, setCopPriceType] = useState<CopPriceType>("PVM");
 
   // Metadata state
@@ -106,13 +109,14 @@ export function CotizadorModal({
         currency,
         copPriceType,
         tipoDescuento,
+        descuentoFinanciero,
         customerName,
         advisorName,
         notes,
       },
       inventoryLookup
     );
-  }, [order, currency, copPriceType, tipoDescuento, customerName, advisorName, notes, inventoryLookup]);
+  }, [order, currency, copPriceType, tipoDescuento, descuentoFinanciero, customerName, advisorName, notes, inventoryLookup]);
 
   if (!open) return null;
 
@@ -440,10 +444,46 @@ export function CotizadorModal({
                   </span>
                 </label>
               </div>
+              {/* Opción de Descuento Financiero del 10% Extra */}
+              <div className="mt-3 pt-3 border-t border-border">
+                <label
+                  className={`flex cursor-pointer items-start gap-3 rounded-xl border-2 p-3.5 transition-all ${
+                    descuentoFinanciero
+                      ? "border-sky-500 bg-sky-500/10 shadow-xs"
+                      : "border-border bg-card/60 hover:border-slate-400/50"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 h-4 w-4 accent-sky-600"
+                    checked={descuentoFinanciero}
+                    onChange={(e) => setDescuentoFinanciero(e.target.checked)}
+                  />
+                  <div className="flex-1 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold text-foreground">Descuento financiero del 10%</span>
+                        <span className="rounded-full bg-sky-500/20 text-sky-700 dark:text-sky-300 border border-sky-500/30 px-2 py-0.5 text-[10px] font-extrabold uppercase">
+                          Descuento Extra
+                        </span>
+                      </div>
+                      <span className="block text-[11px] text-muted-foreground">
+                        Aplica 10% sobre el subtotal sin IVA y se resta al precio total de la cotización
+                      </span>
+                    </div>
+                    {descuentoFinanciero && quotation.valorDescuentoFinanciero > 0 && (
+                      <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 shrink-0">
+                        -{quotation.formattedValorDescuentoFinanciero}
+                      </span>
+                    )}
+                  </div>
+                </label>
+              </div>
               <p className="mt-3 text-[11px] text-muted-foreground">
                 {tipoDescuento === "ninguno"
                   ? "Sin casilla marcada se cotiza a precio detal, sin descuento."
-                  : `Aplicado: ${quotation.tierInfo.label}.`}
+                  : `Tarifa base: ${quotation.tierInfo.label}.`}
+                {descuentoFinanciero && " + Descuento financiero del 10% activo (calculado sobre subtotal sin IVA)."}
               </p>
             </div>
           )}
@@ -680,6 +720,12 @@ export function CotizadorModal({
                       <span>Total IVA (19%): </span>
                       <span>{quotation.formattedTotalIva}</span>
                     </div>
+                    {quotation.descuentoFinanciero && quotation.valorDescuentoFinanciero > 0 && (
+                      <div className="text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-1 rounded border border-emerald-200 dark:border-emerald-800">
+                        <span>Dto. Financiero (10%): </span>
+                        <span>-{quotation.formattedValorDescuentoFinanciero}</span>
+                      </div>
+                    )}
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
                         Total Cotización ({currency}):

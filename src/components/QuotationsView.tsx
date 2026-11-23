@@ -371,6 +371,11 @@ export function QuotationsView({
                           {quote.tierBadge}
                         </span>
                       )}
+                      {quote.descuentoFinanciero && (
+                        <span className="inline-flex items-center rounded-md bg-sky-500/15 border border-sky-500/30 text-sky-700 dark:text-sky-300 px-2 py-0.5 text-[11px] font-extrabold">
+                          Dto. Financiero 10%
+                        </span>
+                      )}
                     </div>
 
                     {/* Items snippet */}
@@ -402,6 +407,11 @@ export function QuotationsView({
                         <span className="text-sky-600 dark:text-sky-400 font-semibold">
                           {formatMoney(quote.totalIva)}
                         </span>
+                        {quote.descuentoFinanciero && quote.valorDescuentoFinanciero && quote.valorDescuentoFinanciero > 0 ? (
+                          <span className="text-emerald-600 dark:text-emerald-400 font-bold ml-1">
+                            · Dto. Fin 10%: -{formatMoney(quote.valorDescuentoFinanciero)}
+                          </span>
+                        ) : null}
                       </div>
                       <div className="text-lg lg:text-xl font-black text-foreground">
                         {formatMoney(quote.totalAmount)}

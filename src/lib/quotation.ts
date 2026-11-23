@@ -72,6 +72,45 @@ export function useTipoDescuento(): TipoDescuento {
   );
 }
 
+const CLAVE_DESCUENTO_FINANCIERO = "cotizador_descuento_financiero_v1";
+let descuentoFinancieroActual: boolean = (() => {
+  try {
+    const v = typeof window !== "undefined" ? window.localStorage.getItem(CLAVE_DESCUENTO_FINANCIERO) : null;
+    return v === "true";
+  } catch {
+    return false;
+  }
+})();
+const oyentesDescuentoFinanciero = new Set<() => void>();
+
+export function getDescuentoFinanciero(): boolean {
+  return descuentoFinancieroActual;
+}
+
+export function setDescuentoFinanciero(activo: boolean): void {
+  descuentoFinancieroActual = activo;
+  try {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(CLAVE_DESCUENTO_FINANCIERO, String(activo));
+    }
+  } catch {
+    // sin almacenamiento
+  }
+  oyentesDescuentoFinanciero.forEach((fn) => fn());
+}
+
+/** Hook reactivo para el descuento financiero del 10% */
+export function useDescuentoFinanciero(): boolean {
+  return useSyncExternalStore(
+    (fn) => {
+      oyentesDescuentoFinanciero.add(fn);
+      return () => oyentesDescuentoFinanciero.delete(fn);
+    },
+    () => descuentoFinancieroActual,
+    () => false
+  );
+}
+
 /** Recupera el tipo de descuento de una cotización guardada a partir de su etiqueta */
 export function tipoDescuentoDesdeBadge(badge?: string | null): TipoDescuento {
   const b = (badge || "").toLowerCase();
@@ -191,6 +230,8 @@ export interface QuotationConfig {
   copPriceType?: CopPriceType;
   /** Descuento elegido con las casillas del cotizador (por defecto, la selección actual) */
   tipoDescuento?: TipoDescuento;
+  /** Descuento financiero del 10% aplicado sobre el subtotal sin IVA */
+  descuentoFinanciero?: boolean;
   customerName?: string;
   advisorName?: string;
   notes?: string;
@@ -223,8 +264,13 @@ export interface QuotationData {
   totalDiscount: number; // Ahorro total respecto al detal (0 en mayorista)
   subtotalSinIva: number; // Suma de todos los subtotales de prendas sin IVA
   totalIva: number; // Suma de todas las cantidades del IVA (19%)
-  totalWithIva: number; // Total general con IVA incluido (subtotalSinIva + totalIva)
+  totalWithIva: number; // Total general con IVA incluido (menos descuento financiero si aplica)
   totalAmount: number; // Total general
+  descuentoFinanciero: boolean; // true si aplica el 10% de descuento financiero
+  valorDescuentoFinanciero: number; // 10% del subtotalSinIva
+  totalWithIvaBeforeFinancial: number; // Total antes de restar el descuento financiero
+  formattedValorDescuentoFinanciero: string;
+  formattedTotalOriginal: string;
   subtotalBase: number; // Alias: subtotalSinIva
   subtotalAntesIva: number; // Alias: subtotalSinIva
   formattedSubtotalDetal: string;
@@ -248,7 +294,8 @@ export function calculateQuotationSummary(
     sku?: string;
     referencia?: string;
   }>,
-  tipo: TipoDescuento = getTipoDescuento()
+  tipo: TipoDescuento = getTipoDescuento(),
+  descuentoFinanciero: boolean = getDescuentoFinanciero()
 ) {
   const activeItems = items.filter((it) => (Number(it.cantidad) || 0) > 0);
   const totalUnits = activeItems.reduce((s, it) => s + (Number(it.cantidad) || 0), 0);
@@ -306,19 +353,28 @@ export function calculateQuotationSummary(
     };
   });
 
-  const totalSavings = Math.max(0, subtotalDetal - totalAmount);
+  const totalAmountBeforeFinancial = totalAmount;
+  const valorDescuentoFinanciero = descuentoFinanciero
+    ? Math.round(subtotalSinIva * 0.10)
+    : 0;
+  const finalTotalAmount = Math.max(0, totalAmountBeforeFinancial - valorDescuentoFinanciero);
+  const totalSavings = Math.max(0, subtotalDetal - finalTotalAmount);
 
   return {
     totalUnits,
     tierInfo,
     subtotalDetal,
     subtotalMayorista,
-    totalAmount,
+    totalAmount: finalTotalAmount,
+    totalAmountBeforeFinancial,
     subtotalSinIva,
     totalIva,
     totalSavings,
     totalUsd,
     hasUsdPrices,
+    descuentoFinanciero,
+    valorDescuentoFinanciero,
+    formattedValorDescuentoFinanciero: formatCurrency(valorDescuentoFinanciero),
     itemPrices,
   };
 }
@@ -483,9 +539,17 @@ export function buildQuotationData(
     };
   });
 
+  const descuentoFinanciero = config.descuentoFinanciero ?? getDescuentoFinanciero();
   const subtotalSinIva = itemSummaries.reduce((sum, it) => sum + it.totalLineSinIva, 0);
   const totalIva = itemSummaries.reduce((sum, it) => sum + it.totalLineIva, 0);
-  const totalWithIva = itemSummaries.reduce((sum, it) => sum + it.totalPrice, 0);
+  const totalWithIvaBeforeFinancial = itemSummaries.reduce((sum, it) => sum + it.totalPrice, 0);
+  const valorDescuentoFinanciero = descuentoFinanciero
+    ? (isUsd
+        ? Math.round(subtotalSinIva * 0.10 * 100) / 100
+        : Math.round(subtotalSinIva * 0.10))
+    : 0;
+  const totalWithIva = Math.max(0, totalWithIvaBeforeFinancial - valorDescuentoFinanciero);
+
   const subtotalDetal = itemSummaries.reduce(
     (sum, it) => sum + it.precioDetal * it.cantidad,
     0
@@ -495,7 +559,7 @@ export function buildQuotationData(
     0
   );
   const subtotalCatalogo = isMayorista ? subtotalMayorista : subtotalDetal;
-  const totalDiscount = isUsd || isMayorista ? 0 : Math.max(0, subtotalDetal - totalWithIva);
+  const totalDiscount = isUsd || isMayorista ? 0 : Math.max(0, subtotalDetal - totalWithIvaBeforeFinancial);
   const distinctRefs = new Set(itemSummaries.map((it) => it.referencia)).size;
 
   const formattedSubtotalDetal = formatCurrency(subtotalDetal);
@@ -504,6 +568,8 @@ export function buildQuotationData(
   const formattedTotalDiscount = formatCurrency(totalDiscount);
   const formattedSubtotalSinIva = isUsd ? formatUsd(subtotalSinIva) : formatCurrency(subtotalSinIva);
   const formattedTotalIva = isUsd ? formatUsd(totalIva) : formatCurrency(totalIva);
+  const formattedValorDescuentoFinanciero = isUsd ? formatUsd(valorDescuentoFinanciero) : formatCurrency(valorDescuentoFinanciero);
+  const formattedTotalOriginal = isUsd ? formatUsd(totalWithIvaBeforeFinancial) : formatCurrency(totalWithIvaBeforeFinancial);
   const formattedTotalWithIva = isUsd ? formatUsd(totalWithIva) : formatCurrency(totalWithIva);
 
   return {
@@ -530,6 +596,11 @@ export function buildQuotationData(
     totalIva,
     totalWithIva,
     totalAmount: totalWithIva,
+    descuentoFinanciero,
+    valorDescuentoFinanciero,
+    totalWithIvaBeforeFinancial,
+    formattedValorDescuentoFinanciero,
+    formattedTotalOriginal,
     subtotalBase: subtotalSinIva,
     subtotalAntesIva: subtotalSinIva,
     formattedSubtotalDetal,
@@ -670,6 +741,22 @@ export function downloadQuotationExcel(quotation: QuotationData): void {
     "",
     quotation.totalIva,
   ]);
+  if (quotation.descuentoFinanciero && quotation.valorDescuentoFinanciero > 0) {
+    aoa.push([
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "DESCUENTO FINANCIERO (10%):",
+      "",
+      "",
+      "",
+      -quotation.valorDescuentoFinanciero,
+    ]);
+  }
   aoa.push([
     "",
     "",
@@ -1160,7 +1247,8 @@ export function generateQuotationPdfBlob(quotation: QuotationData): Blob {
       currentY -= totBarH;
 
       currentY -= 14;
-      const sumH = 104;
+      const hasFinDisc = quotation.descuentoFinanciero && quotation.valorDescuentoFinanciero > 0;
+      const sumH = hasFinDisc ? 118 : 104;
       const rightW = 210;
       const leftW = usableWidth - rightW - 12; // 540 - 210 - 12 = 318 pt
       const rightX = marginLeft + leftW + 12; // 366 pt
@@ -1273,18 +1361,29 @@ export function generateQuotationPdfBlob(quotation: QuotationData): Blob {
       const totIvaCardX = rightX + rightW - 12 - totIvaCardStr.length * 5.0;
       s += `BT /F2 9 Tf ${totIvaCardX} ${currentY - 65} Td (${totIvaCardStr}) Tj ET\n`;
 
+      if (hasFinDisc) {
+        // Row 6: DTO. FINANCIERO (10%)
+        s += "0.45 0.88 0.65 rg\n"; // Emerald green
+        s += `BT /F2 7.2 Tf ${rightX + 12} ${currentY - 77} Td (DTO. FINANCIERO (10%):) Tj ET\n`;
+        const finDiscStr = `-${escapePdf(quotation.formattedValorDescuentoFinanciero)}`;
+        const finDiscX = rightX + rightW - 12 - finDiscStr.length * 4.8;
+        s += `BT /F2 8.5 Tf ${finDiscX} ${currentY - 77} Td (${finDiscStr}) Tj ET\n`;
+      }
+
+      const divY = hasFinDisc ? currentY - 88 : currentY - 76;
       // Hairline divider in card
       s += "0.22 0.22 0.28 RG 0.5 w\n";
-      s += `${rightX + 12} ${currentY - 76} m ${rightX + rightW - 12} ${currentY - 76} l S\n`;
+      s += `${rightX + 12} ${divY} m ${rightX + rightW - 12} ${divY} l S\n`;
 
-      // Row 6: Grand Total Cotización (con IVA incluido)
+      // Row 7: Grand Total Cotización (con IVA incluido y restado dto financiero)
+      const grandY = hasFinDisc ? currentY - 104 : currentY - 92;
       s += "0.90 0.90 0.95 rg\n";
-      s += `BT /F2 8 Tf ${rightX + 12} ${currentY - 92} Td (TOTAL COTIZACION:) Tj ET\n`;
+      s += `BT /F2 8 Tf ${rightX + 12} ${grandY} Td (TOTAL COTIZACION:) Tj ET\n`;
 
       s += "1 1 1 rg\n"; // Crisp pure white amount
       const totGrandStr = escapePdf(quotation.formattedTotalWithIva);
       const totGrandX = rightX + rightW - 12 - totGrandStr.length * 7.5;
-      s += `BT /F2 13 Tf ${totGrandX} ${currentY - 93} Td (${totGrandStr}) Tj ET\n`;
+      s += `BT /F2 13 Tf ${totGrandX} ${grandY - 1} Td (${totGrandStr}) Tj ET\n`;
       s += "Q\n";
     }
 
@@ -1755,6 +1854,15 @@ export function openQuotationPrintView(quotation: QuotationData): void {
             <span>TOTAL IVA (19%):</span>
             <strong style="color: #93c5fd; font-size: 13px;">${quotation.formattedTotalIva}</strong>
           </div>
+          ${
+            quotation.descuentoFinanciero && quotation.valorDescuentoFinanciero > 0
+              ? `
+          <div class="row" style="color: #4ade80; font-weight: bold; border-top: 1px dashed #374151; padding-top: 6px; margin-top: 6px;">
+            <span>DTO. FINANCIERO (10%):</span>
+            <strong style="color: #86efac; font-size: 13px;">-${quotation.formattedValorDescuentoFinanciero}</strong>
+          </div>`
+              : ""
+          }
         </div>
         <div>
           <div class="divider"></div>

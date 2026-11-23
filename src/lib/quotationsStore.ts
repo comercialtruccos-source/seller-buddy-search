@@ -53,6 +53,8 @@ export interface SavedQuotation {
   totalIva: number;
   totalAmount: number;
   totalDiscount: number;
+  descuentoFinanciero?: boolean;
+  valorDescuentoFinanciero?: number;
   tierBadge: string;
   status: QuotationStatus;
   items: SavedQuotationItem[];
@@ -232,6 +234,8 @@ export async function saveQuotation(
     totalIva: quotation.totalIva,
     totalAmount: quotation.totalWithIva,
     totalDiscount: quotation.totalDiscount,
+    descuentoFinanciero: quotation.descuentoFinanciero,
+    valorDescuentoFinanciero: quotation.valorDescuentoFinanciero,
     tierBadge: quotation.tierInfo.badge,
     status: quotation.status || status,
     items: mapQuotationItems(quotation.items),

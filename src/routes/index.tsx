@@ -75,6 +75,8 @@ import {
   calculateQuotationSummary,
   useTipoDescuento,
   setTipoDescuento,
+  useDescuentoFinanciero,
+  setDescuentoFinanciero,
 } from "@/lib/quotation";
 
 const colorToHex = (colorStr: string) => {
@@ -837,7 +839,11 @@ function OrderModal({
   const [customerName, setCustomerName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const tipoDescuento = useTipoDescuento();
-  const summary = useMemo(() => calculateQuotationSummary(order, tipoDescuento), [order, tipoDescuento]);
+  const descuentoFinanciero = useDescuentoFinanciero();
+  const summary = useMemo(
+    () => calculateQuotationSummary(order, tipoDescuento, descuentoFinanciero),
+    [order, tipoDescuento, descuentoFinanciero]
+  );
   const { totalUnits: unidades, tierInfo, subtotalDetal, totalAmount, totalSavings, totalUsd } = summary;
 
   const handleExportUbicacionesOrder = (format: "xlsx" | "csv" = "xlsx") => {
@@ -980,6 +986,31 @@ function OrderModal({
                   onChange={(e) => setTipoDescuento(e.target.checked ? "mayorista" : "ninguno")}
                 />
                 Descuento mayorista
+              </label>
+            </div>
+
+            {/* Descuento financiero del 10% extra */}
+            <div className="mt-2">
+              <label className={`flex cursor-pointer items-center justify-between rounded-lg border px-2.5 py-2 text-xs font-semibold transition-colors ${
+                descuentoFinanciero ? "border-sky-500 bg-sky-500/10 text-foreground" : "border-border bg-card text-muted-foreground"
+              }`}>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 accent-sky-600"
+                    checked={descuentoFinanciero}
+                    onChange={(e) => setDescuentoFinanciero(e.target.checked)}
+                  />
+                  <span>Descuento financiero del 10%</span>
+                  <span className="rounded bg-sky-500/20 text-sky-700 dark:text-sky-300 border border-sky-500/30 px-1.5 py-0.2 text-[9px] font-extrabold uppercase">
+                    Extra
+                  </span>
+                </div>
+                {descuentoFinanciero && summary.valorDescuentoFinanciero > 0 && (
+                  <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                    -{formatCurrency(summary.valorDescuentoFinanciero)}
+                  </span>
+                )}
               </label>
             </div>
           </div>
@@ -1138,6 +1169,13 @@ function OrderModal({
               <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-400 font-semibold">
                 <span>Ahorro aplicado ({tierInfo.label}):</span>
                 <span>-{formatCurrency(totalSavings)}</span>
+              </div>
+            )}
+
+            {summary.descuentoFinanciero && summary.valorDescuentoFinanciero > 0 && (
+              <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-400 font-semibold">
+                <span>Dto. Financiero (10% s/subtotal sin IVA):</span>
+                <span>-{formatCurrency(summary.valorDescuentoFinanciero)}</span>
               </div>
             )}
 
