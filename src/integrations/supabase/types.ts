@@ -112,6 +112,99 @@ export type Database = {
           },
         ]
       }
+      cargas_clientes_mora: {
+        Row: {
+          archivo: string
+          created_at: string
+          filas_insertadas: number
+          filas_recibidas: number
+          id: number
+          total_clientes: number
+          total_saldo: number
+          usuario_id: string | null
+        }
+        Insert: {
+          archivo: string
+          created_at?: string
+          filas_insertadas?: number
+          filas_recibidas?: number
+          id?: number
+          total_clientes?: number
+          total_saldo?: number
+          usuario_id?: string | null
+        }
+        Update: {
+          archivo?: string
+          created_at?: string
+          filas_insertadas?: number
+          filas_recibidas?: number
+          id?: number
+          total_clientes?: number
+          total_saldo?: number
+          usuario_id?: string | null
+        }
+        Relationships: []
+      }
+      clientes_mora: {
+        Row: {
+          carga_id: number | null
+          created_at: string
+          cuota: string
+          dias_mora: number
+          documento: string
+          fecha: string | null
+          id: number
+          nombre: string
+          referencia: string | null
+          saldo: number
+          t: string
+          tercero: string
+          tr: string
+          updated_at: string
+          valor: number
+          vence: string | null
+          vendedor: string
+        }
+        Insert: {
+          carga_id?: number | null
+          created_at?: string
+          cuota?: string
+          dias_mora?: number
+          documento?: string
+          fecha?: string | null
+          id?: number
+          nombre?: string
+          referencia?: string | null
+          saldo?: number
+          t?: string
+          tercero?: string
+          tr?: string
+          updated_at?: string
+          valor?: number
+          vence?: string | null
+          vendedor?: string
+        }
+        Update: {
+          carga_id?: number | null
+          created_at?: string
+          cuota?: string
+          dias_mora?: number
+          documento?: string
+          fecha?: string | null
+          id?: number
+          nombre?: string
+          referencia?: string | null
+          saldo?: number
+          t?: string
+          tercero?: string
+          tr?: string
+          updated_at?: string
+          valor?: number
+          vence?: string | null
+          vendedor?: string
+        }
+        Relationships: []
+      }
       inventory: {
         Row: {
           bodega: string
@@ -129,7 +222,6 @@ export type Database = {
           sku: string
           talla: string
           talla_lote: string
-          ubicaciones: string | null
         }
         Insert: {
           bodega?: string
@@ -147,7 +239,6 @@ export type Database = {
           sku?: string
           talla?: string
           talla_lote?: string
-          ubicaciones?: string | null
         }
         Update: {
           bodega?: string
@@ -165,7 +256,6 @@ export type Database = {
           sku?: string
           talla?: string
           talla_lote?: string
-          ubicaciones?: string | null
         }
         Relationships: []
       }
@@ -240,92 +330,161 @@ export type Database = {
         }
         Relationships: []
       }
-      quotations: {
-        Row: {
-          id: string
-          quotation_number: string
-          customer_name: string
-          advisor_name: string
-          notes: string
-          currency: string
-          cop_price_type: string
-          total_units: number
-          total_references: number
-          subtotal_catalogo: number
-          subtotal_sin_iva: number
-          total_iva: number
-          total_amount: number
-          total_discount: number
-          tier_badge: string
-          status: string
-          approved_at: string | null
-          approved_by: string | null
-          order_id: string | null
-          items: Json
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          quotation_number: string
-          customer_name: string
-          advisor_name?: string
-          notes?: string
-          currency?: string
-          cop_price_type?: string
-          total_units?: number
-          total_references?: number
-          subtotal_catalogo?: number
-          subtotal_sin_iva?: number
-          total_iva?: number
-          total_amount?: number
-          total_discount?: number
-          tier_badge?: string
-          status?: string
-          approved_at?: string | null
-          approved_by?: string | null
-          order_id?: string | null
-          items?: Json
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          quotation_number?: string
-          customer_name?: string
-          advisor_name?: string
-          notes?: string
-          currency?: string
-          cop_price_type?: string
-          total_units?: number
-          total_references?: number
-          subtotal_catalogo?: number
-          subtotal_sin_iva?: number
-          total_iva?: number
-          total_amount?: number
-          total_discount?: number
-          tier_badge?: string
-          status?: string
-          approved_at?: string | null
-          approved_by?: string | null
-          order_id?: string | null
-          items?: Json
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "quotations_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
     }
     Views: {
-      [_ in never]: never
+      cargas_cartera_mora: {
+        Row: {
+          archivo: string | null
+          created_at: string | null
+          filas_insertadas: number | null
+          filas_recibidas: number | null
+          id: number | null
+          total_clientes: number | null
+          total_saldo: number | null
+          usuario_id: string | null
+        }
+        Insert: {
+          archivo?: string | null
+          created_at?: string | null
+          filas_insertadas?: number | null
+          filas_recibidas?: number | null
+          id?: number | null
+          total_clientes?: number | null
+          total_saldo?: number | null
+          usuario_id?: string | null
+        }
+        Update: {
+          archivo?: string | null
+          created_at?: string | null
+          filas_insertadas?: number | null
+          filas_recibidas?: number | null
+          id?: number | null
+          total_clientes?: number | null
+          total_saldo?: number | null
+          usuario_id?: string | null
+        }
+        Relationships: []
+      }
+      cartera_clientes_mora: {
+        Row: {
+          carga_id: number | null
+          created_at: string | null
+          cuota: string | null
+          dias_mora: number | null
+          documento: string | null
+          fecha: string | null
+          id: number | null
+          nombre: string | null
+          referencia: string | null
+          saldo: number | null
+          t: string | null
+          tercero: string | null
+          tr: string | null
+          updated_at: string | null
+          valor: number | null
+          vence: string | null
+          vendedor: string | null
+        }
+        Insert: {
+          carga_id?: number | null
+          created_at?: string | null
+          cuota?: string | null
+          dias_mora?: number | null
+          documento?: string | null
+          fecha?: string | null
+          id?: number | null
+          nombre?: string | null
+          referencia?: string | null
+          saldo?: number | null
+          t?: string | null
+          tercero?: string | null
+          tr?: string | null
+          updated_at?: string | null
+          valor?: number | null
+          vence?: string | null
+          vendedor?: string | null
+        }
+        Update: {
+          carga_id?: number | null
+          created_at?: string | null
+          cuota?: string | null
+          dias_mora?: number | null
+          documento?: string | null
+          fecha?: string | null
+          id?: number | null
+          nombre?: string | null
+          referencia?: string | null
+          saldo?: number | null
+          t?: string | null
+          tercero?: string | null
+          tr?: string | null
+          updated_at?: string | null
+          valor?: number | null
+          vence?: string | null
+          vendedor?: string | null
+        }
+        Relationships: []
+      }
+      cartera_mora: {
+        Row: {
+          carga_id: number | null
+          created_at: string | null
+          cuota: string | null
+          dias_mora: number | null
+          documento: string | null
+          fecha: string | null
+          id: number | null
+          nombre: string | null
+          referencia: string | null
+          saldo: number | null
+          t: string | null
+          tercero: string | null
+          tr: string | null
+          updated_at: string | null
+          valor: number | null
+          vence: string | null
+          vendedor: string | null
+        }
+        Insert: {
+          carga_id?: number | null
+          created_at?: string | null
+          cuota?: string | null
+          dias_mora?: number | null
+          documento?: string | null
+          fecha?: string | null
+          id?: number | null
+          nombre?: string | null
+          referencia?: string | null
+          saldo?: number | null
+          t?: string | null
+          tercero?: string | null
+          tr?: string | null
+          updated_at?: string | null
+          valor?: number | null
+          vence?: string | null
+          vendedor?: string | null
+        }
+        Update: {
+          carga_id?: number | null
+          created_at?: string | null
+          cuota?: string | null
+          dias_mora?: number | null
+          documento?: string | null
+          fecha?: string | null
+          id?: number | null
+          nombre?: string | null
+          referencia?: string | null
+          saldo?: number | null
+          t?: string | null
+          tercero?: string | null
+          tr?: string | null
+          updated_at?: string | null
+          valor?: number | null
+          vence?: string | null
+          vendedor?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       api_consume_key: {
@@ -356,6 +515,13 @@ export type Database = {
         Returns: Json
       }
       api_norm: { Args: { t: string }; Returns: string }
+      ingest_clientes_mora: {
+        Args: { payload: Json }
+        Returns: {
+          insertadas: number
+          recibidas: number
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
