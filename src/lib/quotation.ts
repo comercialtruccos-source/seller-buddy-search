@@ -414,10 +414,9 @@ export function buildQuotationData(
     // Los precios de catálogo (PVP y PVM) ya tienen el 19% de IVA incluido
     const basePvp = it.pvp ?? invRow?.pvp ?? it.pvm ?? invRow?.pvm ?? 0;
     const basePvm = it.pvm ?? invRow?.pvm ?? 0;
-    const precioDetal = basePvp > 0 ? basePvp : basePvm;
-    const precioMayorista = basePvm > 0 ? basePvm : precioDetal;
-    // Si la cotización es mayorista (>= 24 unidades), el precio base de catálogo es el precio mayorista
-    const precioBaseCatalogo = isMayorista ? precioMayorista : precioDetal;
+    let precioDetal = basePvp > 0 ? basePvp : basePvm;
+    let precioMayorista = basePvm > 0 ? basePvm : precioDetal;
+    let precioBaseCatalogo = isMayorista ? precioMayorista : precioDetal;
 
     let precioUnitConIva = 0;
     let unitDiscount = 0;
@@ -432,6 +431,10 @@ export function buildQuotationData(
       } else {
         precioUnitConIva = Math.ceil(((basePvm / 1.19 + 1000) / trmFallback) * 100) / 100;
       }
+      // En cotización USD: los precios mayorista, detal y base de catálogo deben ser en DÓLARES (USD)
+      precioMayorista = precioUnitConIva;
+      precioDetal = precioUnitConIva;
+      precioBaseCatalogo = precioUnitConIva;
     } else {
       // En COP el descuento lo define el asesor con las casillas del cotizador
       // (ya no depende de la cantidad de unidades), sobre el precio con IVA incluido:
@@ -451,6 +454,7 @@ export function buildQuotationData(
         unitDiscount = 0;
         discountPercentage = 0;
       }
+      precioBaseCatalogo = isMayorista ? precioMayorista : precioDetal;
     }
 
     // Como los precios de venta detal y mayorista ya tienen IVA incluido:
@@ -562,7 +566,7 @@ export function buildQuotationData(
   const totalDiscount = isUsd || isMayorista ? 0 : Math.max(0, subtotalDetal - totalWithIvaBeforeFinancial);
   const distinctRefs = new Set(itemSummaries.map((it) => it.referencia)).size;
 
-  const formattedSubtotalDetal = formatCurrency(subtotalDetal);
+  const formattedSubtotalDetal = isUsd ? formatUsd(subtotalDetal) : formatCurrency(subtotalDetal);
   const formattedSubtotalMayorista = isUsd ? formatUsd(subtotalMayorista) : formatCurrency(subtotalMayorista);
   const formattedSubtotalCatalogo = isUsd ? formatUsd(subtotalCatalogo) : formatCurrency(subtotalCatalogo);
   const formattedTotalDiscount = formatCurrency(totalDiscount);
